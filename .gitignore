@@ -1,0 +1,24 @@
+# Logs
+bhsi-frontend/logs
+bhsi-frontend/*.log
+bhsi-frontend/npm-debug.log*
+bhsi-frontend/yarn-debug.log*
+bhsi-frontend/yarn-error.log*
+bhsi-frontend/pnpm-debug.log*
+bhsi-frontend/lerna-debug.log*
+
+bhsi-frontend/node_modules
+bhsi-frontend/dist
+bhsi-frontend/dist-ssr
+bhsi-frontend/*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
