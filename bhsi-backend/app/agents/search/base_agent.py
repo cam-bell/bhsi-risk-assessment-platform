@@ -19,9 +19,9 @@ class BaseSearchAgent(ABC):
             await self.session.close()
     
     @abstractmethod
-    async def search(self, query: str) -> List[Dict[str, Any]]:
+    async def search(self, query: str) -> Dict[str, Any]:
         """
-        Perform a search query and return results
+        Perform a search using the specific search agent
         """
         pass
     
