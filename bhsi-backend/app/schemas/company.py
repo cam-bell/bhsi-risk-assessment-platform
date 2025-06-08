@@ -1,5 +1,5 @@
 from typing import Optional, Dict, Any, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 
 
@@ -27,6 +27,8 @@ class CompanyUpdate(CompanyBase):
 
 
 class CompanyInDBBase(CompanyBase):
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     turnover: Optional[str] = None
     shareholding: Optional[str] = None
@@ -41,9 +43,6 @@ class CompanyInDBBase(CompanyBase):
     analysis_summary: Optional[str] = None
     created_at: datetime
     updated_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class CompanyResponse(CompanyInDBBase):

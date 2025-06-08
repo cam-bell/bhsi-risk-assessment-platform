@@ -1,8 +1,8 @@
 from typing import Any, Dict, Optional
 from pydantic_settings import BaseSettings
-from pydantic import PostgresDsn, validator
 import secrets
 from functools import lru_cache
+from pathlib import Path
 
 
 class Settings(BaseSettings):
@@ -15,21 +15,13 @@ class Settings(BaseSettings):
     SECRET_KEY: str = secrets.token_urlsafe(32)
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     
-    # Database
-    DATABASE_URL: Optional[PostgresDsn] = None
-    
-    @validator("DATABASE_URL", pre=True)
-    def assemble_db_connection(cls, v: Optional[str], values: Dict[str, Any]) -> Any:
-        if isinstance(v, str):
-            return v
-        return PostgresDsn.build(
-            scheme="postgresql",
-            user="postgres",
-            password="postgres",
-            host="localhost",
-            port="5432",
-            path="/bhsi_db",
-        )
+    # Database - SQLite configuration with absolute path
+    @property
+    def DATABASE_URL(self) -> str:
+        # Get absolute path to database file
+        backend_dir = Path(__file__).parent.parent  # Go up to bhsi-backend
+        db_path = backend_dir / "app" / "db" / "queue.db"
+        return f"sqlite:///{db_path}"
     
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
