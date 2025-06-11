@@ -198,12 +198,103 @@ class BOEDocumentProcessor:
             # Process the reset documents
             if stats["reset"] > 0:
                 process_stats = self.process_unparsed_documents(batch_size=stats["reset"])
-                stats["processed"] = process_stats.get("created_events", 0)
+                stats["processed"] = process_stats["created_events"]
             
+            logger.info(f"✅ Reprocessing complete: {stats}")
             return stats
             
         finally:
             db.close()
+
+
+class DataProcessor:
+    """Processes search results for company analysis"""
+    
+    def __init__(self):
+        self.logger = logging.getLogger(__name__)
+    
+    def process_search_results(self, search_results: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
+        """
+        Process raw search results into structured data
+        """
+        processed = {
+            "google_results": [],
+            "bing_results": [],
+            "gov_results": [],
+            "news_results": [],
+            "summary": {
+                "total_results": 0,
+                "date_range": None,
+                "key_findings": []
+            }
+        }
+        
+        total_results = 0
+        dates = []
+        key_findings = []
+        
+        # Process each search source
+        for source, results in search_results.items():
+            if not results:
+                continue
+                
+            processed_source_results = []
+            
+            for result in results:
+                if isinstance(result, dict):
+                    # Extract standard fields
+                    processed_result = {
+                        "title": result.get("title", ""),
+                        "url": result.get("url", ""),
+                        "snippet": result.get("snippet", result.get("description", "")),
+                        "source": source,
+                        "date": result.get("date", result.get("published_date"))
+                    }
+                    
+                    processed_source_results.append(processed_result)
+                    total_results += 1
+                    
+                    # Collect dates
+                    if processed_result["date"]:
+                        dates.append(processed_result["date"])
+                    
+                    # Extract key findings
+                    if processed_result["title"]:
+                        key_findings.append(processed_result["title"])
+            
+            # Store results by source
+            if source.lower() in ["google", "google_agent"]:
+                processed["google_results"] = processed_source_results
+            elif source.lower() in ["bing", "bing_agent"]:
+                processed["bing_results"] = processed_source_results
+            elif source.lower() in ["gov", "government", "boe"]:
+                processed["gov_results"] = processed_source_results
+            elif source.lower() in ["news", "news_agent"]:
+                processed["news_results"] = processed_source_results
+        
+        # Generate summary
+        processed["summary"]["total_results"] = total_results
+        processed["summary"]["key_findings"] = key_findings[:10]  # Top 10 findings
+        
+        if dates:
+            processed["summary"]["date_range"] = {
+                "earliest": min(dates),
+                "latest": max(dates)
+            }
+        
+        return processed
+    
+    def format_for_storage(self, processed_results: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Format processed results for database storage
+        """
+        return {
+            "google_results": json.dumps(processed_results.get("google_results", [])),
+            "bing_results": json.dumps(processed_results.get("bing_results", [])),
+            "gov_results": json.dumps(processed_results.get("gov_results", [])),
+            "news_results": json.dumps(processed_results.get("news_results", [])),
+            "analysis_summary": json.dumps(processed_results.get("summary", {}))
+        }
 
 
 # CLI interface
