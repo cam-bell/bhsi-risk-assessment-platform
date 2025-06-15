@@ -44,6 +44,15 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     LOG_FORMAT: str = "json"
     
+    # NewsAPI settings
+    NEWS_API_KEY: str = "d191eaacfc0c47118a582d23e35e9c63"  # Your NewsAPI key
+    NEWS_API_RATE_LIMIT: int = 100  # Maximum requests per day
+    NEWS_API_CACHE_TTL: int = 3600  # Cache time in seconds
+    
+    # LLM settings
+    USE_OLLAMA: bool = True
+    OLLAMA_MODEL: str = "llama3:latest"
+    
     class Config:
         case_sensitive = True
         env_file = ".env"

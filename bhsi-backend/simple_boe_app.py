@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 import uvicorn
 import datetime
+from app.agents.search.orchestrator import SearchOrchestrator
 
 # Import the BOE search function directly
 from app.agents.search.BOE import search_boe_for_company, fetch_boe_summary, iter_items, tag_risk, full_text, entities
@@ -34,6 +35,22 @@ class CompanySearchRequest(BaseModel):
     start_date: Optional[str] = None  # Format: YYYYMMDD
     end_date: Optional[str] = None    # Format: YYYYMMDD
     days_back: Optional[int] = 7      # Alternative: search last N days
+
+class NewsSearchRequest(BaseModel):
+    company_name: str
+    start_date: Optional[str] = None  # Format: YYYY-MM-DD
+    end_date: Optional[str] = None    # Format: YYYY-MM-DD
+    days_back: Optional[int] = 7      # Alternative: search last N days
+    page: Optional[int] = 1
+    page_size: Optional[int] = 20
+
+class UnifiedSearchRequest(BaseModel):
+    company_name: str
+    start_date: Optional[str] = None  # Format: YYYY-MM-DD
+    end_date: Optional[str] = None    # Format: YYYY-MM-DD
+    days_back: Optional[int] = 7      # Alternative: search last N days
+    include_boe: bool = True
+    include_news: bool = True
 
 @app.get("/")
 async def root():
@@ -171,16 +188,89 @@ async def search_company_unlimited(
         raise HTTPException(status_code=500, detail=f"Error searching for {company_name}: {str(e)}")
 
 @app.post("/search")
-async def search_company_post(request: CompanySearchRequest):
+async def unified_search(request: UnifiedSearchRequest):
     """
-    Search for a company via POST method
+    Unified search endpoint that combines BOE and news search
+    
+    - **company_name**: Name of the company to search for
+    - **start_date**: Start date in YYYY-MM-DD format (optional)
+    - **end_date**: End date in YYYY-MM-DD format (optional)
+    - **days_back**: Search last N days if dates not specified (default: 7)
+    - **include_boe**: Whether to include BOE results (default: True)
+    - **include_news**: Whether to include news results (default: True)
+    
+    Returns combined results from both sources with risk assessment
     """
-    return await search_company_unlimited(
-        company_name=request.company_name,
-        start_date=request.start_date,
-        end_date=request.end_date,
-        days_back=request.days_back
-    )
+    try:
+        orchestrator = SearchOrchestrator()
+        
+        # Configure which agents to use
+        active_agents = []
+        if request.include_boe:
+            active_agents.append("boe")
+        if request.include_news:
+            active_agents.append("newsapi")
+            
+        if not active_agents:
+            raise HTTPException(
+                status_code=400,
+                detail="At least one source (BOE or news) must be enabled"
+            )
+        
+        results = await orchestrator.search_all(
+            query=request.company_name,
+            start_date=request.start_date,
+            end_date=request.end_date,
+            days_back=request.days_back,
+            active_agents=active_agents
+        )
+        
+        # Combine and sort results by date
+        all_results = []
+        for source, source_results in results.items():
+            if source == "boe":
+                for result in source_results.get("results", []):
+                    all_results.append({
+                        "source": "BOE",
+                        "date": result.get("date"),
+                        "title": result.get("title"),
+                        "summary": result.get("summary"),
+                        "risk_level": result.get("risk_level"),
+                        "confidence": result.get("confidence"),
+                        "url": result.get("url")
+                    })
+            elif source == "newsapi":
+                for result in source_results.get("articles", []):
+                    # Defensive: use published_at or fallback to today if missing
+                    date_val = result.get("published_at") or datetime.datetime.now().strftime("%Y-%m-%d")
+                    all_results.append({
+                        "source": "News",
+                        "date": date_val,
+                        "title": result.get("title"),
+                        "summary": result.get("description"),
+                        "risk_level": result.get("risk_level"),
+                        "confidence": result.get("confidence"),
+                        "url": result.get("url")
+                    })
+        
+        # Remove results with None dates (just in case)
+        all_results = [r for r in all_results if r.get("date")]
+        # Sort by date, most recent first
+        all_results.sort(key=lambda x: x["date"], reverse=True)
+        
+        return {
+            "company_name": request.company_name,
+            "search_date": datetime.datetime.now().isoformat(),
+            "date_range": {
+                "start": request.start_date,
+                "end": request.end_date,
+                "days_back": request.days_back
+            },
+            "results": all_results
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error in unified search: {str(e)}")
 
 def generate_date_range(start_date: str, end_date: str) -> List[str]:
     """Generate list of dates between start_date and end_date"""
@@ -199,6 +289,59 @@ def generate_date_range(start_date: str, end_date: str) -> List[str]:
 async def health_check():
     """Simple health check"""
     return {"status": "healthy", "message": "BOE Company Search API is running"}
+
+@app.get("/news/{company_name}")
+async def search_company_news(
+    company_name: str,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    days_back: Optional[int] = 7,
+    page: Optional[int] = 1,
+    page_size: Optional[int] = 20
+):
+    """
+    Search for news articles about a company
+    
+    - **company_name**: Name of the company to search for
+    - **start_date**: Start date in YYYY-MM-DD format (optional)
+    - **end_date**: End date in YYYY-MM-DD format (optional)
+    - **days_back**: Search last N days if dates not specified (default: 7)
+    - **page**: Page number for pagination (default: 1)
+    - **page_size**: Number of results per page (default: 20, max: 100)
+    
+    Returns news articles with risk assessment
+    """
+    try:
+        orchestrator = SearchOrchestrator()
+        results = await orchestrator.search_all(
+            query=company_name,
+            start_date=start_date,
+            end_date=end_date,
+            days_back=days_back
+        )
+        
+        return {
+            "company_name": company_name,
+            "search_date": datetime.datetime.now().isoformat(),
+            "results": results
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error searching news for {company_name}: {str(e)}")
+
+@app.post("/news")
+async def search_company_news_post(request: NewsSearchRequest):
+    """
+    Search for news articles via POST method
+    """
+    return await search_company_news(
+        company_name=request.company_name,
+        start_date=request.start_date,
+        end_date=request.end_date,
+        days_back=request.days_back,
+        page=request.page,
+        page_size=request.page_size
+    )
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8001, log_level="info") 

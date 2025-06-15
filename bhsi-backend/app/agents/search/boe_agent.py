@@ -6,11 +6,16 @@ BOE Ingestion Agent - Fetches raw BOE data and stores in landing zone
 import json
 import logging
 import requests
-import datetime
+from datetime import datetime, timedelta
 import sys
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from sqlalchemy.orm import Session
+import aiohttp
+from app.agents.search.base_agent import BaseSearchAgent
+from app.core.config import settings
+from app.agents.analysis.classifier import RiskClassifier
+from app.agents.search.BOE import fetch_boe_summary, iter_items, full_text
 
 # Add the backend directory to Python path for imports
 current_dir = Path(__file__).parent
@@ -20,32 +25,93 @@ sys.path.insert(0, str(backend_dir))
 from app.db.session import SessionLocal
 from app.crud.raw_docs import raw_docs
 
-# Import BOE functions - use absolute import to work when run directly
-try:
-    from app.agents.search.BOE import fetch_boe_summary, iter_items
-except ImportError:
-    # Fallback for when running script directly
-    from BOE import fetch_boe_summary, iter_items
-
 logger = logging.getLogger(__name__)
 
 
-class BOEIngestionAgent:
-    """Focused BOE ingestion agent - fetch and store raw documents"""
+class BOEIngestionAgent(BaseSearchAgent):
+    """BOE API integration for Spanish official gazette search (robust, decoupled)"""
     
     def __init__(self):
+        super().__init__()
+        self.classifier = RiskClassifier()
         self.source = "BOE"
-        self._ensure_database()
     
-    def _ensure_database(self):
-        """Ensure database tables exist"""
+    async def search(
+        self,
+        query: str,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        days_back: Optional[int] = 7
+    ) -> Dict[str, Any]:
+        """
+        Search for BOE documents about a company using robust, proven logic.
+        """
         try:
-            from app.db.init_db import init_database
-            # Try to create tables if they don't exist
-            init_database()
+            # Determine date range
+            if not start_date or not end_date:
+                end_date = datetime.now().strftime("%Y-%m-%d")
+                start_date = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%d")
+            
+            results = []
+            errors = []
+            current_date = datetime.strptime(start_date, "%Y-%m-%d")
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+            while current_date <= end_dt:
+                date_str = current_date.strftime("%Y%m%d")
+                try:
+                    summary = fetch_boe_summary(date_str)
+                    for item in iter_items(summary):
+                        try:
+                            title = item.get("titulo", "")
+                            # Check if company name appears in title or text
+                            if query.lower() in title.lower():
+                                text = full_text(item)
+                                classification = await self.classifier.classify_text(
+                                    text=text,
+                                    title=title,
+                                    source="BOE",
+                                    section=item.get("seccion_codigo", "")
+                                )
+                                processed_doc = {
+                                    "identificador": item.get("identificador", "Unknown"),
+                                    "title": title,
+                                    "section": item.get("seccion_codigo", ""),
+                                    "date": item.get("fecha_publicacion", current_date.strftime("%Y-%m-%d")),
+                                    "url": item.get("url_html", ""),
+                                    "content": text,
+                                    "risk_level": classification["label"],
+                                    "confidence": classification["confidence"],
+                                    "classification_reason": classification["reason"],
+                                    "classification_method": classification["method"]
+                                }
+                                results.append(processed_doc)
+                        except Exception as e:
+                            logger.error(f"Error processing BOE item: {e}")
+                            errors.append(str(e))
+                except Exception as e:
+                    logger.error(f"Error fetching/parsing BOE for {date_str}: {e}")
+                    errors.append(f"{date_str}: {e}")
+                current_date += timedelta(days=1)
+            return {
+                "search_summary": {
+                    "query": query,
+                    "date_range": f"{start_date} to {end_date}",
+                    "total_results": len(results),
+                    "errors": errors
+                },
+                "results": results
+            }
         except Exception as e:
-            logger.warning(f"Database initialization check: {e}")
-            # Continue anyway - tables might already exist
+            logger.error(f"Error processing BOE results: {e}")
+            return {
+                "search_summary": {
+                    "query": query,
+                    "date_range": f"{start_date} to {end_date}",
+                    "total_results": 0,
+                    "errors": [str(e)]
+                },
+                "results": []
+            }
     
     def ingest_boe_day(self, date_str: Optional[str] = None) -> Dict[str, Any]:
         """
