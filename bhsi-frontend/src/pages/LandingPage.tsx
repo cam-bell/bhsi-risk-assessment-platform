@@ -2,7 +2,6 @@ import { Box, Container, Typography, useMediaQuery, AppBar, Toolbar, Button } fr
 import { useTheme } from '@mui/material/styles';
 import { LogOut } from 'lucide-react';
 import { useAuth } from '../auth/useAuth';
-import StatsCards from '../components/StatsCards';
 import TrafficLightQuery from '../components/TrafficLightQuery';
 
 const LandingPage = () => {
@@ -73,19 +72,8 @@ const LandingPage = () => {
 
       {/* Main Content */}
       <Container maxWidth="lg" sx={{ py: 6, flex: 1 }}>
-        {/* Stats Section */}
-        <Typography
-          variant="h4"
-          component="h2"
-          gutterBottom
-          sx={{ mb: 3, textAlign: { xs: 'center', md: 'left' } }}
-        >
-          BHSI at a Glance
-        </Typography>
-        <StatsCards />
-
         {/* Traffic Light Query Section */}
-        <Box sx={{ mt: 8 }}>
+        <Box>
           <Typography
             variant="h4"
             component="h2"
