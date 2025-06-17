@@ -1,19 +1,24 @@
-from typing import Dict, Any, List, Optional
-from app.agents.search.base_agent import BaseSearchAgent
-from app.agents.search.boe_agent import BOEIngestionAgent
-from app.agents.search.newsapi_agent import NewsAPIAgent
+#!/usr/bin/env python3
+"""
+Streamlined Search Orchestrator - Fast search without classification during search
+"""
+
 import logging
+from typing import Dict, Any, List, Optional
+from app.agents.search.streamlined_boe_agent import StreamlinedBOEAgent
+from app.agents.search.streamlined_newsapi_agent import StreamlinedNewsAPIAgent
 
 logger = logging.getLogger(__name__)
 
-class SearchOrchestrator:
-    """Orchestrates multiple search agents"""
+
+class StreamlinedSearchOrchestrator:
+    """Ultra-fast search orchestrator - data fetching only, classification happens later"""
     
     def __init__(self):
-        """Initialize search agents"""
+        """Initialize streamlined search agents"""
         self.agents = {
-            "boe": BOEIngestionAgent(),
-            "newsapi": NewsAPIAgent()
+            "boe": StreamlinedBOEAgent(),
+            "newsapi": StreamlinedNewsAPIAgent()
         }
     
     async def search_all(
@@ -25,17 +30,7 @@ class SearchOrchestrator:
         active_agents: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         """
-        Search across all active agents
-        
-        Args:
-            query: Search query
-            start_date: Start date in YYYY-MM-DD format
-            end_date: End date in YYYY-MM-DD format
-            days_back: Number of days to look back if dates not specified
-            active_agents: List of agent names to use (default: all agents)
-            
-        Returns:
-            Dict containing results from all agents
+        FAST search across all active agents - no classification during search
         """
         results = {}
         
@@ -43,7 +38,9 @@ class SearchOrchestrator:
         if active_agents is None:
             active_agents = list(self.agents.keys())
         
-        # Search with each active agent
+        logger.info(f"🔍 Streamlined search: '{query}' using {active_agents}")
+        
+        # Search with each active agent in parallel if possible
         for agent_name in active_agents:
             if agent_name not in self.agents:
                 logger.warning(f"Unknown agent: {agent_name}")
@@ -58,7 +55,15 @@ class SearchOrchestrator:
                     days_back=days_back
                 )
                 results[agent_name] = agent_results
-                logger.info(f"✅ {agent_name} search completed successfully")
+                
+                result_count = 0
+                if agent_name == "boe":
+                    result_count = len(agent_results.get("results", []))
+                elif agent_name == "newsapi":
+                    result_count = len(agent_results.get("articles", []))
+                
+                logger.info(f"✅ {agent_name}: {result_count} results")
+                
             except Exception as e:
                 logger.error(f"❌ {agent_name} search failed: {e}")
                 results[agent_name] = {
@@ -66,7 +71,8 @@ class SearchOrchestrator:
                     "search_summary": {
                         "query": query,
                         "date_range": f"{start_date} to {end_date}",
-                        "total_results": 0
+                        "total_results": 0,
+                        "errors": [str(e)]
                     }
                 }
         

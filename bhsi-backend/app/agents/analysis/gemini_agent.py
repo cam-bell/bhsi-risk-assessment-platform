@@ -2,13 +2,22 @@ from typing import List, Dict, Any
 import google.generativeai as genai
 from app.core.config import settings
 from ..search.base_agent import BaseSearchAgent
+from google.cloud import aiplatform
+from config.gcp_config import VERTEX_AI_LOCATION, GEMINI_ENDPOINT_ID, PROJECT_ID
 
 
 class GeminiAgent:
     def __init__(self):
         self.api_key = settings.GEMINI_API_KEY
         genai.configure(api_key=self.api_key)
-        self.model = genai.GenerativeModel('gemini-pro')
+        
+        # Initialize Vertex AI
+        aiplatform.init(project=PROJECT_ID, location=VERTEX_AI_LOCATION)
+        
+        # Get the endpoint
+        self.endpoint = aiplatform.Endpoint(
+            endpoint_name=f"projects/{PROJECT_ID}/locations/{VERTEX_AI_LOCATION}/endpoints/{GEMINI_ENDPOINT_ID}"
+        )
         
         # Define risk assessment criteria
         self.risk_criteria = {

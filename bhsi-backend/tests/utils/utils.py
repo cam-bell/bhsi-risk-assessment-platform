@@ -28,8 +28,46 @@ def create_random_user(db: Session) -> Dict:
 
 def get_test_company_data() -> Dict:
     return {
-        "name": "Test Company",
-        "description": "A test company for automated testing"
+        "company_name": "Test Company",
+        "days_back": 7,
+        "include_boe": True,
+        "include_news": False  # Avoid API costs in tests
+    }
+
+
+def get_test_search_response() -> Dict:
+    return {
+        "company_name": "Test Company",
+        "search_date": "2025-06-17T14:30:45.123Z",
+        "date_range": {
+            "start": "2025-06-10",
+            "end": "2025-06-17", 
+            "days_back": 7
+        },
+        "results": [],
+        "metadata": {
+            "total_results": 0,
+            "boe_results": 0,
+            "news_results": 0,
+            "high_risk_results": 0,
+            "sources_searched": ["boe"]
+        },
+        "performance": {
+            "total_time_seconds": "0.15",
+            "search_time_seconds": "0.10", 
+            "classification_time_seconds": "0.05",
+            "keyword_efficiency": "100.0%",
+            "llm_usage": "0.0%"
+        }
+    }
+
+
+def get_test_classification_data() -> Dict:
+    return {
+        "text": "Concurso de acreedores de la empresa",
+        "title": "Test Document",
+        "source": "BOE",
+        "section": "JUS"
     }
 
 

@@ -1,15 +1,29 @@
 #!/bin/bash
 
-# Activate virtual environment if it exists
+echo "🚀 Starting BHSI Corporate Risk Assessment API (Production)..."
+
+# Activate virtual environment
 if [ -d "venv" ]; then
+    echo "🔌 Activating virtual environment..."
     source venv/bin/activate
 fi
 
 # Install dependencies
+echo "📚 Installing dependencies..."
 pip install -r requirements.txt
 
-# Run database migrations
-alembic upgrade head
+# Start the application with Gunicorn for production
+echo "🎯 Starting production server on http://0.0.0.0:8000"
+echo "📖 API Documentation available at http://localhost:8000/docs"
+echo "🔍 Main search endpoint: POST http://localhost:8000/api/v1/search"
+echo ""
 
-# Start the FastAPI application with uvicorn in production mode
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4 --log-level info 
+# Use Gunicorn for production deployment
+gunicorn main:app \
+    --bind 0.0.0.0:8000 \
+    --workers 4 \
+    --worker-class uvicorn.workers.UvicornWorker \
+    --timeout 120 \
+    --keep-alive 5 \
+    --max-requests 1000 \
+    --preload 
