@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Box,
   AppBar,
@@ -17,7 +17,7 @@ import {
   Badge,
   useTheme,
   useMediaQuery,
-} from '@mui/material';
+} from "@mui/material";
 import {
   Menu as MenuIcon,
   BarChart3 as Dashboard,
@@ -29,10 +29,10 @@ import {
   Bell,
   LogOut,
   User,
-} from 'lucide-react';
-import { useAuth } from '../auth/useAuth';
-import { NotificationCenter } from './NotificationSystem';
-import { useNavigate, useLocation } from 'react-router-dom';
+} from "lucide-react";
+import { useAuth } from "../auth/useAuth";
+import { NotificationCenter } from "./NotificationSystem";
+import { useNavigate, useLocation } from "react-router-dom";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -40,23 +40,30 @@ interface LayoutProps {
 }
 
 const navigationItems = [
-  { id: 'dashboard', label: 'Dashboard', icon: Dashboard, path: '/dashboard' },
-  { id: 'search', label: 'Risk Assessment', icon: Search, path: '/' },
-  { id: 'batch', label: 'Batch Upload', icon: FileUp, path: '/batch' },
-  { id: 'history', label: 'Assessment History', icon: History, path: '/history' },
-  { id: 'settings', label: 'Settings', icon: Settings, path: '/settings' },
-  { id: 'help', label: 'Help & Support', icon: HelpCircle, path: '/help' },
+  { id: "dashboard", label: "Dashboard", icon: Dashboard, path: "/dashboard" },
+  { id: "search", label: "Risk Assessment", icon: Search, path: "/" },
+  { id: "batch", label: "Batch Upload", icon: FileUp, path: "/batch" },
+  {
+    id: "history",
+    label: "Assessment History",
+    icon: History,
+    path: "/history",
+  },
+  { id: "settings", label: "Settings", icon: Settings, path: "/settings" },
+  { id: "help", label: "Help & Support", icon: HelpCircle, path: "/help" },
 ];
 
-const Layout = ({ children, currentPage = 'search' }: LayoutProps) => {
+const Layout = ({ children, currentPage = "search" }: LayoutProps) => {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  
+
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
+  const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(
+    null
+  );
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -75,6 +82,16 @@ const Layout = ({ children, currentPage = 'search' }: LayoutProps) => {
     logout();
   };
 
+  const handleProfileClick = () => {
+    handleUserMenuClose();
+    navigate("/profile");
+  };
+
+  const handleSettingsClick = () => {
+    handleUserMenuClose();
+    navigate("/settings");
+  };
+
   const handleNavigation = (path: string) => {
     navigate(path);
     if (isMobile) {
@@ -84,21 +101,21 @@ const Layout = ({ children, currentPage = 'search' }: LayoutProps) => {
 
   // Determine current page from location
   const getCurrentPage = () => {
-    if (location.pathname === '/dashboard') return 'dashboard';
-    if (location.pathname === '/') return 'search';
-    if (location.pathname === '/batch') return 'batch';
-    if (location.pathname === '/history') return 'history';
-    if (location.pathname === '/settings') return 'settings';
-    if (location.pathname === '/help') return 'help';
+    if (location.pathname === "/dashboard") return "dashboard";
+    if (location.pathname === "/") return "search";
+    if (location.pathname === "/batch") return "batch";
+    if (location.pathname === "/history") return "history";
+    if (location.pathname === "/settings") return "settings";
+    if (location.pathname === "/help") return "help";
     return currentPage;
   };
 
   const drawerWidth = 280;
 
   const drawer = (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
       {/* Logo Section */}
-      <Box sx={{ p: 3, bgcolor: 'primary.main', color: 'white' }}>
+      <Box sx={{ p: 3, bgcolor: "primary.main", color: "white" }}>
         <Typography variant="h6" fontWeight="bold">
           BHSI
         </Typography>
@@ -112,7 +129,7 @@ const Layout = ({ children, currentPage = 'search' }: LayoutProps) => {
         {navigationItems.map((item) => {
           const Icon = item.icon;
           const isActive = getCurrentPage() === item.id;
-          
+
           return (
             <ListItem
               key={item.id}
@@ -120,22 +137,24 @@ const Layout = ({ children, currentPage = 'search' }: LayoutProps) => {
               sx={{
                 borderRadius: 2,
                 mb: 0.5,
-                bgcolor: isActive ? 'primary.light' : 'transparent',
-                color: isActive ? 'white' : 'inherit',
-                '&:hover': {
-                  bgcolor: isActive ? 'primary.light' : 'grey.100',
+                bgcolor: isActive ? "primary.light" : "transparent",
+                color: isActive ? "white" : "inherit",
+                "&:hover": {
+                  bgcolor: isActive ? "primary.light" : "grey.100",
                 },
-                cursor: 'pointer',
-                transition: 'all 0.2s ease-in-out',
+                cursor: "pointer",
+                transition: "all 0.2s ease-in-out",
               }}
             >
-              <ListItemIcon sx={{ color: isActive ? 'white' : 'inherit', minWidth: 40 }}>
+              <ListItemIcon
+                sx={{ color: isActive ? "white" : "inherit", minWidth: 40 }}
+              >
                 <Icon size={20} />
               </ListItemIcon>
               <ListItemText
                 primary={item.label}
                 primaryTypographyProps={{
-                  fontSize: '0.9rem',
+                  fontSize: "0.9rem",
                   fontWeight: isActive ? 600 : 400,
                 }}
               />
@@ -145,17 +164,19 @@ const Layout = ({ children, currentPage = 'search' }: LayoutProps) => {
       </List>
 
       {/* User Info Section */}
-      <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-          <Avatar sx={{ width: 32, height: 32, mr: 2, bgcolor: 'primary.main' }}>
-            {user?.name?.charAt(0).toUpperCase() || 'U'}
+      <Box sx={{ p: 2, borderTop: 1, borderColor: "divider" }}>
+        <Box sx={{ display: "flex", alignItems: "center" }}>
+          <Avatar
+            sx={{ width: 32, height: 32, mr: 2, bgcolor: "primary.main" }}
+          >
+            {user?.name?.charAt(0).toUpperCase() || "U"}
           </Avatar>
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography variant="body2" fontWeight={500} noWrap>
-              {user?.name || 'User'}
+              {user?.name || "User"}
             </Typography>
             <Typography variant="caption" color="text.secondary" noWrap>
-              {user?.email || 'user@bhsi.com'}
+              {user?.email || "user@bhsi.com"}
             </Typography>
           </Box>
         </Box>
@@ -164,15 +185,15 @@ const Layout = ({ children, currentPage = 'search' }: LayoutProps) => {
   );
 
   return (
-    <Box sx={{ display: 'flex', height: '100vh' }}>
+    <Box sx={{ display: "flex", height: "100vh" }}>
       {/* App Bar */}
       <AppBar
         position="fixed"
         sx={{
           width: { md: `calc(100% - ${drawerWidth}px)` },
           ml: { md: `${drawerWidth}px` },
-          bgcolor: 'white',
-          color: 'text.primary',
+          bgcolor: "white",
+          color: "text.primary",
           boxShadow: 1,
         }}
       >
@@ -182,13 +203,14 @@ const Layout = ({ children, currentPage = 'search' }: LayoutProps) => {
             aria-label="open drawer"
             edge="start"
             onClick={handleDrawerToggle}
-            sx={{ mr: 2, display: { md: 'none' } }}
+            sx={{ mr: 2, display: { md: "none" } }}
           >
             <MenuIcon />
           </IconButton>
-          
+
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            {navigationItems.find(item => item.id === getCurrentPage())?.label || 'Risk Assessment'}
+            {navigationItems.find((item) => item.id === getCurrentPage())
+              ?.label || "Risk Assessment"}
           </Typography>
 
           {/* Notifications */}
@@ -200,25 +222,25 @@ const Layout = ({ children, currentPage = 'search' }: LayoutProps) => {
             color="inherit"
             sx={{ ml: 1 }}
           >
-            <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }}>
-              {user?.name?.charAt(0).toUpperCase() || 'U'}
+            <Avatar sx={{ width: 32, height: 32, bgcolor: "primary.main" }}>
+              {user?.name?.charAt(0).toUpperCase() || "U"}
             </Avatar>
           </IconButton>
-          
+
           <Menu
             anchorEl={userMenuAnchor}
             open={Boolean(userMenuAnchor)}
             onClose={handleUserMenuClose}
-            transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-            anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+            transformOrigin={{ horizontal: "right", vertical: "top" }}
+            anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
           >
-            <MenuItem onClick={handleUserMenuClose}>
+            <MenuItem onClick={handleProfileClick}>
               <ListItemIcon>
                 <User size={20} />
               </ListItemIcon>
               <ListItemText>Profile</ListItemText>
             </MenuItem>
-            <MenuItem onClick={handleUserMenuClose}>
+            <MenuItem onClick={handleSettingsClick}>
               <ListItemIcon>
                 <Settings size={20} />
               </ListItemIcon>
@@ -241,13 +263,13 @@ const Layout = ({ children, currentPage = 'search' }: LayoutProps) => {
         sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}
       >
         <Drawer
-          variant={isMobile ? 'temporary' : 'permanent'}
+          variant={isMobile ? "temporary" : "permanent"}
           open={isMobile ? mobileOpen : true}
           onClose={handleDrawerToggle}
           ModalProps={{ keepMounted: true }}
           sx={{
-            '& .MuiDrawer-paper': {
-              boxSizing: 'border-box',
+            "& .MuiDrawer-paper": {
+              boxSizing: "border-box",
               width: drawerWidth,
               borderRight: 0,
               boxShadow: 2,
@@ -264,8 +286,8 @@ const Layout = ({ children, currentPage = 'search' }: LayoutProps) => {
         sx={{
           flexGrow: 1,
           width: { md: `calc(100% - ${drawerWidth}px)` },
-          bgcolor: 'grey.50',
-          minHeight: '100vh',
+          bgcolor: "grey.50",
+          minHeight: "100vh",
         }}
       >
         <Toolbar /> {/* Spacer for fixed AppBar */}
@@ -275,4 +297,4 @@ const Layout = ({ children, currentPage = 'search' }: LayoutProps) => {
   );
 };
 
-export default Layout; 
+export default Layout;

@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Optional
 from pydantic_settings import BaseSettings
 import secrets
 from functools import lru_cache
@@ -52,10 +52,12 @@ class Settings(BaseSettings):
     # LLM settings
     USE_OLLAMA: bool = True
     OLLAMA_MODEL: str = "llama3:latest"
+    OLLAMA_HOST: str = "http://localhost:11434"
     
     class Config:
         case_sensitive = True
         env_file = ".env"
+        extra = "ignore"  # Allow extra fields from environment
 
 
 @lru_cache()
