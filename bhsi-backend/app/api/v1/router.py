@@ -1,13 +1,13 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import auth, results, companies
+from app.api.v1.endpoints import companies, search, analysis
 
 api_router = APIRouter()
 
-# Authentication endpoints
-api_router.include_router(auth.router, prefix="/auth", tags=["authentication"])
+# Search endpoints - Main functionality
+api_router.include_router(search.router, tags=["search"])
 
-# Results endpoints
-api_router.include_router(results.router, prefix="/results", tags=["results"])
+# Company analysis endpoints
+api_router.include_router(companies.router, prefix="/companies", tags=["companies"])
 
-# Company endpoints
-api_router.include_router(companies.router, prefix="/companies", tags=["companies"]) 
+# Management analysis endpoints - Executive summaries and insights
+api_router.include_router(analysis.router, prefix="/analysis", tags=["analysis"]) 
