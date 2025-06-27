@@ -15,6 +15,7 @@ from app.agents.search.streamlined_lavanguardia_agent import StreamlinedLaVangua
 from app.agents.search.streamlined_elconfidencial_agent import StreamlinedElConfidencialAgent
 from app.agents.search.streamlined_eldiario_agent import StreamlinedElDiarioAgent
 from app.agents.search.streamlined_europapress_agent import StreamlinedEuropaPressAgent
+from app.agents.search.streamlined_yahoo_finance_agent import StreamlinedYahooFinanceAgent
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,8 @@ class StreamlinedSearchOrchestrator:
             "lavanguardia": StreamlinedLaVanguardiaAgent(),
             "elconfidencial": StreamlinedElConfidencialAgent(),
             "eldiario": StreamlinedElDiarioAgent(),
-            "europapress": StreamlinedEuropaPressAgent()
+            "europapress": StreamlinedEuropaPressAgent(),
+            "yahoo_finance": StreamlinedYahooFinanceAgent()
         }
     
     async def search_all(
@@ -77,6 +79,8 @@ class StreamlinedSearchOrchestrator:
                     result_count = len(agent_results.get("results", []))
                 elif agent_name in ["newsapi", "elpais", "expansion", "elmundo", "abc", "lavanguardia", "elconfidencial", "eldiario", "europapress"]:
                     result_count = len(agent_results.get("articles", []))
+                elif agent_name == "yahoo_finance":
+                    result_count = len(agent_results.get("financial_data", []))
                 
                 logger.info(f"✅ {agent_name}: {result_count} results")
                 
