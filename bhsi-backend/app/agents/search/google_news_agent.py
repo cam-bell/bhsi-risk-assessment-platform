@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+"""
+FIXED Google Custom Search Agent - Matches standalone functionality
+Copy this to replace your current google_news_agent.py
+"""
+
 import aiohttp
 import asyncio
 from typing import Dict, Any, List, Optional
@@ -11,8 +17,7 @@ logger = logging.getLogger(__name__)
 
 class GoogleNewsSearchAgent(BaseSearchAgent):
     """
-    Google Custom Search Agent integrated with BHSI architecture
-    Searches news.google.com for company information
+    FIXED Google Custom Search Agent - Now matches standalone performance
     """
     
     def __init__(self):
@@ -29,18 +34,7 @@ class GoogleNewsSearchAgent(BaseSearchAgent):
     async def search(self, query: str, start_date: str = None, end_date: str = None, 
                     days_back: int = None, max_results: int = 10) -> Dict[str, Any]:
         """
-        Search Google News for company information
-        Follows BHSI's existing agent response format
-        
-        Args:
-            query: Company name to search for
-            start_date: Start date (YYYY-MM-DD format)
-            end_date: End date (YYYY-MM-DD format) 
-            days_back: Alternative to date range - search last N days
-            max_results: Maximum number of results to return
-        
-        Returns:
-            Dict following BHSI's standardized search response format
+        FIXED search method that matches standalone functionality
         """
         if not self.api_key or not self.search_engine_id:
             return self._create_disabled_response(query)
@@ -56,34 +50,40 @@ class GoogleNewsSearchAgent(BaseSearchAgent):
             
             logger.info(f"🔍 Google News search: {query}")
             
-            # Build search parameters
+            # FIXED: Use the EXACT same parameters as your working standalone version
             params = {
                 "key": self.api_key,
                 "cx": self.search_engine_id,
-                "q": f"{query} site:news.google.com",
+                "q": f"{query} site:news.google.com",  # Exact match to standalone
                 "num": min(max_results, 10),  # Google CSE max per request
-                "gl": "es",  # Spain
-                "hl": "es",  # Spanish language
-                "safe": "medium"
+                "gl": "es",  # Spain - exact match to standalone
+                "hl": "es",  # Spanish language - exact match to standalone
+                "safe": "medium"  # Exact match to standalone
             }
             
-            # Add date filter if specified
+            # Add date filter if specified (exact match to standalone logic)
             if start_date and end_date:
                 date_filter = self._create_date_filter(start_date, end_date)
                 if date_filter:
                     params["dateRestrict"] = date_filter
                     logger.info(f"📅 Date filter applied: {date_filter}")
             
-            # Make API request
+            # DEBUG: Log the exact API call being made
+            logger.info(f"🔧 API URL: {self.base_url}")
+            logger.info(f"🔧 API Params: {params}")
+            
+            # Make API request (exact match to standalone)
             async with self.session.get(self.base_url, params=params) as response:
+                logger.info(f"📡 API Response Status: {response.status}")
+                
                 if response.status != 200:
                     error_text = await response.text()
                     logger.error(f"❌ Google CSE HTTP Error {response.status}: {error_text}")
-                    return self._create_error_response(query, f"HTTP {response.status}")
+                    return self._create_error_response(query, f"HTTP {response.status}: {error_text}")
                 
                 data = await response.json()
                 
-                # Check for API errors
+                # Check for API errors (exact match to standalone)
                 if "error" in data:
                     error_details = data["error"]
                     error_msg = error_details.get("message", "Unknown API error")
@@ -91,16 +91,17 @@ class GoogleNewsSearchAgent(BaseSearchAgent):
                     logger.error(f"❌ Google CSE API Error {error_code}: {error_msg}")
                     return self._create_error_response(query, f"API Error {error_code}: {error_msg}")
                 
-                # Process successful response
+                # Process successful response (exact match to standalone)
                 search_info = data.get("searchInformation", {})
                 items = data.get("items", [])
                 
                 logger.info(f"✅ Google News: Found {len(items)} results")
+                logger.info(f"📊 Total results available: {search_info.get('totalResults', 0)}")
                 
                 # Convert to BHSI format
                 results = []
-                for item in items:
-                    processed_result = self._convert_to_bhsi_format(item)
+                for i, item in enumerate(items, 1):
+                    processed_result = self._convert_to_bhsi_format(item, i)
                     if processed_result:
                         results.append(processed_result)
                 
@@ -114,19 +115,21 @@ class GoogleNewsSearchAgent(BaseSearchAgent):
                         "date_range": f"{start_date} to {end_date}" if start_date else "No date filter",
                         "errors": []
                     },
-                    "results": results
+                    "results": results,
+                    "raw_api_response": data  # NEW: Include raw response for debugging
                 }
                 
         except Exception as e:
             logger.error(f"❌ Google News search failed: {str(e)}")
             return self._create_error_response(query, str(e))
     
-    def _convert_to_bhsi_format(self, item: Dict) -> Optional[Dict]:
+    def _convert_to_bhsi_format(self, item: Dict, index: int) -> Optional[Dict]:
         """
-        Convert Google CSE result to BHSI's standardized format
-        Matches the format used by BOE and NewsAPI agents
+        FIXED conversion that matches standalone processing
         """
         try:
+            logger.info(f"  📄 Processing result {index}: {item.get('title', 'No title')[:50]}...")
+            
             # Extract basic information
             title = item.get("title", "")
             snippet = item.get("snippet", "")
@@ -161,11 +164,11 @@ class GoogleNewsSearchAgent(BaseSearchAgent):
             return result
             
         except Exception as e:
-            logger.warning(f"⚠️  Error converting Google result: {e}")
+            logger.warning(f"⚠️  Error converting Google result {index}: {e}")
             return None
     
     def _extract_published_date(self, item: Dict) -> Optional[str]:
-        """Extract publication date from Google CSE result"""
+        """Extract publication date from Google CSE result (exact match to standalone)"""
         try:
             # Try pagemap structured data
             if "pagemap" in item:
@@ -184,7 +187,7 @@ class GoogleNewsSearchAgent(BaseSearchAgent):
                 # Check meta tags
                 if "metatags" in pagemap:
                     for meta in pagemap["metatags"]:
-                        for date_field in ["article:published_time", "datePublished", "publishedDate"]:
+                        for date_field in ["article:published_time", "datePublished", "publishedDate", "og:article:published_time"]:
                             if date_field in meta and meta[date_field]:
                                 return self._standardize_date(meta[date_field])
         except Exception as e:
@@ -193,7 +196,7 @@ class GoogleNewsSearchAgent(BaseSearchAgent):
         return None
     
     def _standardize_date(self, date_str: str) -> str:
-        """Convert various date formats to YYYY-MM-DD"""
+        """Convert various date formats to YYYY-MM-DD (exact match to standalone)"""
         try:
             # Handle ISO format (most common)
             if "T" in date_str:
@@ -214,7 +217,7 @@ class GoogleNewsSearchAgent(BaseSearchAgent):
             return datetime.now().strftime("%Y-%m-%d")
     
     def _extract_source_info(self, item: Dict) -> Dict:
-        """Extract source/publisher information"""
+        """Extract source/publisher information (exact match to standalone)"""
         source_info = {
             "source": "Unknown",
             "publisher": "",
@@ -243,29 +246,54 @@ class GoogleNewsSearchAgent(BaseSearchAgent):
         return source_info
     
     def _create_date_filter(self, start_date: str, end_date: str) -> Optional[str]:
-        """Create Google CSE date filter"""
+        """
+        IMPROVED: Create Google CSE date filter with better handling
+        
+        Google Custom Search dateRestrict parameter format:
+        - d[number] = past number of days
+        - w[number] = past number of weeks  
+        - m[number] = past number of months
+        - y[number] = past number of years
+        
+        IMPORTANT: Long date ranges (>6 months) often return poor results
+        """
         try:
             start = datetime.strptime(start_date, "%Y-%m-%d")
             end = datetime.strptime(end_date, "%Y-%m-%d")
             days_diff = (end - start).days
             
+            logger.info(f"📅 Date range: {start_date} to {end_date} ({days_diff} days)")
+            
+            # CRITICAL FIX: Limit maximum date range for better results
+            if days_diff > 180:  # More than 6 months
+                logger.warning(f"⚠️  Date range too long ({days_diff} days), limiting to 30 days for better results")
+                # Use last 30 days instead of the full range
+                return "d30"
+            
+            # Optimize date filter selection
             if days_diff <= 1:
-                return "d1"
+                filter_val = "d1"
             elif days_diff <= 7:
-                return f"d{days_diff}"
+                filter_val = f"d{days_diff}"
             elif days_diff <= 30:
+                filter_val = f"d{days_diff}"
+            elif days_diff <= 90:
+                # Use weeks for 1-3 month ranges
                 weeks = max(1, days_diff // 7)
-                return f"w{weeks}"
-            elif days_diff <= 365:
-                months = max(1, days_diff // 30)
-                return f"m{months}"
+                filter_val = f"w{weeks}"
             else:
-                years = max(1, days_diff // 365)
-                return f"y{years}"
-                
+                # For 3-6 month ranges, use months but cap at 6
+                months = min(6, max(1, days_diff // 30))
+                filter_val = f"m{months}"
+            
+            logger.info(f"📅 Applied date filter: {filter_val}")
+            return filter_val
+            
         except Exception as e:
             logger.warning(f"Error creating date filter: {e}")
-            return None
+            # FALLBACK: Use last 7 days if date parsing fails
+            logger.info("📅 Fallback: Using last 7 days")
+            return "d7"
     
     def _create_disabled_response(self, query: str) -> Dict:
         """Response when Google search is disabled due to missing config"""
@@ -283,7 +311,7 @@ class GoogleNewsSearchAgent(BaseSearchAgent):
         }
     
     def _create_error_response(self, query: str, error_message: str) -> Dict:
-        """Create standardized error response"""
+        """Create standardized error response (exact match to standalone)"""
         return {
             "search_summary": {
                 "query": query,
@@ -299,8 +327,7 @@ class GoogleNewsSearchAgent(BaseSearchAgent):
     
     async def fetch_full_content(self, url: str) -> Optional[str]:
         """
-        Fetch full article content from URL
-        Additional utility method for content analysis
+        Fetch full article content from URL (exact match to standalone)
         """
         if not self.session:
             raise RuntimeError("Agent must be used as an async context manager")
@@ -325,7 +352,7 @@ class GoogleNewsSearchAgent(BaseSearchAgent):
             return None
     
     def _extract_text_from_html(self, html_content: str) -> str:
-        """Basic HTML text extraction"""
+        """Basic HTML text extraction (exact match to standalone)"""
         # Remove script and style elements
         html_content = re.sub(r'<script[^>]*>.*?</script>', '', html_content, flags=re.DOTALL | re.IGNORECASE)
         html_content = re.sub(r'<style[^>]*>.*?</style>', '', html_content, flags=re.DOTALL | re.IGNORECASE)
