@@ -23,6 +23,7 @@ class StreamlinedSearchRequest(BaseModel):
     days_back: Optional[int] = 7      # Alternative: search last N days
     include_boe: bool = True
     include_news: bool = True
+    include_rss: bool = True  # Include RSS news sources
 
 
 @router.post("/search")
@@ -61,11 +62,14 @@ async def streamlined_search(request: StreamlinedSearchRequest):
             active_agents.append("boe")
         if request.include_news:
             active_agents.append("newsapi")
+        if request.include_rss:
+            # Add working RSS agents
+            active_agents.extend(["elpais", "expansion", "elmundo", "abc", "lavanguardia", "elconfidencial", "eldiario", "europapress"])
             
         if not active_agents:
             raise HTTPException(
                 status_code=400,
-                detail="At least one source (BOE or news) must be enabled"
+                detail="At least one source (BOE, news, or RSS) must be enabled"
             )
         
         # STEP 1: FAST SEARCH (no classification during search)
@@ -176,6 +180,53 @@ async def streamlined_search(request: StreamlinedSearchRequest):
                     }
                     classified_results.append(classified_result)
         
+        # Process RSS results (all individual RSS agents)
+        rss_agents = ["elpais", "expansion", "elmundo", "abc", "lavanguardia", "elconfidencial", "eldiario", "europapress"]
+        for agent_name in rss_agents:
+            if agent_name in search_results and search_results[agent_name].get("articles"):
+                for article in search_results[agent_name]["articles"]:
+                    try:
+                        # Optimized hybrid classification
+                        classification = await classifier.classify_document(
+                            text=article.get("content", article.get("description", "")),
+                            title=article.get("title", ""),
+                            source=f"RSS-{agent_name.upper()}"
+                        )
+                        
+                        classified_result = {
+                            "source": f"RSS-{agent_name.upper()}",
+                            "date": article.get("publishedAt"),
+                            "title": article.get("title", ""),
+                            "summary": article.get("description"),
+                            "risk_level": classification.get("label", "Unknown"),
+                            "confidence": classification.get("confidence", 0.5),
+                            "method": classification.get("method", "unknown"),
+                            "processing_time_ms": classification.get("processing_time_ms", 0),
+                            "url": article.get("url", ""),
+                            # RSS-specific fields
+                            "author": article.get("author"),
+                            "source_name": article.get("source", agent_name.upper())
+                        }
+                        classified_results.append(classified_result)
+                        
+                    except Exception as e:
+                        # Simple fallback
+                        classified_result = {
+                            "source": f"RSS-{agent_name.upper()}",
+                            "date": article.get("publishedAt"),
+                            "title": article.get("title", ""),
+                            "summary": article.get("description"),
+                            "risk_level": "Unknown",
+                            "confidence": 0.3,
+                            "method": "error_fallback",
+                            "processing_time_ms": 0,
+                            "url": article.get("url", ""),
+                            "author": article.get("author"),
+                            "source_name": article.get("source", agent_name.upper()),
+                            "error": str(e)
+                        }
+                        classified_results.append(classified_result)
+        
         classification_time = time.time() - classification_start_time
         
         # STEP 3: SORT AND FORMAT RESULTS
@@ -219,6 +270,7 @@ async def streamlined_search(request: StreamlinedSearchRequest):
                 "total_results": len(valid_results),
                 "boe_results": len([r for r in valid_results if r["source"] == "BOE"]),
                 "news_results": len([r for r in valid_results if r["source"] == "News"]),
+                "rss_results": len([r for r in valid_results if r["source"].startswith("RSS-")]),
                 "high_risk_results": len([r for r in valid_results if r["risk_level"] == "High-Legal"]),
                 "sources_searched": active_agents
             },
@@ -251,6 +303,7 @@ async def streamlined_search(request: StreamlinedSearchRequest):
                 "total_results": 0,
                 "boe_results": 0,
                 "news_results": 0,
+                "rss_results": 0,
                 "high_risk_results": 0,
                 "sources_searched": []
             },
@@ -280,7 +333,8 @@ async def streamlined_search_health():
                 "streamlined_orchestrator": "available",
                 "optimized_hybrid_classifier": "available",
                 "streamlined_boe_agent": "available",
-                "streamlined_newsapi_agent": "available"
+                "streamlined_newsapi_agent": "available",
+                "streamlined_rss_agent": "available"
             },
             "performance": classifier.get_performance_stats(),
             "expected_improvement": "90%+ faster than previous implementation"
@@ -293,7 +347,8 @@ async def streamlined_search_health():
                 "streamlined_orchestrator": "unknown",
                 "optimized_hybrid_classifier": "unknown", 
                 "streamlined_boe_agent": "unknown",
-                "streamlined_newsapi_agent": "unknown"
+                "streamlined_newsapi_agent": "unknown",
+                "streamlined_rss_agent": "unknown"
             }
         }
 

@@ -9,6 +9,12 @@ from app.agents.search.streamlined_boe_agent import StreamlinedBOEAgent
 from app.agents.search.streamlined_newsapi_agent import StreamlinedNewsAPIAgent
 from app.agents.search.streamlined_elpais_agent import StreamlinedElPaisAgent
 from app.agents.search.streamlined_expansion_agent import StreamlinedExpansionAgent
+from app.agents.search.streamlined_elmundo_agent import StreamlinedElMundoAgent
+from app.agents.search.streamlined_abc_agent import StreamlinedABCAgent
+from app.agents.search.streamlined_lavanguardia_agent import StreamlinedLaVanguardiaAgent
+from app.agents.search.streamlined_elconfidencial_agent import StreamlinedElConfidencialAgent
+from app.agents.search.streamlined_eldiario_agent import StreamlinedElDiarioAgent
+from app.agents.search.streamlined_europapress_agent import StreamlinedEuropaPressAgent
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +28,13 @@ class StreamlinedSearchOrchestrator:
             "boe": StreamlinedBOEAgent(),
             "newsapi": StreamlinedNewsAPIAgent(),
             "elpais": StreamlinedElPaisAgent(),
-            "expansion": StreamlinedExpansionAgent()
+            "expansion": StreamlinedExpansionAgent(),
+            "elmundo": StreamlinedElMundoAgent(),
+            "abc": StreamlinedABCAgent(),
+            "lavanguardia": StreamlinedLaVanguardiaAgent(),
+            "elconfidencial": StreamlinedElConfidencialAgent(),
+            "eldiario": StreamlinedElDiarioAgent(),
+            "europapress": StreamlinedEuropaPressAgent()
         }
     
     async def search_all(
@@ -63,9 +75,7 @@ class StreamlinedSearchOrchestrator:
                 result_count = 0
                 if agent_name == "boe":
                     result_count = len(agent_results.get("results", []))
-                elif agent_name == "newsapi":
-                    result_count = len(agent_results.get("articles", []))
-                elif agent_name in ["elpais", "expansion"]:
+                elif agent_name in ["newsapi", "elpais", "expansion", "elmundo", "abc", "lavanguardia", "elconfidencial", "eldiario", "europapress"]:
                     result_count = len(agent_results.get("articles", []))
                 
                 logger.info(f"✅ {agent_name}: {result_count} results")
