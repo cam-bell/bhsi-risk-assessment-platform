@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""
-FIXED Google Custom Search Agent - Matches standalone functionality
-Copy this to replace your current google_news_agent.py
-"""
-
 import aiohttp
 import asyncio
 from typing import Dict, Any, List, Optional
@@ -16,9 +11,6 @@ import re
 logger = logging.getLogger(__name__)
 
 class GoogleNewsSearchAgent(BaseSearchAgent):
-    """
-    FIXED Google Custom Search Agent - Now matches standalone performance
-    """
     
     def __init__(self):
         super().__init__()
@@ -33,9 +25,18 @@ class GoogleNewsSearchAgent(BaseSearchAgent):
     
     async def search(self, query: str, start_date: str = None, end_date: str = None, 
                     days_back: int = None, max_results: int = 10) -> Dict[str, Any]:
-        """
-        FIXED search method that matches standalone functionality
-        """
+        
+        # ADD THESE DEBUG LINES
+        print(f"\n=== GOOGLE AGENT DEBUG ===")
+        print(f"Query: {query}")
+        print(f"Start date: {start_date}")
+        print(f"End date: {end_date}")
+        print(f"Days back: {days_back}")
+        print(f"Max results: {max_results}")
+        print(f"API Key present: {bool(self.api_key)}")
+        print(f"Search Engine ID: {self.search_engine_id}")
+        print(f"=========================\n")
+        
         if not self.api_key or not self.search_engine_id:
             return self._create_disabled_response(query)
         
@@ -43,14 +44,42 @@ class GoogleNewsSearchAgent(BaseSearchAgent):
             raise RuntimeError("Agent must be used as an async context manager")
         
         try:
-            # Handle date range logic (matching your other agents)
+            # CRITICAL FIX: Smart date handling to avoid generic results
+            use_date_filter = False
+            date_filter = None
+            
+            # Handle date range logic with intelligence
             if days_back and not start_date:
-                end_date = datetime.now().strftime("%Y-%m-%d")
-                start_date = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%d")
+                # Use days_back parameter
+                if days_back <= 30:
+                    # Good range for Google Custom Search
+                    date_filter = f"d{days_back}"
+                    use_date_filter = True
+                    logger.info(f"Using days_back filter: {date_filter}")
+                else:
+                    # Too long - don't use date filter for better results
+                    logger.info(f"days_back too long ({days_back}), searching without date filter")
+                    use_date_filter = False
             
-            logger.info(f"🔍 Google News search: {query}")
+            elif start_date and end_date:
+                # Custom date range
+                start = datetime.strptime(start_date, "%Y-%m-%d")
+                end = datetime.strptime(end_date, "%Y-%m-%d")
+                days_diff = (end - start).days
+                
+                if days_diff <= 30:
+                    # Good range
+                    date_filter = self._create_date_filter(start_date, end_date)
+                    use_date_filter = True
+                    logger.info(f"Using custom date filter: {date_filter}")
+                else:
+                    # CRITICAL FIX: Don't use date filter for long ranges
+                    logger.info(f"Date range too long ({days_diff} days), searching without date filter for better results")
+                    use_date_filter = False
             
-            # FIXED: Use the EXACT same parameters as your working standalone version
+            logger.info(f"Google News search: {query}")
+            
+            # Use the EXACT same parameters as your working standalone version
             params = {
                 "key": self.api_key,
                 "cx": self.search_engine_id,
@@ -60,43 +89,52 @@ class GoogleNewsSearchAgent(BaseSearchAgent):
                 "hl": "es",  # Spanish language - exact match to standalone
                 "safe": "medium"  # Exact match to standalone
             }
+
+            print(f"Final API params: {params}")
             
-            # Add date filter if specified (exact match to standalone logic)
-            if start_date and end_date:
-                date_filter = self._create_date_filter(start_date, end_date)
-                if date_filter:
-                    params["dateRestrict"] = date_filter
-                    logger.info(f"📅 Date filter applied: {date_filter}")
+            # CRITICAL: Only add date filter if it's reasonable (<=30 days)
+            if use_date_filter and date_filter:
+                params["dateRestrict"] = date_filter
+                logger.info(f"Date filter applied: {date_filter}")
+            else:
+                logger.info(f"No date filter applied - searching all dates (like working debug test)")
             
             # DEBUG: Log the exact API call being made
-            logger.info(f"🔧 API URL: {self.base_url}")
-            logger.info(f"🔧 API Params: {params}")
+            logger.info(f"API URL: {self.base_url}")
+            logger.info(f"API Params: {params}")
             
             # Make API request (exact match to standalone)
             async with self.session.get(self.base_url, params=params) as response:
-                logger.info(f"📡 API Response Status: {response.status}")
+                logger.info(f"API Response Status: {response.status}")
                 
                 if response.status != 200:
                     error_text = await response.text()
-                    logger.error(f"❌ Google CSE HTTP Error {response.status}: {error_text}")
+                    logger.error(f"Google CSE HTTP Error {response.status}: {error_text}")
                     return self._create_error_response(query, f"HTTP {response.status}: {error_text}")
                 
                 data = await response.json()
+
+                print(f"Raw API response total results: {data.get('searchInformation', {}).get('totalResults', 0)}")
+                print(f"Raw API response items count: {len(data.get('items', []))}")
+                if data.get('items'):
+                    first_item = data.get('items', [])[0]
+                    print(f"First item title: {first_item.get('title', 'No title')}")
+                    print(f"First item URL: {first_item.get('link', 'No URL')}")
                 
                 # Check for API errors (exact match to standalone)
                 if "error" in data:
                     error_details = data["error"]
                     error_msg = error_details.get("message", "Unknown API error")
                     error_code = error_details.get("code", "Unknown")
-                    logger.error(f"❌ Google CSE API Error {error_code}: {error_msg}")
+                    logger.error(f"Google CSE API Error {error_code}: {error_msg}")
                     return self._create_error_response(query, f"API Error {error_code}: {error_msg}")
                 
                 # Process successful response (exact match to standalone)
                 search_info = data.get("searchInformation", {})
                 items = data.get("items", [])
                 
-                logger.info(f"✅ Google News: Found {len(items)} results")
-                logger.info(f"📊 Total results available: {search_info.get('totalResults', 0)}")
+                logger.info(f"Google News: Found {len(items)} results")
+                logger.info(f"Total results available: {search_info.get('totalResults', 0)}")
                 
                 # Convert to BHSI format
                 results = []
@@ -105,6 +143,12 @@ class GoogleNewsSearchAgent(BaseSearchAgent):
                     if processed_result:
                         results.append(processed_result)
                 
+                # Filter results by date if no date filter was applied but dates were requested
+                if not use_date_filter and (start_date or days_back):
+                    original_count = len(results)
+                    results = self._filter_results_by_date(results, start_date, end_date, days_back)
+                    logger.info(f"Post-search date filtering: {original_count} -> {len(results)} results")
+                
                 return {
                     "search_summary": {
                         "query": query,
@@ -112,23 +156,24 @@ class GoogleNewsSearchAgent(BaseSearchAgent):
                         "total_results": int(search_info.get("totalResults", 0)),
                         "results_returned": len(results),
                         "search_time": float(search_info.get("searchTime", 0)),
-                        "date_range": f"{start_date} to {end_date}" if start_date else "No date filter",
+                        "date_range": f"{start_date} to {end_date}" if start_date else f"Last {days_back} days" if days_back else "No date filter",
+                        "date_filter_applied": use_date_filter,
                         "errors": []
                     },
                     "results": results,
-                    "raw_api_response": data  # NEW: Include raw response for debugging
+                    "raw_api_response": data  # Include raw response for debugging
                 }
                 
         except Exception as e:
-            logger.error(f"❌ Google News search failed: {str(e)}")
+            logger.error(f"Google News search failed: {str(e)}")
             return self._create_error_response(query, str(e))
     
     def _convert_to_bhsi_format(self, item: Dict, index: int) -> Optional[Dict]:
         """
-        FIXED conversion that matches standalone processing
+        Convert that matches standalone processing
         """
         try:
-            logger.info(f"  📄 Processing result {index}: {item.get('title', 'No title')[:50]}...")
+            logger.info(f"Processing result {index}: {item.get('title', 'No title')[:50]}...")
             
             # Extract basic information
             title = item.get("title", "")
@@ -164,7 +209,7 @@ class GoogleNewsSearchAgent(BaseSearchAgent):
             return result
             
         except Exception as e:
-            logger.warning(f"⚠️  Error converting Google result {index}: {e}")
+            logger.warning(f"Error converting Google result {index}: {e}")
             return None
     
     def _extract_published_date(self, item: Dict) -> Optional[str]:
@@ -246,29 +291,18 @@ class GoogleNewsSearchAgent(BaseSearchAgent):
         return source_info
     
     def _create_date_filter(self, start_date: str, end_date: str) -> Optional[str]:
-        """
-        IMPROVED: Create Google CSE date filter with better handling
-        
-        Google Custom Search dateRestrict parameter format:
-        - d[number] = past number of days
-        - w[number] = past number of weeks  
-        - m[number] = past number of months
-        - y[number] = past number of years
-        
-        IMPORTANT: Long date ranges (>6 months) often return poor results
-        """
+        """Create Google CSE date filter with IMPROVED logic"""
         try:
             start = datetime.strptime(start_date, "%Y-%m-%d")
             end = datetime.strptime(end_date, "%Y-%m-%d")
             days_diff = (end - start).days
             
-            logger.info(f"📅 Date range: {start_date} to {end_date} ({days_diff} days)")
+            logger.info(f"Date range: {start_date} to {end_date} ({days_diff} days)")
             
-            # CRITICAL FIX: Limit maximum date range for better results
+            # CRITICAL FIX: Don't use date filters for long ranges
             if days_diff > 180:  # More than 6 months
-                logger.warning(f"⚠️  Date range too long ({days_diff} days), limiting to 30 days for better results")
-                # Use last 30 days instead of the full range
-                return "d30"
+                logger.warning(f"Date range too long ({days_diff} days), returning None for no date filter")
+                return None
             
             # Optimize date filter selection
             if days_diff <= 1:
@@ -286,14 +320,63 @@ class GoogleNewsSearchAgent(BaseSearchAgent):
                 months = min(6, max(1, days_diff // 30))
                 filter_val = f"m{months}"
             
-            logger.info(f"📅 Applied date filter: {filter_val}")
+            logger.info(f"Applied date filter: {filter_val}")
             return filter_val
             
         except Exception as e:
             logger.warning(f"Error creating date filter: {e}")
             # FALLBACK: Use last 7 days if date parsing fails
-            logger.info("📅 Fallback: Using last 7 days")
+            logger.info("Fallback: Using last 7 days")
             return "d7"
+    
+    def _filter_results_by_date(self, results: List[Dict], start_date: str = None, 
+                              end_date: str = None, days_back: int = None) -> List[Dict]:
+        """
+        Filter results by date when no API date filter was applied
+        """
+        if not (start_date or days_back):
+            return results
+        
+        try:
+            filtered_results = []
+            
+            if days_back:
+                cutoff_date = datetime.now() - timedelta(days=days_back)
+            else:
+                cutoff_date = datetime.strptime(start_date, "%Y-%m-%d") if start_date else None
+            
+            end_date_obj = datetime.strptime(end_date, "%Y-%m-%d") if end_date else datetime.now()
+            
+            for result in results:
+                result_date_str = result.get("date")
+                if not result_date_str:
+                    # Include results without dates
+                    filtered_results.append(result)
+                    continue
+                
+                try:
+                    # Parse result date
+                    if "T" in result_date_str:
+                        result_date = datetime.fromisoformat(result_date_str.replace("Z", ""))
+                    else:
+                        result_date = datetime.strptime(result_date_str, "%Y-%m-%d")
+                    
+                    # Check if within date range
+                    if cutoff_date and result_date >= cutoff_date and result_date <= end_date_obj:
+                        filtered_results.append(result)
+                    elif not cutoff_date:
+                        filtered_results.append(result)
+                        
+                except Exception as e:
+                    # Include results with date parsing errors
+                    logger.debug(f"Date parsing error for result: {e}")
+                    filtered_results.append(result)
+            
+            return filtered_results
+            
+        except Exception as e:
+            logger.warning(f"Error filtering results by date: {e}")
+            return results
     
     def _create_disabled_response(self, query: str) -> Dict:
         """Response when Google search is disabled due to missing config"""
@@ -326,9 +409,6 @@ class GoogleNewsSearchAgent(BaseSearchAgent):
         }
     
     async def fetch_full_content(self, url: str) -> Optional[str]:
-        """
-        Fetch full article content from URL (exact match to standalone)
-        """
         if not self.session:
             raise RuntimeError("Agent must be used as an async context manager")
         

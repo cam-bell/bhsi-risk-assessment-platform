@@ -89,6 +89,9 @@ async def unified_search(request: UnifiedSearchRequest):
         # Process BOE results
         if "boe" in search_results and search_results["boe"].get("results"):
             for result in search_results["boe"]["results"]:
+                if not isinstance(result, dict):
+                    print(f"WARNING: BOE returned non-dict result: {type(result)} - {result}")
+                    continue
                 try:
                     # Classify with optimized hybrid classifier
                     classification = await classifier.classify_document(
@@ -137,6 +140,9 @@ async def unified_search(request: UnifiedSearchRequest):
         # Process News results
         if "newsapi" in search_results and search_results["newsapi"].get("articles"):
             for article in search_results["newsapi"]["articles"]:
+                if not isinstance(article, dict):
+                    print(f"WARNING: NewsAPI returned non-dict article: {type(article)} - {article}")
+                    continue
                 try:
                     # Optimized hybrid classification
                     classification = await classifier.classify_document(
@@ -182,6 +188,9 @@ async def unified_search(request: UnifiedSearchRequest):
         # Process Google Custom Search results (NEW)
         if "google" in search_results and search_results["google"].get("results"):
             for result in search_results["google"]["results"]:
+                if not isinstance(result, dict):
+                    print(f"WARNING: Google returned non-dict result: {type(result)} - {result}")
+                    continue
                 try:
                     # Optimized hybrid classification
                     classification = await classifier.classify_document(
@@ -361,16 +370,12 @@ async def search_performance_stats():
             "message": f"Could not retrieve performance stats: {str(e)}"
         }
 
-
-# Test endpoint for individual Google search
 @router.post("/search/google-only")
 async def google_only_search(request: UnifiedSearchRequest):
-    """
-    Test endpoint for Google Custom Search only
-    Useful for testing Google integration independently
-    """
     try:
         orchestrator = StreamlinedSearchOrchestrator()
+        print(f"DEBUG: Orchestrator created, calling search_all...")
+        classifier = OptimizedHybridClassifier()
         
         # Force only Google agent
         search_results = await orchestrator.search_all(
@@ -381,6 +386,8 @@ async def google_only_search(request: UnifiedSearchRequest):
             active_agents=["google"]
         )
         
+        print(f"DEBUG: Search results received: {list(search_results.keys())}")
+
         if "google" not in search_results:
             raise HTTPException(
                 status_code=500,
@@ -389,11 +396,79 @@ async def google_only_search(request: UnifiedSearchRequest):
         
         google_results = search_results["google"]
         
+        # ADD CLASSIFICATION PROCESSING (same as main endpoint)
+        classified_results = []
+        if google_results.get("results"):
+            for result in google_results["results"]:
+                try:
+                    # CRITICAL: Check if result is a dictionary
+                    if not isinstance(result, dict):
+                        continue
+                        
+                    # Optimized hybrid classification
+                    classification = await classifier.classify_document(
+                        text=result.get("text", result.get("summary", "")),
+                        title=result.get("title", ""),
+                        source="Google News"
+                    )
+                    
+                    classified_result = {
+                        "source": "Google News",
+                        "date": result.get("date"),
+                        "title": result.get("title", ""),
+                        "summary": result.get("summary"),
+                        "risk_level": classification.get("label", "Unknown"),
+                        "confidence": classification.get("confidence", 0.5),
+                        "method": classification.get("method", "unknown"),
+                        "processing_time_ms": classification.get("processing_time_ms", 0),
+                        "url": result.get("url", ""),
+                        # Google-specific fields
+                        "display_link": result.get("display_link"),
+                        "publisher": result.get("publisher"),
+                        "news_source": result.get("news_source", "Unknown"),
+                        "search_timestamp": result.get("search_timestamp")
+                    }
+                    classified_results.append(classified_result)
+                    
+                except Exception as e:
+                    # Graceful fallback for classification errors
+                    classified_result = {
+                        "source": "Google News",
+                        "date": result.get("date", "") if isinstance(result, dict) else "",
+                        "title": result.get("title", "") if isinstance(result, dict) else "Error",
+                        "summary": "Error processing result",
+                        "risk_level": "Unknown",
+                        "confidence": 0.3,
+                        "method": "error_fallback",
+                        "processing_time_ms": 0,
+                        "url": result.get("url", "") if isinstance(result, dict) else "",
+                        "display_link": "",
+                        "publisher": "",
+                        "news_source": "Unknown",
+                        "error": str(e)
+                    }
+                    classified_results.append(classified_result)
+        
+        # Generate summary statistics
+        total_results = len(classified_results)
+        source_breakdown = {"Google News": total_results}
+        risk_level_breakdown = {}
+        
+        for result in classified_results:
+            risk_level = result["risk_level"]
+            risk_level_breakdown[risk_level] = risk_level_breakdown.get(risk_level, 0) + 1
+        
         return {
             "company_name": request.company_name,
             "source": "Google Custom Search Only",
+            "summary": {
+                "total_results": total_results,
+                "source_breakdown": source_breakdown,
+                "risk_level_breakdown": risk_level_breakdown,
+                "search_performance": classifier.get_performance_stats()
+            },
+            "results": classified_results,
             "search_summary": google_results.get("search_summary", {}),
-            "results": google_results.get("results", []),
             "raw_response": google_results
         }
         
