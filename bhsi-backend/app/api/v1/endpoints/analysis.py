@@ -37,8 +37,11 @@ async def generate_management_summary(
     """
     Generate an executive management summary explaining company risk classification
     
-    This endpoint provides a high-level explanation of why a company received
-    specific risk classifications, including evidence and recommendations.
+    **Purpose**: Provide executive-level explanation of why a company was classified 
+    with specific risk levels.
+    
+    **Input**: Classification results from the search endpoint
+    **Output**: Executive summary with risk breakdown and recommendations
     """
     
     try:
@@ -54,6 +57,8 @@ async def generate_management_summary(
             include_evidence=request.include_evidence,
             language=request.language
         )
+        
+        logger.info(f"✅ Management summary generated successfully")
         
         return ManagementSummaryResponse(**summary)
         

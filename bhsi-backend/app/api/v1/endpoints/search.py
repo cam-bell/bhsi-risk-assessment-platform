@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """
 Search API Endpoints - Unified search across BOE and news sources
+
+⚠️  DEPRECATED: This endpoint has been replaced by streamlined_search.py
+    Use the streamlined search endpoint for better performance and features.
+    This file is kept for reference and backward compatibility only.
 """
 
 from fastapi import APIRouter, HTTPException
