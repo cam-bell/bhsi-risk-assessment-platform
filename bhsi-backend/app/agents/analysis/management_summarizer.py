@@ -6,7 +6,12 @@ Combines cloud AI and template-based approaches for comprehensive business intel
 
 import logging
 import httpx
+<<<<<<< HEAD
 from typing import Dict, Any, List
+=======
+import json
+from typing import Dict, Any, List, Optional
+>>>>>>> origin/integration
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -19,9 +24,13 @@ class ManagementSummarizer:
         """Initialize the management summarizer"""
         
         # Cloud service URLs
+<<<<<<< HEAD
         self.gemini_service_url = (
             "https://gemini-service-185303190462.europe-west1.run.app"
         )
+=======
+        self.gemini_service_url = "https://gemini-service-185303190462.europe-west1.run.app"
+>>>>>>> origin/integration
         
         # Risk level mappings
         self.risk_colors = {
@@ -34,10 +43,14 @@ class ManagementSummarizer:
         # Spanish templates for different risk scenarios
         self.spanish_templates = {
             "high_risk": {
+<<<<<<< HEAD
                 "summary": (
                     "Se han identificado riesgos significativos que requieren "
                     "atención inmediata de la dirección."
                 ),
+=======
+                "summary": "Se han identificado riesgos significativos que requieren atención inmediata de la dirección.",
+>>>>>>> origin/integration
                 "recommendations": [
                     "Revisar inmediatamente los procedimientos de cumplimiento",
                     "Consultar con el departamento legal",
@@ -45,10 +58,14 @@ class ManagementSummarizer:
                 ]
             },
             "medium_risk": {
+<<<<<<< HEAD
                 "summary": (
                     "Se han detectado algunas irregularidades que requieren "
                     "seguimiento y supervisión."
                 ),
+=======
+                "summary": "Se han detectado algunas irregularidades que requieren seguimiento y supervisión.",
+>>>>>>> origin/integration
                 "recommendations": [
                     "Establecer monitoreo regular de la situación",
                     "Revisar políticas internas relacionadas",
@@ -56,10 +73,14 @@ class ManagementSummarizer:
                 ]
             },
             "low_risk": {
+<<<<<<< HEAD
                 "summary": (
                     "No se han identificado riesgos significativos en el "
                     "análisis actual."
                 ),
+=======
+                "summary": "No se han identificado riesgos significativos en el análisis actual.",
+>>>>>>> origin/integration
                 "recommendations": [
                     "Continuar con el monitoreo rutinario",
                     "Mantener actualizadas las políticas de cumplimiento"
@@ -97,10 +118,14 @@ class ManagementSummarizer:
             return summary
             
         except Exception as e:
+<<<<<<< HEAD
             logger.warning(
                 f"Cloud summary failed for {company_name}: {e}, "
                 "falling back to template"
             )
+=======
+            logger.warning(f"Cloud summary failed for {company_name}: {e}, falling back to template")
+>>>>>>> origin/integration
             
             # Fallback to template-based summary
             summary = self._template_summary(
@@ -123,9 +148,13 @@ class ManagementSummarizer:
             "company_name": company_name,
             "classification_results": classification_results,
             "total_documents": len(classification_results),
+<<<<<<< HEAD
             "risk_distribution": self._calculate_risk_distribution(
                 classification_results
             )
+=======
+            "risk_distribution": self._calculate_risk_distribution(classification_results)
+>>>>>>> origin/integration
         }
         
         # Call Gemini service for company analysis
@@ -140,10 +169,14 @@ class ManagementSummarizer:
             )
             
             if response.status_code != 200:
+<<<<<<< HEAD
                 raise Exception(
                     f"Gemini service returned {response.status_code}: "
                     f"{response.text}"
                 )
+=======
+                raise Exception(f"Gemini service returned {response.status_code}: {response.text}")
+>>>>>>> origin/integration
             
             gemini_result = response.json()
             
@@ -186,9 +219,13 @@ class ManagementSummarizer:
         return {
             "company_name": company_name,
             "overall_risk": overall_risk,
+<<<<<<< HEAD
             "executive_summary": (
                 f"Análisis de riesgo para {company_name}: {template['summary']}"
             ),
+=======
+            "executive_summary": f"Análisis de riesgo para {company_name}: {template['summary']}",
+>>>>>>> origin/integration
             "risk_breakdown": risk_breakdown,
             "key_findings": key_findings,
             "recommendations": template["recommendations"],
@@ -196,6 +233,7 @@ class ManagementSummarizer:
             "method": "template_analysis"
         }
     
+<<<<<<< HEAD
     def _calculate_risk_distribution(
         self, classification_results: List[Dict[str, Any]]
     ) -> Dict[str, int]:
@@ -205,6 +243,12 @@ class ManagementSummarizer:
             "High-Legal": 0, "Medium-Legal": 0, 
             "Low-Legal": 0, "No-Legal": 0
         }
+=======
+    def _calculate_risk_distribution(self, classification_results: List[Dict[str, Any]]) -> Dict[str, int]:
+        """Calculate distribution of risk levels"""
+        
+        distribution = {"High-Legal": 0, "Medium-Legal": 0, "Low-Legal": 0, "No-Legal": 0}
+>>>>>>> origin/integration
         
         for result in classification_results:
             risk_level = result.get("risk_level", "No-Legal")
@@ -213,9 +257,13 @@ class ManagementSummarizer:
         
         return distribution
     
+<<<<<<< HEAD
     def _analyze_risk_levels(
         self, classification_results: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
+=======
+    def _analyze_risk_levels(self, classification_results: List[Dict[str, Any]]) -> Dict[str, Any]:
+>>>>>>> origin/integration
         """Analyze overall risk levels"""
         
         distribution = self._calculate_risk_distribution(classification_results)
@@ -249,6 +297,7 @@ class ManagementSummarizer:
         
         # Define category keywords
         category_keywords = {
+<<<<<<< HEAD
             "legal": [
                 "sanción", "sentencia", "procedimiento", "tribunal", "delito"
             ],
@@ -261,6 +310,12 @@ class ManagementSummarizer:
             "operational": [
                 "cese", "nombramiento", "fusión", "adquisición"
             ]
+=======
+            "legal": ["sanción", "sentencia", "procedimiento", "tribunal", "delito"],
+            "financial": ["concurso", "insolvencia", "pérdidas", "facturación"],
+            "regulatory": ["cnmv", "banco de españa", "cnmc", "aepd"],
+            "operational": ["cese", "nombramiento", "fusión", "adquisición"]
+>>>>>>> origin/integration
         }
         
         keywords = category_keywords.get(category, [])
@@ -278,6 +333,7 @@ class ManagementSummarizer:
         # Determine category risk level
         if high_risk_count > 0:
             level = "red"
+<<<<<<< HEAD
             reasoning = (
                 f"Se encontraron {high_risk_count} documentos de alto "
                 f"riesgo relacionados con {category}"
@@ -288,6 +344,12 @@ class ManagementSummarizer:
                 f"Se identificaron {len(relevant_docs)} documentos "
                 f"relevantes para {category}"
             )
+=======
+            reasoning = f"Se encontraron {high_risk_count} documentos de alto riesgo relacionados con {category}"
+        elif len(relevant_docs) > 0:
+            level = "orange"
+            reasoning = f"Se identificaron {len(relevant_docs)} documentos relevantes para {category}"
+>>>>>>> origin/integration
         else:
             level = "green"
             reasoning = f"No se detectaron riesgos significativos en {category}"
@@ -295,10 +357,14 @@ class ManagementSummarizer:
         # Prepare evidence
         evidence = []
         if include_evidence and relevant_docs:
+<<<<<<< HEAD
             evidence = [
                 doc.get("title", "Documento sin título")[:100] 
                 for doc in relevant_docs[:3]
             ]
+=======
+            evidence = [doc.get("title", "Documento sin título")[:100] for doc in relevant_docs[:3]]
+>>>>>>> origin/integration
         
         return {
             "level": level,
@@ -307,9 +373,13 @@ class ManagementSummarizer:
             "confidence": 0.85 if relevant_docs else 0.95
         }
     
+<<<<<<< HEAD
     def _extract_key_findings(
         self, classification_results: List[Dict[str, Any]]
     ) -> List[str]:
+=======
+    def _extract_key_findings(self, classification_results: List[Dict[str, Any]]) -> List[str]:
+>>>>>>> origin/integration
         """Extract key findings from classification results"""
         
         findings = []
@@ -317,6 +387,7 @@ class ManagementSummarizer:
         
         # High-risk findings
         if distribution["High-Legal"] > 0:
+<<<<<<< HEAD
             findings.append(
                 f"Se identificaron {distribution['High-Legal']} "
                 "documentos de alto riesgo legal"
@@ -328,6 +399,13 @@ class ManagementSummarizer:
                 f"Se detectaron {distribution['Medium-Legal']} "
                 "documentos de riesgo medio"
             )
+=======
+            findings.append(f"Se identificaron {distribution['High-Legal']} documentos de alto riesgo legal")
+        
+        # Medium-risk findings
+        if distribution["Medium-Legal"] > 0:
+            findings.append(f"Se detectaron {distribution['Medium-Legal']} documentos de riesgo medio")
+>>>>>>> origin/integration
         
         # Source analysis
         sources = {}
@@ -337,6 +415,7 @@ class ManagementSummarizer:
         
         for source, count in sources.items():
             if count > 5:  # Significant number of documents from one source
+<<<<<<< HEAD
                 findings.append(
                     f"Alta actividad regulatoria detectada en {source} "
                     f"({count} documentos)"
@@ -348,6 +427,13 @@ class ManagementSummarizer:
                 "No se detectaron hallazgos significativos en el "
                 "período analizado"
             )
+=======
+                findings.append(f"Alta actividad regulatoria detectada en {source} ({count} documentos)")
+        
+        # Default finding if none found
+        if not findings:
+            findings.append("No se detectaron hallazgos significativos en el período analizado")
+>>>>>>> origin/integration
         
         return findings[:5]  # Limit to top 5 findings
     
@@ -397,9 +483,13 @@ class ManagementSummarizer:
         try:
             # Test cloud Gemini connectivity
             async with httpx.AsyncClient(timeout=10.0) as client:
+<<<<<<< HEAD
                 response = await client.get(
                     f"{self.gemini_service_url}/health"
                 )
+=======
+                response = await client.get(f"{self.gemini_service_url}/health")
+>>>>>>> origin/integration
                 status["cloud_gemini_available"] = response.status_code == 200
         except Exception as e:
             logger.warning(f"Cloud Gemini health check failed: {e}")

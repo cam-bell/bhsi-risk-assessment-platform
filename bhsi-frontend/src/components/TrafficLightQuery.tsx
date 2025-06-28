@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
-import { 
-  Box, 
-  TextField, 
-  Button, 
-  CircularProgress, 
-  Alert, 
-  Card, 
+import { useState, useEffect } from "react";
+import {
+  Box,
+  TextField,
+  Button,
+  CircularProgress,
+  Alert,
+  Card,
   CardContent,
   Typography,
   Tooltip,
@@ -23,33 +23,47 @@ import {
   ToggleButtonGroup,
   Accordion,
   AccordionSummary,
-  AccordionDetails
-} from '@mui/material';
-import { Search, Save, Database, Newspaper, Globe, Calendar, ChevronDown } from 'lucide-react';
-import TrafficLightResult from './TrafficLightResult';
-import SavedResults from './SavedResults';
-import BatchUpload from './BatchUpload';
-import { useAuth } from '../auth/useAuth';
-import { useCompanies } from '../context/CompaniesContext';
+  AccordionDetails,
+} from "@mui/material";
+import {
+  Search,
+  Save,
+  Database,
+  Newspaper,
+  Globe,
+  Calendar,
+  ChevronDown,
+} from "lucide-react";
+import TrafficLightResult from "./TrafficLightResult";
+import SavedResults from "./SavedResults";
+import BatchUpload from "./BatchUpload";
+import { useAuth } from "../auth/useAuth";
+import { useCompanies } from "../context/CompaniesContext";
+import {
+  useSearchCompanyMutation,
+  SearchResponse,
+} from "../store/api/riskAssessmentApi";
 
 // Type for API response
 export interface TrafficLightResponse {
   company: string;
   vat: string;
-  overall: 'green' | 'orange' | 'red';
+  overall: "green" | "orange" | "red";
   blocks: {
-    turnover: 'green' | 'orange' | 'red';
-    shareholding: 'green' | 'orange' | 'red';
-    bankruptcy: 'green' | 'orange' | 'red';
-    legal: 'green' | 'orange' | 'red';
+    turnover: "green" | "orange" | "red";
+    shareholding: "green" | "orange" | "red";
+    bankruptcy: "green" | "orange" | "red";
+    legal: "green" | "orange" | "red";
   };
-  dataSource?: 'BOE' | 'NewsAPI' | 'both';
+  dataSource?: "BOE" | "NewsAPI" | "both";
   dateRange?: {
-    type: 'preset' | 'custom';
+    type: "preset" | "custom";
     daysBack?: number;
     startDate?: string;
     endDate?: string;
   };
+  // Add backend search results
+  searchResults?: SearchResponse;
 }
 
 export interface SavedResult extends TrafficLightResponse {
@@ -57,96 +71,92 @@ export interface SavedResult extends TrafficLightResponse {
   savedBy: string;
 }
 
-// Test company database
-const testCompanies = {
-  'ACME': {
-    company: 'ACME Solutions S.A.',
-    vat: 'ESX78901234',
-    overall: 'orange' as 'orange',
-    blocks: {
-      turnover: 'green' as 'green',
-      shareholding: 'orange' as 'orange',
-      bankruptcy: 'green' as 'green',
-      legal: 'red' as 'red'
-    }
-  },
-  'TECH': {
-    company: 'TechVision Global S.A.',
-    vat: 'ESX45678901',
-    overall: 'green' as 'green',
-    blocks: {
-      turnover: 'green' as 'green',
-      shareholding: 'green' as 'green',
-      bankruptcy: 'green' as 'green',
-      legal: 'green' as 'green'
-    }
-  },
-  'RISK': {
-    company: 'RiskCorp Industries S.A.',
-    vat: 'ESX12345678',
-    overall: 'red' as 'red',
-    blocks: {
-      turnover: 'red' as 'red',
-      shareholding: 'red' as 'red',
-      bankruptcy: 'orange' as 'orange',
-      legal: 'red' as 'red'
-    }
-  },
-  'NOVA': {
-    company: 'Nova Enterprises S.A.',
-    vat: 'ESX23456789',
-    overall: 'orange' as 'orange',
-    blocks: {
-      turnover: 'orange' as 'orange',
-      shareholding: 'green' as 'green',
-      bankruptcy: 'orange' as 'orange',
-      legal: 'green' as 'green'
-    }
-  }
-};
+// Function to convert backend search results to traffic light format
+const convertSearchResultsToTrafficLight = (
+  searchResponse: SearchResponse
+): TrafficLightResponse => {
+  const results = searchResponse.results;
 
-// Mock API response function
-const getMockResponse = (query: string): TrafficLightResponse => {
-  const upperQuery = query.toUpperCase();
-  const matchedCompany = Object.entries(testCompanies).find(([key]) => upperQuery.includes(key));
-  
-  if (matchedCompany) {
-    return matchedCompany[1];
+  // Analyze risk levels from search results
+  const highRiskCount = results.filter(
+    (r) => r.risk_level === "High-Legal" || r.risk_level === "High-Financial"
+  ).length;
+  const mediumRiskCount = results.filter(
+    (r) =>
+      r.risk_level === "Medium-Legal" || r.risk_level === "Medium-Financial"
+  ).length;
+  const lowRiskCount = results.filter(
+    (r) => r.risk_level === "Low-Legal" || r.risk_level === "Low-Financial"
+  ).length;
+
+  // Determine overall risk based on results
+  let overall: "green" | "orange" | "red" = "green";
+  if (highRiskCount > 0) {
+    overall = "red";
+  } else if (mediumRiskCount > 0) {
+    overall = "orange";
   }
 
-  // Default response for unknown companies
+  // Analyze by category (simplified mapping)
+  const legalResults = results.filter((r) => r.risk_level.includes("Legal"));
+  const financialResults = results.filter((r) =>
+    r.risk_level.includes("Financial")
+  );
+
+  const getCategoryRisk = (
+    categoryResults: any[]
+  ): "green" | "orange" | "red" => {
+    const highRisk = categoryResults.filter((r) =>
+      r.risk_level.startsWith("High")
+    ).length;
+    const mediumRisk = categoryResults.filter((r) =>
+      r.risk_level.startsWith("Medium")
+    ).length;
+
+    if (highRisk > 0) return "red";
+    if (mediumRisk > 0) return "orange";
+    return "green";
+  };
+
   return {
-    company: `${query} S.A.`,
-    vat: upperQuery.includes('ESX') ? upperQuery : 'ESX99999999',
-    overall: 'orange' as 'orange',
+    company: searchResponse.company_name,
+    vat: "N/A", // Backend doesn't provide VAT
+    overall,
     blocks: {
-      turnover: 'orange' as 'orange',
-      shareholding: 'orange' as 'orange',
-      bankruptcy: 'green' as 'green',
-      legal: 'orange' as 'orange'
-    }
+      turnover: getCategoryRisk(financialResults),
+      shareholding: "green", // Not directly available from search
+      bankruptcy: getCategoryRisk(financialResults),
+      legal: getCategoryRisk(legalResults),
+    },
+    searchResults: searchResponse,
   };
 };
 
 const TrafficLightQuery = () => {
   const { user } = useAuth();
   const { addAssessedCompany } = useCompanies();
-  const [query, setQuery] = useState('');
-  const [dataSource, setDataSource] = useState<'BOE' | 'NewsAPI' | 'both'>('both');
-  const [dateRangeType, setDateRangeType] = useState<'preset' | 'custom'>('preset');
+  const [query, setQuery] = useState("");
+  const [dataSource, setDataSource] = useState<"BOE" | "NewsAPI" | "both">(
+    "both"
+  );
+  const [dateRangeType, setDateRangeType] = useState<"preset" | "custom">(
+    "preset"
+  );
   const [daysBack, setDaysBack] = useState<number>(30);
-  const [startDate, setStartDate] = useState<string>('');
-  const [endDate, setEndDate] = useState<string>('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<TrafficLightResponse | null>(null);
   const [savedResults, setSavedResults] = useState<SavedResult[]>([]);
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
 
+  // RTK Query hook for API calls
+  const [searchCompany, { isLoading }] = useSearchCompanyMutation();
+
   // Helper function to format date to YYYY-MM-DD
   const formatDateToYYYYMMDD = (date: Date): string => {
-    return date.toISOString().split('T')[0];
+    return date.toISOString().split("T")[0];
   };
 
   // Helper function to validate date format
@@ -165,13 +175,15 @@ const TrafficLightQuery = () => {
     }
   }, [user]);
 
-  const handleDataSourceChange = (event: SelectChangeEvent<'BOE' | 'NewsAPI' | 'both'>) => {
-    setDataSource(event.target.value as 'BOE' | 'NewsAPI' | 'both');
+  const handleDataSourceChange = (
+    event: SelectChangeEvent<"BOE" | "NewsAPI" | "both">
+  ) => {
+    setDataSource(event.target.value as "BOE" | "NewsAPI" | "both");
   };
 
   const handleDateRangeTypeChange = (
     event: React.MouseEvent<HTMLElement>,
-    newType: 'preset' | 'custom'
+    newType: "preset" | "custom"
   ) => {
     if (newType !== null) {
       setDateRangeType(newType);
@@ -185,7 +197,7 @@ const TrafficLightQuery = () => {
   const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     // Ensure YYYY-MM-DD format
-    if (value === '' || isValidDateFormat(value)) {
+    if (value === "" || isValidDateFormat(value)) {
       setStartDate(value);
     }
   };
@@ -193,73 +205,90 @@ const TrafficLightQuery = () => {
   const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     // Ensure YYYY-MM-DD format
-    if (value === '' || isValidDateFormat(value)) {
+    if (value === "" || isValidDateFormat(value)) {
       setEndDate(value);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!query.trim()) {
-      setError('Please enter a company name or VAT number');
+      setError("Please enter a company name or VAT number");
       return;
     }
-    
+
     // Validate custom date range
-    if (dateRangeType === 'custom') {
+    if (dateRangeType === "custom") {
       if (!startDate || !endDate) {
-        setError('Please select both start and end dates for custom range (format: YYYY-MM-DD)');
+        setError(
+          "Please select both start and end dates for custom range (format: YYYY-MM-DD)"
+        );
         return;
       }
       if (!isValidDateFormat(startDate) || !isValidDateFormat(endDate)) {
-        setError('Please enter dates in YYYY-MM-DD format');
+        setError("Please enter dates in YYYY-MM-DD format");
         return;
       }
       if (new Date(startDate) > new Date(endDate)) {
-        setError('Start date must be before end date');
+        setError("Start date must be before end date");
         return;
       }
     }
-    
-    setIsLoading(true);
+
     setError(null);
-    
+
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 800));
-      const data = getMockResponse(query);
-      
-      // Add data source and date range info to result
-      const resultWithMetadata: TrafficLightResponse = { 
-        ...data, 
-        dataSource,
-        dateRange: dateRangeType === 'preset' 
-          ? { type: 'preset' as const, daysBack }
-          : { type: 'custom' as const, startDate, endDate }
+      // Prepare search request
+      const searchRequest = {
+        company_name: query.trim(),
+        include_boe: dataSource === "BOE" || dataSource === "both",
+        include_news: dataSource === "NewsAPI" || dataSource === "both",
+        ...(dateRangeType === "preset"
+          ? { days_back: daysBack }
+          : { start_date: startDate, end_date: endDate }),
       };
+
+      // Call the backend API
+      const searchResponse = await searchCompany(searchRequest).unwrap();
+
+      // Convert to traffic light format
+      const trafficLightResult =
+        convertSearchResultsToTrafficLight(searchResponse);
+
+      // Add metadata
+      const resultWithMetadata: TrafficLightResponse = {
+        ...trafficLightResult,
+        dataSource,
+        dateRange:
+          dateRangeType === "preset"
+            ? { type: "preset" as const, daysBack }
+            : { type: "custom" as const, startDate, endDate },
+      };
+
       setResult(resultWithMetadata);
-      
+
       // Automatically add to dashboard
       if (user) {
         addAssessedCompany({
-          name: data.company,
-          vat: data.vat,
-          overallRisk: data.overall,
+          name: trafficLightResult.company,
+          vat: trafficLightResult.vat,
+          overallRisk: trafficLightResult.overall,
           assessedBy: user.email,
           riskFactors: {
-            turnover: data.blocks.turnover,
-            shareholding: data.blocks.shareholding,
-            bankruptcy: data.blocks.bankruptcy,
-            legal: data.blocks.legal,
-          }
+            turnover: trafficLightResult.blocks.turnover,
+            shareholding: trafficLightResult.blocks.shareholding,
+            bankruptcy: trafficLightResult.blocks.bankruptcy,
+            legal: trafficLightResult.blocks.legal,
+          },
         });
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+    } catch (err: any) {
+      console.error("Search error:", err);
+      setError(
+        err?.data?.detail || err?.message || "An unexpected error occurred"
+      );
       setResult(null);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -268,11 +297,14 @@ const TrafficLightQuery = () => {
       const savedResult: SavedResult = {
         ...result,
         savedAt: new Date().toISOString(),
-        savedBy: user.email
+        savedBy: user.email,
       };
       const newSavedResults = [savedResult, ...savedResults];
       setSavedResults(newSavedResults);
-      localStorage.setItem(`savedResults-${user.email}`, JSON.stringify(newSavedResults));
+      localStorage.setItem(
+        `savedResults-${user.email}`,
+        JSON.stringify(newSavedResults)
+      );
       setResult(null);
       setShowSaveSuccess(true);
     }
@@ -282,23 +314,32 @@ const TrafficLightQuery = () => {
     const updatedResults = [...newResults, ...savedResults];
     setSavedResults(updatedResults);
     if (user) {
-      localStorage.setItem(`savedResults-${user.email}`, JSON.stringify(updatedResults));
+      localStorage.setItem(
+        `savedResults-${user.email}`,
+        JSON.stringify(updatedResults)
+      );
     }
     setShowSaveSuccess(true);
   };
 
   const handleDeleteResult = (resultToDelete: SavedResult) => {
-    const updatedResults = savedResults.filter(result => 
-      !(result.company === resultToDelete.company && 
-        result.savedAt === resultToDelete.savedAt && 
-        result.savedBy === resultToDelete.savedBy)
+    const updatedResults = savedResults.filter(
+      (result) =>
+        !(
+          result.company === resultToDelete.company &&
+          result.savedAt === resultToDelete.savedAt &&
+          result.savedBy === resultToDelete.savedBy
+        )
     );
     setSavedResults(updatedResults);
     if (user) {
-      localStorage.setItem(`savedResults-${user.email}`, JSON.stringify(updatedResults));
+      localStorage.setItem(
+        `savedResults-${user.email}`,
+        JSON.stringify(updatedResults)
+      );
     }
   };
-  
+
   return (
     <Box>
       <Card sx={{ mb: 4 }}>
@@ -318,7 +359,15 @@ const TrafficLightQuery = () => {
                 Enter Company Details
               </Typography>
               <form onSubmit={handleSubmit}>
-                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2, alignItems: { xs: 'stretch', sm: 'flex-end' }, mb: 2 }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    flexDirection: { xs: "column", sm: "row" },
+                    gap: 2,
+                    alignItems: { xs: "stretch", sm: "flex-end" },
+                    mb: 2,
+                  }}
+                >
                   <TextField
                     label="Company Name or VAT Number"
                     variant="outlined"
@@ -328,11 +377,11 @@ const TrafficLightQuery = () => {
                     placeholder="Try: ACME, TECH, RISK, or NOVA"
                     disabled={isLoading}
                     InputProps={{
-                      sx: { borderRadius: 2 }
+                      sx: { borderRadius: 2 },
                     }}
                     sx={{ flex: 1 }}
                   />
-                  <FormControl sx={{ minWidth: { xs: '100%', sm: '200px' } }}>
+                  <FormControl sx={{ minWidth: { xs: "100%", sm: "200px" } }}>
                     <InputLabel>Data Source</InputLabel>
                     <Select
                       value={dataSource}
@@ -342,19 +391,25 @@ const TrafficLightQuery = () => {
                       sx={{ borderRadius: 2 }}
                     >
                       <MenuItem value="BOE">
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box
+                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                        >
                           <Database size={16} />
                           BOE (Boletín Oficial del Estado)
                         </Box>
                       </MenuItem>
                       <MenuItem value="NewsAPI">
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box
+                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                        >
                           <Newspaper size={16} />
                           NewsAPI
                         </Box>
                       </MenuItem>
                       <MenuItem value="both">
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box
+                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                        >
                           <Globe size={16} />
                           Both Sources
                         </Box>
@@ -364,29 +419,39 @@ const TrafficLightQuery = () => {
                 </Box>
 
                 {/* Date Range Section */}
-                <Accordion sx={{ mb: 2, borderRadius: 2, '&:before': { display: 'none' } }}>
-                  <AccordionSummary 
+                <Accordion
+                  sx={{
+                    mb: 2,
+                    borderRadius: 2,
+                    "&:before": { display: "none" },
+                  }}
+                >
+                  <AccordionSummary
                     expandIcon={<ChevronDown />}
-                    sx={{ 
+                    sx={{
                       borderRadius: 2,
-                      '& .MuiAccordionSummary-content': { alignItems: 'center' }
+                      "& .MuiAccordionSummary-content": {
+                        alignItems: "center",
+                      },
                     }}
                   >
                     <Calendar size={18} style={{ marginRight: 8 }} />
-                    <Typography variant="subtitle2">
-                      Date Range
-                    </Typography>
-                    <Typography variant="caption" sx={{ ml: 2, color: 'text.secondary' }}>
-                      {dateRangeType === 'preset' 
+                    <Typography variant="subtitle2">Date Range</Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{ ml: 2, color: "text.secondary" }}
+                    >
+                      {dateRangeType === "preset"
                         ? `Last ${daysBack} days`
-                        : startDate && endDate 
-                          ? `${startDate} to ${endDate}`
-                          : 'Custom range'
-                      }
+                        : startDate && endDate
+                        ? `${startDate} to ${endDate}`
+                        : "Custom range"}
                     </Typography>
                   </AccordionSummary>
                   <AccordionDetails>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <Box
+                      sx={{ display: "flex", flexDirection: "column", gap: 2 }}
+                    >
                       <ToggleButtonGroup
                         value={dateRangeType}
                         exclusive
@@ -398,7 +463,7 @@ const TrafficLightQuery = () => {
                         <ToggleButton value="custom">Custom Range</ToggleButton>
                       </ToggleButtonGroup>
 
-                      {dateRangeType === 'preset' ? (
+                      {dateRangeType === "preset" ? (
                         <FormControl sx={{ maxWidth: 300 }}>
                           <InputLabel>Period</InputLabel>
                           <Select
@@ -417,7 +482,13 @@ const TrafficLightQuery = () => {
                           </Select>
                         </FormControl>
                       ) : (
-                        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2 }}>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            flexDirection: { xs: "column", sm: "row" },
+                            gap: 2,
+                          }}
+                        >
                           <TextField
                             label="Start Date"
                             type="date"
@@ -447,33 +518,44 @@ const TrafficLightQuery = () => {
                         </Box>
                       )}
 
-                      <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.875rem' }}>
-                        💡 <strong>Tip:</strong> Date range primarily affects NewsAPI results. 
-                        BOE data is typically current and less time-sensitive.
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ fontSize: "0.875rem" }}
+                      >
+                        💡 <strong>Tip:</strong> Date range primarily affects
+                        NewsAPI results. BOE data is typically current and less
+                        time-sensitive.
                       </Typography>
                     </Box>
                   </AccordionDetails>
                 </Accordion>
 
-                <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                <Box sx={{ display: "flex", justifyContent: "center" }}>
                   <Button
                     variant="contained"
                     color="primary"
                     type="submit"
                     disabled={isLoading}
-                    startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : <Search />}
-                    sx={{ 
-                      minWidth: '200px',
-                      height: '56px',
-                      fontSize: '1.1rem',
-                      fontWeight: 600
+                    startIcon={
+                      isLoading ? (
+                        <CircularProgress size={20} color="inherit" />
+                      ) : (
+                        <Search />
+                      )
+                    }
+                    sx={{
+                      minWidth: "200px",
+                      height: "56px",
+                      fontSize: "1.1rem",
+                      fontWeight: 600,
                     }}
                   >
-                    {isLoading ? 'Searching...' : 'Get Score'}
+                    {isLoading ? "Searching..." : "Get Score"}
                   </Button>
                 </Box>
               </form>
-              
+
               {error && (
                 <Alert severity="error" sx={{ mt: 3 }}>
                   {error}
@@ -483,7 +565,12 @@ const TrafficLightQuery = () => {
           ) : (
             <BatchUpload
               onSaveResults={handleSaveBatchResults}
-              getMockResponse={getMockResponse}
+              dataSource={dataSource}
+              dateRange={
+                dateRangeType === "preset"
+                  ? { type: "preset" as const, daysBack }
+                  : { type: "custom" as const, startDate, endDate }
+              }
             />
           )}
         </CardContent>
@@ -491,7 +578,7 @@ const TrafficLightQuery = () => {
 
       {/* Current Result Display */}
       {result && (
-        <Card sx={{ mb: 4, position: 'relative' }}>
+        <Card sx={{ mb: 4, position: "relative" }}>
           <CardContent>
             <TrafficLightResult result={result} />
             <Zoom in={true}>
@@ -499,13 +586,14 @@ const TrafficLightQuery = () => {
                 color="primary"
                 onClick={handleSave}
                 sx={{
-                  position: 'absolute',
+                  position: "absolute",
                   top: 16,
                   right: 16,
-                  boxShadow: theme => `0 4px 14px ${theme.palette.primary.main}40`,
-                  '&:hover': {
-                    transform: 'scale(1.05)',
-                  }
+                  boxShadow: (theme) =>
+                    `0 4px 14px ${theme.palette.primary.main}40`,
+                  "&:hover": {
+                    transform: "scale(1.05)",
+                  },
                 }}
               >
                 <Tooltip title="Save Result" placement="left">
@@ -517,15 +605,13 @@ const TrafficLightQuery = () => {
         </Card>
       )}
 
-
-
       {/* Success Snackbar */}
       <Snackbar
         open={showSaveSuccess}
         autoHideDuration={3000}
         onClose={() => setShowSaveSuccess(false)}
         message="Result saved successfully"
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       />
     </Box>
   );

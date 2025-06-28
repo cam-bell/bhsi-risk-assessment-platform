@@ -7,6 +7,7 @@ import logging
 from typing import Dict, Any, List, Optional
 from app.agents.search.streamlined_boe_agent import StreamlinedBOEAgent
 from app.agents.search.streamlined_newsapi_agent import StreamlinedNewsAPIAgent
+<<<<<<< HEAD
 from app.agents.search.streamlined_elpais_agent import StreamlinedElPaisAgent
 from app.agents.search.streamlined_expansion_agent import StreamlinedExpansionAgent
 from app.agents.search.streamlined_elmundo_agent import StreamlinedElMundoAgent
@@ -16,6 +17,8 @@ from app.agents.search.streamlined_elconfidencial_agent import StreamlinedElConf
 from app.agents.search.streamlined_eldiario_agent import StreamlinedElDiarioAgent
 from app.agents.search.streamlined_europapress_agent import StreamlinedEuropaPressAgent
 from app.agents.search.streamlined_yahoo_finance_agent import StreamlinedYahooFinanceAgent
+=======
+>>>>>>> origin/integration
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +30,7 @@ class StreamlinedSearchOrchestrator:
         """Initialize streamlined search agents"""
         self.agents = {
             "boe": StreamlinedBOEAgent(),
+<<<<<<< HEAD
             "newsapi": StreamlinedNewsAPIAgent(),
             "elpais": StreamlinedElPaisAgent(),
             "expansion": StreamlinedExpansionAgent(),
@@ -37,6 +41,9 @@ class StreamlinedSearchOrchestrator:
             "eldiario": StreamlinedElDiarioAgent(),
             "europapress": StreamlinedEuropaPressAgent(),
             "yahoo_finance": StreamlinedYahooFinanceAgent()
+=======
+            "newsapi": StreamlinedNewsAPIAgent()
+>>>>>>> origin/integration
         }
     
     async def search_all(
@@ -77,10 +84,15 @@ class StreamlinedSearchOrchestrator:
                 result_count = 0
                 if agent_name == "boe":
                     result_count = len(agent_results.get("results", []))
+<<<<<<< HEAD
                 elif agent_name in ["newsapi", "elpais", "expansion", "elmundo", "abc", "lavanguardia", "elconfidencial", "eldiario", "europapress"]:
                     result_count = len(agent_results.get("articles", []))
                 elif agent_name == "yahoo_finance":
                     result_count = len(agent_results.get("financial_data", []))
+=======
+                elif agent_name == "newsapi":
+                    result_count = len(agent_results.get("articles", []))
+>>>>>>> origin/integration
                 
                 logger.info(f"✅ {agent_name}: {result_count} results")
                 

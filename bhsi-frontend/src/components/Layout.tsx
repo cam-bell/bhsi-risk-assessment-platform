@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import React, { useState } from "react";
+=======
+import React, { useState } from 'react';
+>>>>>>> origin/integration
 import {
   Box,
   AppBar,
@@ -17,7 +21,11 @@ import {
   Badge,
   useTheme,
   useMediaQuery,
+<<<<<<< HEAD
 } from "@mui/material";
+=======
+} from '@mui/material';
+>>>>>>> origin/integration
 import {
   Menu as MenuIcon,
   BarChart3 as Dashboard,
@@ -29,10 +37,17 @@ import {
   Bell,
   LogOut,
   User,
+<<<<<<< HEAD
 } from "lucide-react";
 import { useAuth } from "../auth/useAuth";
 import { NotificationCenter } from "./NotificationSystem";
 import { useNavigate, useLocation } from "react-router-dom";
+=======
+} from 'lucide-react';
+import { useAuth } from '../auth/useAuth';
+import { NotificationCenter } from './NotificationSystem';
+import { useNavigate, useLocation } from 'react-router-dom';
+>>>>>>> origin/integration
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -40,6 +55,7 @@ interface LayoutProps {
 }
 
 const navigationItems = [
+<<<<<<< HEAD
   { id: "dashboard", label: "Dashboard", icon: Dashboard, path: "/dashboard" },
   { id: "search", label: "Risk Assessment", icon: Search, path: "/" },
   { id: "batch", label: "Batch Upload", icon: FileUp, path: "/batch" },
@@ -64,6 +80,25 @@ const Layout = ({ children, currentPage = "search" }: LayoutProps) => {
   const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(
     null
   );
+=======
+  { id: 'dashboard', label: 'Dashboard', icon: Dashboard, path: '/dashboard' },
+  { id: 'search', label: 'Risk Assessment', icon: Search, path: '/' },
+  { id: 'batch', label: 'Batch Upload', icon: FileUp, path: '/batch' },
+  { id: 'history', label: 'Assessment History', icon: History, path: '/history' },
+  { id: 'settings', label: 'Settings', icon: Settings, path: '/settings' },
+  { id: 'help', label: 'Help & Support', icon: HelpCircle, path: '/help' },
+];
+
+const Layout = ({ children, currentPage = 'search' }: LayoutProps) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
+>>>>>>> origin/integration
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -82,6 +117,7 @@ const Layout = ({ children, currentPage = "search" }: LayoutProps) => {
     logout();
   };
 
+<<<<<<< HEAD
   const handleProfileClick = () => {
     handleUserMenuClose();
     navigate("/profile");
@@ -92,6 +128,8 @@ const Layout = ({ children, currentPage = "search" }: LayoutProps) => {
     navigate("/settings");
   };
 
+=======
+>>>>>>> origin/integration
   const handleNavigation = (path: string) => {
     navigate(path);
     if (isMobile) {
@@ -101,21 +139,36 @@ const Layout = ({ children, currentPage = "search" }: LayoutProps) => {
 
   // Determine current page from location
   const getCurrentPage = () => {
+<<<<<<< HEAD
     if (location.pathname === "/dashboard") return "dashboard";
     if (location.pathname === "/") return "search";
     if (location.pathname === "/batch") return "batch";
     if (location.pathname === "/history") return "history";
     if (location.pathname === "/settings") return "settings";
     if (location.pathname === "/help") return "help";
+=======
+    if (location.pathname === '/dashboard') return 'dashboard';
+    if (location.pathname === '/') return 'search';
+    if (location.pathname === '/batch') return 'batch';
+    if (location.pathname === '/history') return 'history';
+    if (location.pathname === '/settings') return 'settings';
+    if (location.pathname === '/help') return 'help';
+>>>>>>> origin/integration
     return currentPage;
   };
 
   const drawerWidth = 280;
 
   const drawer = (
+<<<<<<< HEAD
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
       {/* Logo Section */}
       <Box sx={{ p: 3, bgcolor: "primary.main", color: "white" }}>
+=======
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* Logo Section */}
+      <Box sx={{ p: 3, bgcolor: 'primary.main', color: 'white' }}>
+>>>>>>> origin/integration
         <Typography variant="h6" fontWeight="bold">
           BHSI
         </Typography>
@@ -129,7 +182,11 @@ const Layout = ({ children, currentPage = "search" }: LayoutProps) => {
         {navigationItems.map((item) => {
           const Icon = item.icon;
           const isActive = getCurrentPage() === item.id;
+<<<<<<< HEAD
 
+=======
+          
+>>>>>>> origin/integration
           return (
             <ListItem
               key={item.id}
@@ -137,6 +194,7 @@ const Layout = ({ children, currentPage = "search" }: LayoutProps) => {
               sx={{
                 borderRadius: 2,
                 mb: 0.5,
+<<<<<<< HEAD
                 bgcolor: isActive ? "primary.light" : "transparent",
                 color: isActive ? "white" : "inherit",
                 "&:hover": {
@@ -149,12 +207,28 @@ const Layout = ({ children, currentPage = "search" }: LayoutProps) => {
               <ListItemIcon
                 sx={{ color: isActive ? "white" : "inherit", minWidth: 40 }}
               >
+=======
+                bgcolor: isActive ? 'primary.light' : 'transparent',
+                color: isActive ? 'white' : 'inherit',
+                '&:hover': {
+                  bgcolor: isActive ? 'primary.light' : 'grey.100',
+                },
+                cursor: 'pointer',
+                transition: 'all 0.2s ease-in-out',
+              }}
+            >
+              <ListItemIcon sx={{ color: isActive ? 'white' : 'inherit', minWidth: 40 }}>
+>>>>>>> origin/integration
                 <Icon size={20} />
               </ListItemIcon>
               <ListItemText
                 primary={item.label}
                 primaryTypographyProps={{
+<<<<<<< HEAD
                   fontSize: "0.9rem",
+=======
+                  fontSize: '0.9rem',
+>>>>>>> origin/integration
                   fontWeight: isActive ? 600 : 400,
                 }}
               />
@@ -164,6 +238,7 @@ const Layout = ({ children, currentPage = "search" }: LayoutProps) => {
       </List>
 
       {/* User Info Section */}
+<<<<<<< HEAD
       <Box sx={{ p: 2, borderTop: 1, borderColor: "divider" }}>
         <Box sx={{ display: "flex", alignItems: "center" }}>
           <Avatar
@@ -177,6 +252,19 @@ const Layout = ({ children, currentPage = "search" }: LayoutProps) => {
             </Typography>
             <Typography variant="caption" color="text.secondary" noWrap>
               {user?.email || "user@bhsi.com"}
+=======
+      <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Avatar sx={{ width: 32, height: 32, mr: 2, bgcolor: 'primary.main' }}>
+            {user?.name?.charAt(0).toUpperCase() || 'U'}
+          </Avatar>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="body2" fontWeight={500} noWrap>
+              {user?.name || 'User'}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" noWrap>
+              {user?.email || 'user@bhsi.com'}
+>>>>>>> origin/integration
             </Typography>
           </Box>
         </Box>
@@ -185,15 +273,24 @@ const Layout = ({ children, currentPage = "search" }: LayoutProps) => {
   );
 
   return (
+<<<<<<< HEAD
     <Box sx={{ display: "flex", height: "100vh" }}>
+=======
+    <Box sx={{ display: 'flex', height: '100vh' }}>
+>>>>>>> origin/integration
       {/* App Bar */}
       <AppBar
         position="fixed"
         sx={{
           width: { md: `calc(100% - ${drawerWidth}px)` },
           ml: { md: `${drawerWidth}px` },
+<<<<<<< HEAD
           bgcolor: "white",
           color: "text.primary",
+=======
+          bgcolor: 'white',
+          color: 'text.primary',
+>>>>>>> origin/integration
           boxShadow: 1,
         }}
       >
@@ -203,6 +300,7 @@ const Layout = ({ children, currentPage = "search" }: LayoutProps) => {
             aria-label="open drawer"
             edge="start"
             onClick={handleDrawerToggle}
+<<<<<<< HEAD
             sx={{ mr: 2, display: { md: "none" } }}
           >
             <MenuIcon />
@@ -211,6 +309,15 @@ const Layout = ({ children, currentPage = "search" }: LayoutProps) => {
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             {navigationItems.find((item) => item.id === getCurrentPage())
               ?.label || "Risk Assessment"}
+=======
+            sx={{ mr: 2, display: { md: 'none' } }}
+          >
+            <MenuIcon />
+          </IconButton>
+          
+          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
+            {navigationItems.find(item => item.id === getCurrentPage())?.label || 'Risk Assessment'}
+>>>>>>> origin/integration
           </Typography>
 
           {/* Notifications */}
@@ -222,25 +329,44 @@ const Layout = ({ children, currentPage = "search" }: LayoutProps) => {
             color="inherit"
             sx={{ ml: 1 }}
           >
+<<<<<<< HEAD
             <Avatar sx={{ width: 32, height: 32, bgcolor: "primary.main" }}>
               {user?.name?.charAt(0).toUpperCase() || "U"}
             </Avatar>
           </IconButton>
 
+=======
+            <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }}>
+              {user?.name?.charAt(0).toUpperCase() || 'U'}
+            </Avatar>
+          </IconButton>
+          
+>>>>>>> origin/integration
           <Menu
             anchorEl={userMenuAnchor}
             open={Boolean(userMenuAnchor)}
             onClose={handleUserMenuClose}
+<<<<<<< HEAD
             transformOrigin={{ horizontal: "right", vertical: "top" }}
             anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
           >
             <MenuItem onClick={handleProfileClick}>
+=======
+            transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+            anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+          >
+            <MenuItem onClick={handleUserMenuClose}>
+>>>>>>> origin/integration
               <ListItemIcon>
                 <User size={20} />
               </ListItemIcon>
               <ListItemText>Profile</ListItemText>
             </MenuItem>
+<<<<<<< HEAD
             <MenuItem onClick={handleSettingsClick}>
+=======
+            <MenuItem onClick={handleUserMenuClose}>
+>>>>>>> origin/integration
               <ListItemIcon>
                 <Settings size={20} />
               </ListItemIcon>
@@ -263,13 +389,22 @@ const Layout = ({ children, currentPage = "search" }: LayoutProps) => {
         sx={{ width: { md: drawerWidth }, flexShrink: { md: 0 } }}
       >
         <Drawer
+<<<<<<< HEAD
           variant={isMobile ? "temporary" : "permanent"}
+=======
+          variant={isMobile ? 'temporary' : 'permanent'}
+>>>>>>> origin/integration
           open={isMobile ? mobileOpen : true}
           onClose={handleDrawerToggle}
           ModalProps={{ keepMounted: true }}
           sx={{
+<<<<<<< HEAD
             "& .MuiDrawer-paper": {
               boxSizing: "border-box",
+=======
+            '& .MuiDrawer-paper': {
+              boxSizing: 'border-box',
+>>>>>>> origin/integration
               width: drawerWidth,
               borderRight: 0,
               boxShadow: 2,
@@ -286,8 +421,13 @@ const Layout = ({ children, currentPage = "search" }: LayoutProps) => {
         sx={{
           flexGrow: 1,
           width: { md: `calc(100% - ${drawerWidth}px)` },
+<<<<<<< HEAD
           bgcolor: "grey.50",
           minHeight: "100vh",
+=======
+          bgcolor: 'grey.50',
+          minHeight: '100vh',
+>>>>>>> origin/integration
         }}
       >
         <Toolbar /> {/* Spacer for fixed AppBar */}
@@ -297,4 +437,8 @@ const Layout = ({ children, currentPage = "search" }: LayoutProps) => {
   );
 };
 
+<<<<<<< HEAD
 export default Layout;
+=======
+export default Layout; 
+>>>>>>> origin/integration

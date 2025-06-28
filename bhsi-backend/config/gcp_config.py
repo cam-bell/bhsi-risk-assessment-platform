@@ -4,7 +4,11 @@ from google.cloud import aiplatform
 import os
 
 # GCP Project Configuration
+<<<<<<< HEAD
 PROJECT_ID = "bhsi-444119"  # Replace with your GCP project ID
+=======
+PROJECT_ID = "your-project-id"  # Replace with your GCP project ID
+>>>>>>> origin/integration
 REGION = "europe-west1"
 
 # Cloud SQL Configuration

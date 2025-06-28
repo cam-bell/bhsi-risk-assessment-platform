@@ -23,7 +23,10 @@ class StreamlinedSearchRequest(BaseModel):
     days_back: Optional[int] = 7      # Alternative: search last N days
     include_boe: bool = True
     include_news: bool = True
+<<<<<<< HEAD
     include_rss: bool = True  # Include RSS news sources
+=======
+>>>>>>> origin/integration
 
 
 @router.post("/search")
@@ -62,14 +65,21 @@ async def streamlined_search(request: StreamlinedSearchRequest):
             active_agents.append("boe")
         if request.include_news:
             active_agents.append("newsapi")
+<<<<<<< HEAD
         if request.include_rss:
             # Add working RSS agents
             active_agents.extend(["elpais", "expansion", "elmundo", "abc", "lavanguardia", "elconfidencial", "eldiario", "europapress"])
+=======
+>>>>>>> origin/integration
             
         if not active_agents:
             raise HTTPException(
                 status_code=400,
+<<<<<<< HEAD
                 detail="At least one source (BOE, news, or RSS) must be enabled"
+=======
+                detail="At least one source (BOE or news) must be enabled"
+>>>>>>> origin/integration
             )
         
         # STEP 1: FAST SEARCH (no classification during search)
@@ -180,6 +190,7 @@ async def streamlined_search(request: StreamlinedSearchRequest):
                     }
                     classified_results.append(classified_result)
         
+<<<<<<< HEAD
         # Process RSS results (all individual RSS agents)
         rss_agents = ["elpais", "expansion", "elmundo", "abc", "lavanguardia", "elconfidencial", "eldiario", "europapress"]
         for agent_name in rss_agents:
@@ -227,6 +238,8 @@ async def streamlined_search(request: StreamlinedSearchRequest):
                         }
                         classified_results.append(classified_result)
         
+=======
+>>>>>>> origin/integration
         classification_time = time.time() - classification_start_time
         
         # STEP 3: SORT AND FORMAT RESULTS
@@ -270,7 +283,10 @@ async def streamlined_search(request: StreamlinedSearchRequest):
                 "total_results": len(valid_results),
                 "boe_results": len([r for r in valid_results if r["source"] == "BOE"]),
                 "news_results": len([r for r in valid_results if r["source"] == "News"]),
+<<<<<<< HEAD
                 "rss_results": len([r for r in valid_results if r["source"].startswith("RSS-")]),
+=======
+>>>>>>> origin/integration
                 "high_risk_results": len([r for r in valid_results if r["risk_level"] == "High-Legal"]),
                 "sources_searched": active_agents
             },
@@ -303,7 +319,10 @@ async def streamlined_search(request: StreamlinedSearchRequest):
                 "total_results": 0,
                 "boe_results": 0,
                 "news_results": 0,
+<<<<<<< HEAD
                 "rss_results": 0,
+=======
+>>>>>>> origin/integration
                 "high_risk_results": 0,
                 "sources_searched": []
             },
@@ -333,8 +352,12 @@ async def streamlined_search_health():
                 "streamlined_orchestrator": "available",
                 "optimized_hybrid_classifier": "available",
                 "streamlined_boe_agent": "available",
+<<<<<<< HEAD
                 "streamlined_newsapi_agent": "available",
                 "streamlined_rss_agent": "available"
+=======
+                "streamlined_newsapi_agent": "available"
+>>>>>>> origin/integration
             },
             "performance": classifier.get_performance_stats(),
             "expected_improvement": "90%+ faster than previous implementation"
@@ -347,8 +370,12 @@ async def streamlined_search_health():
                 "streamlined_orchestrator": "unknown",
                 "optimized_hybrid_classifier": "unknown", 
                 "streamlined_boe_agent": "unknown",
+<<<<<<< HEAD
                 "streamlined_newsapi_agent": "unknown",
                 "streamlined_rss_agent": "unknown"
+=======
+                "streamlined_newsapi_agent": "unknown"
+>>>>>>> origin/integration
             }
         }
 

@@ -37,11 +37,16 @@ async def generate_management_summary(
     """
     Generate an executive management summary explaining company risk classification
     
+<<<<<<< HEAD
     **Purpose**: Provide executive-level explanation of why a company was classified 
     with specific risk levels.
     
     **Input**: Classification results from the search endpoint
     **Output**: Executive summary with risk breakdown and recommendations
+=======
+    This endpoint provides a high-level explanation of why a company received
+    specific risk classifications, including evidence and recommendations.
+>>>>>>> origin/integration
     """
     
     try:
@@ -58,8 +63,11 @@ async def generate_management_summary(
             language=request.language
         )
         
+<<<<<<< HEAD
         logger.info(f"✅ Management summary generated successfully")
         
+=======
+>>>>>>> origin/integration
         return ManagementSummaryResponse(**summary)
         
     except Exception as e:

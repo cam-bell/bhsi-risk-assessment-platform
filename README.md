@@ -166,6 +166,12 @@ npm test
 - `GET /api/v1/companies/{company_id}/analysis`: Get analysis results
 - `GET /api/v1/companies/`: List all companies
 
+## Frontend Test Users
+
+- john@bhsi.com / password123
+- sarah@bhsi.com / password456
+- mike@bhsi.com / password789
+
 ## Contributing
 
 1. Create a feature branch
