@@ -4,12 +4,26 @@ from sqlalchemy.orm import Session
 from app.api import deps
 from app.models.company import Company
 from app.schemas.company import CompanyCreate, CompanyResponse, CompanyAnalysis
-from app.agents.search.streamlined_orchestrator import StreamlinedSearchOrchestrator
-from app.agents.analysis.optimized_hybrid_classifier import OptimizedHybridClassifier
-from app.crud import company as company_crud
-from app.core.config import settings
+from app.agents.search.streamlined_orchestrator import (
+    StreamlinedSearchOrchestrator
+)
+from app.agents.analysis.optimized_hybrid_classifier import (
+    OptimizedHybridClassifier
+)
+from app.agents.analytics.analytics_service import AnalyticsService
+from app.crud.company import company as company_crud
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+logger.info(f"company_crud type: {type(company_crud)}")
+logger.info(f"company_crud dir: {dir(company_crud)}")
+
+
 
 router = APIRouter()
+
 
 @router.post("/analyze", response_model=CompanyAnalysis)
 async def analyze_company(
@@ -43,6 +57,8 @@ async def analyze_company(
         
         # Process BOE results
         boe_results = search_results.get("boe", {}).get("results", [])
+        print("DEBUG: boe_results type:", type(boe_results))
+        print("DEBUG: boe_results value:", boe_results)
         for result in boe_results:
             classification = await classifier.classify_document(
                 text=result.get("texto_completo", ""),
@@ -62,12 +78,14 @@ async def analyze_company(
         
         # Process NewsAPI results
         news_results = search_results.get("newsapi", {}).get("articles", [])
+        print("DEBUG: news_results type:", type(news_results))
+        print("DEBUG: news_results value:", news_results)
         for article in news_results:
             classification = await classifier.classify_document(
                 text=article.get("content", article.get("description", "")),
                 title=article.get("title", ""),
                 source="News",
-                section=article.get("source", {}).get("name", "")
+                section=article.get("source", "")
             )
             
             article["risk_level"] = classification["label"]
@@ -85,7 +103,8 @@ async def analyze_company(
             overall_risk = "green"
         elif high_risk_count > 0:
             overall_risk = "red"
-        elif any(r.get("risk_level") == "Medium-Legal" for r in classified_results):
+        elif any(r.get("risk_level") == "Medium-Legal" 
+                for r in classified_results):
             overall_risk = "orange"
         else:
             overall_risk = "green"
@@ -101,8 +120,11 @@ async def analyze_company(
                 "legal": "red" if high_risk_count > 0 else "green",
                 "turnover": "green",  # Default for streamlined system
                 "shareholding": "green",  # Default for streamlined system 
-                "bankruptcy": "red" if any("concurso" in str(r).lower() for r in classified_results) else "green",
-                "corruption": "red" if any("blanqueo" in str(r).lower() or "corrupción" in str(r).lower() for r in classified_results) else "green"
+                "bankruptcy": ("red" if any("concurso" in str(r).lower() 
+                              for r in classified_results) else "green"),
+                "corruption": ("red" if any("blanqueo" in str(r).lower() or 
+                              "corrupción" in str(r).lower() 
+                              for r in classified_results) else "green")
             },
             "analysis_summary": {
                 "total_results": total_results,
@@ -112,7 +134,7 @@ async def analyze_company(
                 "keyword_efficiency": performance_stats["keyword_efficiency"],
                 "llm_usage": performance_stats["llm_usage"]
             },
-            "classified_results": classified_results[:10],  # Return top 10 for response
+            "classified_results": classified_results[:10],  # Return top 10
             "performance": performance_stats
         }
         
@@ -131,11 +153,13 @@ async def analyze_company(
             "gov_results": str(boe_results),
             "news_results": str(news_results)
         }
-        
+        logger.info(f"company_crud type before get_by_name: {type(company_crud)}")
+        logger.info(f"company_crud dir before get_by_name: {dir(company_crud)}")
         # Create or update company record
         db_company = company_crud.get_by_name(db, name=company.name)
         if db_company:
-            company_crud.update(db, db_obj=db_company, obj_in=formatted_results)
+            company_crud.update(db, db_obj=db_company, 
+                              obj_in=formatted_results)
         else:
             company_crud.create(db, obj_in=formatted_results)
         
@@ -146,6 +170,7 @@ async def analyze_company(
             status_code=500,
             detail=f"Error analyzing company: {str(e)}"
         )
+
 
 @router.post("/batch-analyze", response_model=List[CompanyAnalysis])
 async def batch_analyze_companies(
@@ -168,6 +193,7 @@ async def batch_analyze_companies(
             })
     
     return results
+
 
 @router.get("/{company_id}/analysis", response_model=CompanyAnalysis)
 async def get_company_analysis(
@@ -202,6 +228,7 @@ async def get_company_analysis(
         }
     }
 
+
 @router.get("/", response_model=List[CompanyResponse])
 async def list_companies(
     skip: int = 0,
@@ -213,6 +240,107 @@ async def list_companies(
     """
     companies = company_crud.get_multi(db, skip=skip, limit=limit)
     return companies
+
+
+@router.get("/{company_name}/analytics")
+async def get_company_analytics(
+    company_name: str,
+    include_trends: bool = True,
+    include_sectors: bool = False
+) -> Dict[str, Any]:
+    """
+    Get comprehensive analytics for a specific company using BigQuery service
+    
+    Args:
+        company_name: Name of the company to analyze
+        include_trends: Whether to include system-wide risk trends
+        include_sectors: Whether to include sector analysis
+    """
+    try:
+        analytics_service = AnalyticsService()
+        
+        analytics = await analytics_service.get_comprehensive_analytics(
+            company_name=company_name,
+            include_trends=include_trends,
+            include_sectors=include_sectors
+        )
+        
+        return analytics
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting analytics for {company_name}: {str(e)}"
+        )
+
+
+@router.get("/analytics/trends")
+async def get_risk_trends() -> Dict[str, Any]:
+    """
+    Get system-wide risk trends using BigQuery analytics
+    """
+    try:
+        analytics_service = AnalyticsService()
+        system_analytics = await analytics_service.get_system_analytics()
+        
+        return system_analytics.get("system_analytics", {}).get("trends", {})
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting risk trends: {str(e)}"
+        )
+
+
+@router.get("/analytics/comparison")
+async def compare_companies(
+    companies: str
+) -> Dict[str, Any]:
+    """
+    Compare risk profiles across multiple companies
+    
+    Args:
+        companies: Comma-separated list of company names
+    """
+    try:
+        company_list = [name.strip() for name in companies.split(",")]
+        
+        if len(company_list) < 2:
+            raise HTTPException(
+                status_code=400,
+                detail="At least 2 companies required for comparison"
+            )
+        
+        analytics_service = AnalyticsService()
+        comparison = await analytics_service.get_risk_comparison(company_list)
+        
+        return comparison
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error comparing companies: {str(e)}"
+        )
+
+
+@router.get("/analytics/health")
+async def analytics_health_check() -> Dict[str, Any]:
+    """
+    Health check for analytics services
+    """
+    try:
+        analytics_service = AnalyticsService()
+        health = await analytics_service.health_check()
+        
+        return health
+        
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "error": str(e),
+            "timestamp": "2024-01-17T00:00:00Z"
+        }
+
 
 @router.get("/system/status")
 async def get_system_status():
@@ -229,7 +357,8 @@ async def get_system_status():
         return {
             "status": "operational",
             "system_type": "streamlined_optimized",
-            "message": "Streamlined system with 90%+ performance improvement active",
+            "message": ("Streamlined system with 90%+ performance "
+                       "improvement active"),
             "components": {
                 "search_orchestrator": "StreamlinedSearchOrchestrator",
                 "classifier": "OptimizedHybridClassifier",
@@ -238,7 +367,9 @@ async def get_system_status():
             "performance": {
                 "keyword_efficiency": performance_stats["keyword_efficiency"],
                 "llm_usage": performance_stats["llm_usage"],
-                "avg_processing_time": performance_stats["avg_processing_time_ms"],
+                "avg_processing_time": (
+                    performance_stats["avg_processing_time_ms"]
+                ),
                 "optimization": "90%+ faster than previous system"
             },
             "capabilities": {

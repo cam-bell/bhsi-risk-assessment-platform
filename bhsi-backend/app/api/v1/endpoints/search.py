@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
 """
 Search API Endpoints - Unified search across BOE and news sources
-<<<<<<< HEAD
 
 ⚠️  DEPRECATED: This endpoint has been replaced by streamlined_search.py
     Use the streamlined search endpoint for better performance and features.
     This file is kept for reference and backward compatibility only.
-=======
->>>>>>> origin/integration
 """
 
 from fastapi import APIRouter, HTTPException
@@ -29,10 +26,7 @@ class UnifiedSearchRequest(BaseModel):
     days_back: Optional[int] = 7      # Alternative: search last N days
     include_boe: bool = True
     include_news: bool = True
-<<<<<<< HEAD
     include_rss: bool = True  # Include RSS sources (El País, Expansión, El Mundo)
-=======
->>>>>>> origin/integration
 
 
 @router.post("/search")
@@ -41,11 +35,7 @@ async def unified_search(request: UnifiedSearchRequest):
     Unified search endpoint with HYBRID PERFORMANCE OPTIMIZATION
     
     **Features:**
-<<<<<<< HEAD
     - Searches BOE, NewsAPI, and RSS sources (El País, Expansión, El Mundo)
-=======
-    - Searches both BOE (Spanish official gazette) and news sources
->>>>>>> origin/integration
     - HYBRID CLASSIFICATION: Fast keyword gate (µ-seconds) + Smart LLM fallback
     - 80-90% performance improvement through intelligent keyword filtering
     - Intelligent rate limit handling (NewsAPI limited to 30 days)
@@ -57,18 +47,11 @@ async def unified_search(request: UnifiedSearchRequest):
     - **end_date**: End date in YYYY-MM-DD format (optional)
     - **days_back**: Search last N days if dates not specified (default: 7)
     - **include_boe**: Whether to include BOE results (default: True)
-<<<<<<< HEAD
     - **include_news**: Whether to include NewsAPI results (default: True)
     - **include_rss**: Whether to include RSS sources (default: True)
     
     **Returns:**
     Combined results from all sources with Cloud Gemini risk assessment
-=======
-    - **include_news**: Whether to include news results (default: True)
-    
-    **Returns:**
-    Combined results from both sources with Cloud Gemini risk assessment
->>>>>>> origin/integration
     """
     try:
         orchestrator = StreamlinedSearchOrchestrator()
@@ -80,23 +63,16 @@ async def unified_search(request: UnifiedSearchRequest):
             active_agents.append("boe")
         if request.include_news:
             active_agents.append("newsapi")
-<<<<<<< HEAD
         if request.include_rss:
             active_agents.extend([
                 "elpais", "expansion", "elmundo",
                 "abc", "lavanguardia", "elconfidencial"
             ])
-=======
->>>>>>> origin/integration
             
         if not active_agents:
             raise HTTPException(
                 status_code=400,
-<<<<<<< HEAD
                 detail="At least one source must be enabled"
-=======
-                detail="At least one source (BOE or news) must be enabled"
->>>>>>> origin/integration
             )
         
         # Perform search across selected sources
@@ -194,7 +170,6 @@ async def unified_search(request: UnifiedSearchRequest):
                             "source_name": article.get("source", {}).get("name") if isinstance(article.get("source"), dict) else article.get("source")
                         }
                         classified_results.append(classified_result)
-<<<<<<< HEAD
             
             elif source_name == "elpais" and source_data.get("articles"):
                 for article in source_data["articles"]:
@@ -432,8 +407,6 @@ async def unified_search(request: UnifiedSearchRequest):
                             "source_name": "El Confidencial"
                         }
                         classified_results.append(classified_result)
-=======
->>>>>>> origin/integration
         
         # Filter out results with None/invalid dates and sort by date (most recent first)
         valid_results = []
@@ -472,15 +445,12 @@ async def unified_search(request: UnifiedSearchRequest):
                 "total_results": len(valid_results),
                 "boe_results": len([r for r in valid_results if r["source"] == "BOE"]),
                 "news_results": len([r for r in valid_results if r["source"] == "News"]),
-<<<<<<< HEAD
                 "elpais_results": len([r for r in valid_results if r["source"] == "El País"]),
                 "expansion_results": len([r for r in valid_results if r["source"] == "Expansión"]),
                 "elmundo_results": len([r for r in valid_results if r["source"] == "El Mundo"]),
                 "abc_results": len([r for r in valid_results if r["source"] == "ABC"]),
                 "lavanguardia_results": len([r for r in valid_results if r["source"] == "La Vanguardia"]),
                 "elconfidencial_results": len([r for r in valid_results if r["source"] == "El Confidencial"]),
-=======
->>>>>>> origin/integration
                 "high_risk_results": len([r for r in valid_results if r["risk_level"] == "High-Legal"]),
                 "sources_searched": active_agents
             },
@@ -505,15 +475,12 @@ async def unified_search(request: UnifiedSearchRequest):
                 "total_results": 0,
                 "boe_results": 0,
                 "news_results": 0,
-<<<<<<< HEAD
                 "elpais_results": 0,
                 "expansion_results": 0,
                 "elmundo_results": 0,
                 "abc_results": 0,
                 "lavanguardia_results": 0,
                 "elconfidencial_results": 0,
-=======
->>>>>>> origin/integration
                 "high_risk_results": 0,
                 "sources_searched": []
             }
@@ -538,7 +505,6 @@ async def search_health():
                 "orchestrator": "available",
                 "hybrid_classifier": "available",
                 "boe_agent": "available",
-<<<<<<< HEAD
                 "newsapi_agent": "available",
                 "elpais_agent": "available",
                 "expansion_agent": "available",
@@ -546,9 +512,6 @@ async def search_health():
                 "abc_agent": "available",
                 "lavanguardia_agent": "available",
                 "elconfidencial_agent": "available"
-=======
-                "newsapi_agent": "available"
->>>>>>> origin/integration
             },
             "performance": classifier.get_performance_stats()
         }
@@ -559,8 +522,7 @@ async def search_health():
             "services": {
                 "orchestrator": "unknown",
                 "hybrid_classifier": "unknown",
-                "boe_agent": "unknown", 
-<<<<<<< HEAD
+                "boe_agent": "unknown",
                 "newsapi_agent": "unknown",
                 "elpais_agent": "unknown",
                 "expansion_agent": "unknown",
@@ -568,9 +530,6 @@ async def search_health():
                 "abc_agent": "unknown",
                 "lavanguardia_agent": "unknown",
                 "elconfidencial_agent": "unknown"
-=======
-                "newsapi_agent": "unknown"
->>>>>>> origin/integration
             }
         }
 

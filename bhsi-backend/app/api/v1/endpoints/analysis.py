@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from app.agents.analysis.management_summarizer import ManagementSummarizer
@@ -8,17 +8,20 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+
 class ManagementSummaryRequest(BaseModel):
     company_name: str
     classification_results: List[Dict[str, Any]]
     include_evidence: bool = True
     language: str = "es"
 
+
 class RiskBreakdown(BaseModel):
     level: str
     reasoning: str
     evidence: List[str]
     confidence: float
+
 
 class ManagementSummaryResponse(BaseModel):
     company_name: str
@@ -30,6 +33,7 @@ class ManagementSummaryResponse(BaseModel):
     generated_at: str
     method: str
 
+
 @router.post("/management-summary", response_model=ManagementSummaryResponse)
 async def generate_management_summary(
     request: ManagementSummaryRequest
@@ -37,16 +41,12 @@ async def generate_management_summary(
     """
     Generate an executive management summary explaining company risk classification
     
-<<<<<<< HEAD
+
     **Purpose**: Provide executive-level explanation of why a company was classified 
     with specific risk levels.
     
     **Input**: Classification results from the search endpoint
     **Output**: Executive summary with risk breakdown and recommendations
-=======
-    This endpoint provides a high-level explanation of why a company received
-    specific risk classifications, including evidence and recommendations.
->>>>>>> origin/integration
     """
     
     try:
@@ -63,19 +63,20 @@ async def generate_management_summary(
             language=request.language
         )
         
-<<<<<<< HEAD
-        logger.info(f"✅ Management summary generated successfully")
+        logger.info("✅ Management summary generated successfully")
         
-=======
->>>>>>> origin/integration
         return ManagementSummaryResponse(**summary)
         
     except Exception as e:
-        logger.error(f"Failed to generate management summary for {request.company_name}: {e}")
+        logger.error(
+            f"Failed to generate management summary for "
+            f"{request.company_name}: {e}"
+        )
         raise HTTPException(
             status_code=500,
             detail=f"Error generating management summary: {str(e)}"
         )
+
 
 @router.get("/summary-templates")
 async def get_summary_templates():
@@ -94,9 +95,11 @@ async def get_summary_templates():
         ],
         "languages_supported": ["es", "en"],
         "evidence_types": [
-            "boe_documents", "news_articles", "regulatory_filings", "court_proceedings"
+            "boe_documents", "news_articles", "regulatory_filings", 
+            "court_proceedings"
         ]
     }
+
 
 @router.get("/health")
 async def analysis_health_check():

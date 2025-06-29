@@ -54,6 +54,20 @@ class Settings(BaseSettings):
     OLLAMA_MODEL: str = "llama3:latest"
     OLLAMA_HOST: str = "http://localhost:11434"
     
+    # Cloud Service URLs
+    GEMINI_SERVICE_URL: str = (
+        "https://gemini-service-185303190462.europe-west1.run.app"
+    )
+    EMBEDDER_SERVICE_URL: str = (
+        "https://embedder-service-185303190462.europe-west1.run.app"
+    )
+    VECTOR_SEARCH_SERVICE_URL: str = (
+        "https://vector-search-185303190462.europe-west1.run.app"
+    )
+    BIGQUERY_ANALYTICS_SERVICE_URL: str = (
+        "https://bigquery-analytics-185303190462.europe-west1.run.app"
+    )
+    
     class Config:
         case_sensitive = True
         env_file = ".env"

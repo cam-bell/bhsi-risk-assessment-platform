@@ -307,4 +307,109 @@ class OptimizedHybridClassifier:
             "keyword_hits": 0,
             "llm_calls": 0,
             "total_classifications": 0
+        }
+    
+    async def classify_with_cloud_enhancement(
+        self, 
+        text: str, 
+        title: str = "", 
+        source: str = "Unknown",
+        section: str = "",
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Enhanced classification with cloud fallback for low confidence cases
+        
+        This method implements the cloud enhancement strategy:
+        1. Try keyword gate first (fastest)
+        2. If confidence < 0.8, get second opinion from cloud
+        3. Combine results for final classification
+        """
+        start_time = time.time()
+        self.stats["total_classifications"] += 1
+        
+        # STAGE 1: Keyword gate
+        keyword_result = await self.classify_document(
+            text=text,
+            title=title,
+            source=source,
+            section=section,
+            **kwargs
+        )
+        
+        # STAGE 2: Cloud enhancement for low confidence
+        if keyword_result.get("confidence", 0) < 0.8:
+            try:
+                cloud_classifier = self._get_cloud_classifier()
+                cloud_result = await cloud_classifier.classify_document(
+                    text=text,
+                    title=title,
+                    source=source,
+                    section=section,
+                    **kwargs
+                )
+                
+                # Combine results for final classification
+                final_result = self._combine_classifications(
+                    keyword_result, cloud_result
+                )
+                
+                processing_time = (time.time() - start_time) * 1000
+                final_result["processing_time_ms"] = processing_time
+                final_result["method"] = "hybrid_cloud_enhanced"
+                final_result["stats"] = self.stats.copy()
+                
+                return final_result
+                
+            except Exception as e:
+                logger.warning(f"Cloud enhancement failed: {e}")
+                # Return keyword result if cloud fails
+                return keyword_result
+        
+        return keyword_result
+    
+    def _combine_classifications(
+        self, 
+        keyword_result: Dict[str, Any], 
+        cloud_result: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Combine keyword and cloud classification results
+        
+        Strategy:
+        - If both agree: use higher confidence
+        - If disagree: use cloud result with combined confidence
+        - Add rationale for management summaries
+        """
+        
+        keyword_label = keyword_result.get("label", "No-Legal")
+        cloud_label = cloud_result.get("label", "No-Legal")
+        keyword_conf = keyword_result.get("confidence", 0)
+        cloud_conf = cloud_result.get("confidence", 0)
+        
+        # If labels agree, use the higher confidence
+        if keyword_label == cloud_label:
+            final_label = keyword_label
+            final_confidence = max(keyword_conf, cloud_conf)
+            rationale = f"Both keyword ({keyword_conf:.2f}) and cloud ({cloud_conf:.2f}) agree on {keyword_label}"
+        
+        # If labels disagree, use cloud result with combined confidence
+        else:
+            final_label = cloud_label
+            # Weight cloud result more heavily but consider keyword input
+            final_confidence = (cloud_conf * 0.7) + (keyword_conf * 0.3)
+            rationale = (
+                f"Keyword classified as {keyword_label} ({keyword_conf:.2f}), "
+                f"cloud classified as {cloud_label} ({cloud_conf:.2f}). "
+                f"Using cloud result with combined confidence {final_confidence:.2f}"
+            )
+        
+        return {
+            "label": final_label,
+            "confidence": round(final_confidence, 3),
+            "method": "hybrid_combined",
+            "reason": rationale,
+            "keyword_result": keyword_result,
+            "cloud_result": cloud_result,
+            "combination_strategy": "weighted_cloud_preference"
         } 
