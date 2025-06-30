@@ -3,14 +3,19 @@
 STREAMLINED Search API Endpoints - Ultra-fast search with optimized hybrid classification
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 import datetime
 import time
+from sqlalchemy.orm import Session
 
-from app.agents.search.streamlined_orchestrator import StreamlinedSearchOrchestrator
+from app.agents.search.orchestrator_factory import get_search_orchestrator
 from app.agents.analysis.optimized_hybrid_classifier import OptimizedHybridClassifier
+from app.services.database_integration import db_integration
+from app.api import deps
+from app.agents.search.boe_adapter import boe_to_rawdoc_dict
+from app.crud.raw_docs import raw_docs
 
 router = APIRouter()
 
@@ -27,7 +32,10 @@ class StreamlinedSearchRequest(BaseModel):
 
 
 @router.post("/search")
-async def streamlined_search(request: StreamlinedSearchRequest):
+async def streamlined_search(
+    request: StreamlinedSearchRequest,
+    db: Session = Depends(deps.get_db)
+):
     """
     ULTRA-FAST STREAMLINED SEARCH ENDPOINT
     
@@ -42,6 +50,7 @@ async def streamlined_search(request: StreamlinedSearchRequest):
     - Intelligent rate limit handling (NewsAPI 30-day limit)
     - Performance monitoring and statistics
     - Structured response format with confidence scores
+    - Database persistence of search results
     
     **Expected Performance:**
     - 90%+ results classified in µ-seconds via keyword gate
@@ -52,8 +61,8 @@ async def streamlined_search(request: StreamlinedSearchRequest):
     overall_start_time = time.time()
     
     try:
-        # Initialize streamlined components
-        orchestrator = StreamlinedSearchOrchestrator()
+        # Initialize streamlined components using factory
+        orchestrator = get_search_orchestrator()
         classifier = OptimizedHybridClassifier()
         
         # Configure which agents to use
@@ -86,54 +95,71 @@ async def streamlined_search(request: StreamlinedSearchRequest):
         )
         search_time = time.time() - search_start_time
         
-        # STEP 2: BULK CLASSIFICATION (optimized hybrid approach)
+        # STEP 2: DATABASE INTEGRATION - Save raw results
+        db_start_time = time.time()
+        db_stats = db_integration.save_search_results(
+            db, search_results, request.company_name, request.company_name
+        )
+        db_time = time.time() - db_start_time
+        
+        # STEP 3: BULK CLASSIFICATION (optimized hybrid approach)
         classification_start_time = time.time()
         classified_results = []
         
         # Process BOE results
         if "boe" in search_results and search_results["boe"].get("results"):
-            for result in search_results["boe"]["results"]:
+            for boe_result in search_results["boe"]["results"]:
                 try:
                     # Optimized hybrid classification
                     classification = await classifier.classify_document(
-                        text=result.get("text", result.get("summary", "")),
-                        title=result.get("titulo", ""),
+                        text=boe_result.get("text", boe_result.get("summary", "")),
+                        title=boe_result.get("titulo", ""),
                         source="BOE",
-                        section=result.get("seccion_codigo", "")
+                        section=boe_result.get("seccion_codigo", "")
                     )
                     
                     classified_result = {
                         "source": "BOE",
-                        "date": result.get("fechaPublicacion"),
-                        "title": result.get("titulo", ""),
-                        "summary": result.get("summary"),
+                        "date": boe_result.get("fechaPublicacion"),
+                        "title": boe_result.get("titulo", ""),
+                        "summary": boe_result.get("summary"),
                         "risk_level": classification.get("label", "Unknown"),
                         "confidence": classification.get("confidence", 0.5),
                         "method": classification.get("method", "unknown"),
                         "processing_time_ms": classification.get("processing_time_ms", 0),
-                        "url": result.get("url_html", ""),
+                        "url": boe_result.get("url_html", ""),
                         # BOE-specific fields
-                        "identificador": result.get("identificador"),
-                        "seccion": result.get("seccion_codigo"),
-                        "seccion_nombre": result.get("seccion_nombre")
+                        "identificador": boe_result.get("identificador"),
+                        "seccion": boe_result.get("seccion_codigo"),
+                        "seccion_nombre": boe_result.get("seccion_nombre")
                     }
                     classified_results.append(classified_result)
+                    
+                    # Store BOE results in raw_docs table
+                    rawdoc_data = boe_to_rawdoc_dict(boe_result)
+                    # Use CRUD utility to insert with deduplication
+                    raw_docs.create_with_dedup(
+                        db,
+                        source=rawdoc_data["source"],
+                        payload=rawdoc_data["payload"],
+                        meta=rawdoc_data["meta"]
+                    )
                     
                 except Exception as e:
                     # Simple fallback - don't slow down the entire response
                     classified_result = {
                         "source": "BOE",
-                        "date": result.get("fechaPublicacion"),
-                        "title": result.get("titulo", ""),
-                        "summary": result.get("summary"),
+                        "date": boe_result.get("fechaPublicacion"),
+                        "title": boe_result.get("titulo", ""),
+                        "summary": boe_result.get("summary"),
                         "risk_level": "Unknown",
                         "confidence": 0.3,
                         "method": "error_fallback",
                         "processing_time_ms": 0,
-                        "url": result.get("url_html", ""),
-                        "identificador": result.get("identificador"),
-                        "seccion": result.get("seccion_codigo"),
-                        "seccion_nombre": result.get("seccion_nombre"),
+                        "url": boe_result.get("url_html", ""),
+                        "identificador": boe_result.get("identificador"),
+                        "seccion": boe_result.get("seccion_codigo"),
+                        "seccion_nombre": boe_result.get("seccion_nombre"),
                         "error": str(e)
                     }
                     classified_results.append(classified_result)
@@ -208,7 +234,8 @@ async def streamlined_search(request: StreamlinedSearchRequest):
                             "url": article.get("url", ""),
                             # RSS-specific fields
                             "author": article.get("author"),
-                            "source_name": article.get("source", agent_name.upper())
+                            "category": article.get("category"),
+                            "source_name": article.get("source_name", f"RSS-{agent_name.upper()}")
                         }
                         classified_results.append(classified_result)
                         
@@ -225,16 +252,18 @@ async def streamlined_search(request: StreamlinedSearchRequest):
                             "processing_time_ms": 0,
                             "url": article.get("url", ""),
                             "author": article.get("author"),
-                            "source_name": article.get("source", agent_name.upper()),
+                            "category": article.get("category"),
+                            "source_name": article.get("source_name", f"RSS-{agent_name.upper()}"),
                             "error": str(e)
                         }
                         classified_results.append(classified_result)
         
         classification_time = time.time() - classification_start_time
         
-        # STEP 3: SORT AND FORMAT RESULTS
-        # Filter out results with invalid dates and sort by date (most recent first)
+        # STEP 4: RESPONSE PREPARATION
         valid_results = []
+        
+        # Validate and format dates
         for result in classified_results:
             date_val = result.get("date")
             if date_val:
@@ -259,7 +288,7 @@ async def streamlined_search(request: StreamlinedSearchRequest):
         # Calculate total time
         total_time = time.time() - overall_start_time
         
-        # Build optimized response
+        # Build optimized response with database stats
         response = {
             "company_name": request.company_name,
             "search_date": datetime.datetime.now().isoformat(),
@@ -282,7 +311,14 @@ async def streamlined_search(request: StreamlinedSearchRequest):
                 "total_time_seconds": f"{total_time:.2f}",
                 "search_time_seconds": f"{search_time:.2f}",
                 "classification_time_seconds": f"{classification_time:.2f}",
+                "database_time_seconds": f"{db_time:.2f}",
                 "optimization": "Streamlined search + optimized hybrid classifier"
+            },
+            "database_stats": {
+                "raw_docs_saved": db_stats["raw_docs_saved"],
+                "events_created": db_stats["events_created"],
+                "total_processed": db_stats["total_processed"],
+                "errors": db_stats["errors"][:5]  # Limit error list
             }
         }
         
@@ -313,6 +349,12 @@ async def streamlined_search(request: StreamlinedSearchRequest):
             "performance": {
                 "total_time_seconds": f"{total_time:.2f}",
                 "error": "Search failed before completion"
+            },
+            "database_stats": {
+                "raw_docs_saved": 0,
+                "events_created": 0,
+                "total_processed": 0,
+                "errors": [str(e)]
             }
         }
         
@@ -322,64 +364,63 @@ async def streamlined_search(request: StreamlinedSearchRequest):
 @router.get("/search/health")
 async def streamlined_search_health():
     """
-    Health check for streamlined search services
+    Health check for streamlined search system
     """
     try:
-        orchestrator = StreamlinedSearchOrchestrator()
+        orchestrator = get_search_orchestrator()
         classifier = OptimizedHybridClassifier()
         
         return {
             "status": "healthy",
-            "message": "STREAMLINED search services operational",
-            "optimization": "Ultra-fast search with optimized hybrid classification",
-            "services": {
-                "streamlined_orchestrator": "available",
-                "optimized_hybrid_classifier": "available",
-                "streamlined_boe_agent": "available",
-                "streamlined_newsapi_agent": "available",
-                "streamlined_rss_agent": "available"
-            },
-            "performance": classifier.get_performance_stats(),
-            "expected_improvement": "90%+ faster than previous implementation"
+            "message": "Streamlined search system is operational",
+            "orchestrator_type": type(orchestrator).__name__,
+            "classifier_type": type(classifier).__name__,
+            "features": [
+                "Ultra-fast search across multiple sources",
+                "Optimized hybrid classification",
+                "Intelligent rate limit handling",
+                "Performance monitoring",
+                "Database persistence"
+            ],
+            "sources_available": [
+                "BOE (Spanish Official Gazette)",
+                "NewsAPI (International news)",
+                "RSS feeds (Spanish news sources)"
+            ]
         }
+        
     except Exception as e:
         return {
-            "status": "degraded",
-            "message": f"Streamlined search services partially available: {str(e)}",
-            "services": {
-                "streamlined_orchestrator": "unknown",
-                "optimized_hybrid_classifier": "unknown", 
-                "streamlined_boe_agent": "unknown",
-                "streamlined_newsapi_agent": "unknown",
-                "streamlined_rss_agent": "unknown"
-            }
+            "status": "unhealthy",
+            "error": str(e),
+            "message": "Streamlined search system is not operational"
         }
 
 
 @router.get("/search/performance")
 async def streamlined_search_performance():
     """
-    Get detailed performance statistics for the optimized system
+    Get detailed performance statistics for the OPTIMIZED hybrid classifier
     """
     try:
         classifier = OptimizedHybridClassifier()
         stats = classifier.get_performance_stats()
         
         return {
-            "status": "success",
-            "message": "Performance statistics for STREAMLINED search system",
+            "status": "success", 
+            "message": "Performance statistics for OPTIMIZED STREAMLINED search system",
             "architecture": {
                 "search_stage": "Streamlined agents - Fast data fetching only",
-                "classification_stage_1": "Optimized keyword gate (µ-seconds)",
-                "classification_stage_2": "Smart LLM routing (only for ambiguous cases)",
-                "optimization": "90%+ cases handled by keyword gate"
+                "classification_stage_1": "Optimized keyword gate (µ-seconds) - 90%+ efficiency",
+                "classification_stage_2": "Smart LLM routing (only for truly ambiguous cases)",
+                "optimization": "Removed classification loops + optimized patterns"
             },
             "statistics": stats,
             "improvements": {
-                "search_speed": "Removed classification loops from search agents",
-                "classification_speed": "Optimized keyword patterns + smart LLM routing", 
-                "overall_performance": "Expected 90%+ improvement over previous system",
-                "cost_efficiency": "Dramatically reduced LLM API calls"
+                "search_optimization": "No classification during search loops",
+                "keyword_patterns": "Enhanced patterns for Spanish D&O risks",
+                "smart_routing": "Only legal-looking ambiguous content sent to LLM",
+                "expected_performance": "90%+ improvement over previous system"
             }
         }
         
@@ -387,4 +428,25 @@ async def streamlined_search_performance():
         return {
             "status": "error",
             "message": f"Could not retrieve performance stats: {str(e)}"
+        }
+
+
+@router.get("/search/database-stats")
+async def get_database_stats(db: Session = Depends(deps.get_db)):
+    """
+    Get database statistics for search results
+    """
+    try:
+        stats = db_integration.get_database_stats(db)
+        
+        return {
+            "status": "success",
+            "message": "Database statistics retrieved successfully",
+            "statistics": stats
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Could not retrieve database stats: {str(e)}"
         } 

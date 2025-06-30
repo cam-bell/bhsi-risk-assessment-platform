@@ -3,6 +3,7 @@ from pydantic_settings import BaseSettings
 import secrets
 from functools import lru_cache
 from pathlib import Path
+import os
 
 
 class Settings(BaseSettings):
@@ -67,6 +68,11 @@ class Settings(BaseSettings):
     BIGQUERY_ANALYTICS_SERVICE_URL: str = (
         "https://bigquery-analytics-185303190462.europe-west1.run.app"
     )
+    
+    # Demo Configuration
+    USE_MOCK_DATA: bool = False  # Set to True for demo mode, False for production
+    MOCK_MODE_ENABLED: bool = True  # Enable mock data system for demo
+    USE_MOCK_ORCHESTRATOR: bool = os.getenv("USE_MOCK_ORCHESTRATOR", "false").lower() in ("1", "true", "yes")
     
     class Config:
         case_sensitive = True

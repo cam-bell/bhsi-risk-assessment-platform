@@ -13,6 +13,8 @@ from app.agents.analysis.optimized_hybrid_classifier import (
 from app.agents.analytics.analytics_service import AnalyticsService
 from app.crud.company import company as company_crud
 import logging
+from app.core.config import settings
+from app.agents.analytics.mock_analytics import generate_mock_analytics, generate_mock_risk_trends, generate_mock_comparison
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -39,6 +41,9 @@ async def analyze_company(
     2. Bulk optimized hybrid classification (90%+ keyword efficiency)
     3. Smart LLM routing only for ambiguous cases
     """
+    if settings.USE_MOCK_ORCHESTRATOR:
+        logger.info("Returning MOCK analytics for company: %s", company.name)
+        return generate_mock_analytics(company.name)
     # Initialize streamlined components
     search_orchestrator = StreamlinedSearchOrchestrator()
     classifier = OptimizedHybridClassifier()
@@ -256,6 +261,9 @@ async def get_company_analytics(
         include_trends: Whether to include system-wide risk trends
         include_sectors: Whether to include sector analysis
     """
+    if settings.USE_MOCK_ORCHESTRATOR:
+        logger.info("Returning MOCK company analytics for: %s", company_name)
+        return generate_mock_analytics(company_name)
     try:
         analytics_service = AnalyticsService()
         
@@ -279,6 +287,9 @@ async def get_risk_trends() -> Dict[str, Any]:
     """
     Get system-wide risk trends using BigQuery analytics
     """
+    if settings.USE_MOCK_ORCHESTRATOR:
+        logger.info("Returning MOCK risk trends")
+        return generate_mock_risk_trends()
     try:
         analytics_service = AnalyticsService()
         system_analytics = await analytics_service.get_system_analytics()
@@ -302,9 +313,11 @@ async def compare_companies(
     Args:
         companies: Comma-separated list of company names
     """
+    company_list = [name.strip() for name in companies.split(",")]
+    if settings.USE_MOCK_ORCHESTRATOR:
+        logger.info("Returning MOCK company comparison for: %s", company_list)
+        return generate_mock_comparison(company_list)
     try:
-        company_list = [name.strip() for name in companies.split(",")]
-        
         if len(company_list) < 2:
             raise HTTPException(
                 status_code=400,

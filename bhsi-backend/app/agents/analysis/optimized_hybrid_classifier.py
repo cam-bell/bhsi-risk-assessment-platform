@@ -307,7 +307,7 @@ class OptimizedHybridClassifier:
             "keyword_hits": 0,
             "llm_calls": 0,
             "total_classifications": 0
-        }
+        } 
     
     async def classify_with_cloud_enhancement(
         self, 

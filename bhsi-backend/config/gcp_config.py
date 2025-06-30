@@ -4,6 +4,7 @@ from google.cloud import aiplatform
 import os
 
 # GCP Project Configuration
+<<<<<<< HEAD
 PROJECT_ID = "bhsi-444119"  # Replace with your GCP project ID
 REGION = "europe-west1"
 

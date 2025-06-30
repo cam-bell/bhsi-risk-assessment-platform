@@ -7,54 +7,57 @@ Search API Endpoints - Unified search across BOE and news sources
     This file is kept for reference and backward compatibility only.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from typing import Dict, Any, List, Optional
+from typing import Optional
 import datetime
+import time
+from sqlalchemy.orm import Session
 
-from app.agents.search.streamlined_orchestrator import StreamlinedSearchOrchestrator
+from app.agents.search.orchestrator_factory import get_search_orchestrator
 from app.agents.analysis.optimized_hybrid_classifier import OptimizedHybridClassifier
+from app.services.database_integration import db_integration
+from app.api import deps
 
 router = APIRouter()
 
 
 # Request/Response Models
-class UnifiedSearchRequest(BaseModel):
+class SearchRequest(BaseModel):
     company_name: str
     start_date: Optional[str] = None  # Format: YYYY-MM-DD
     end_date: Optional[str] = None    # Format: YYYY-MM-DD
     days_back: Optional[int] = 7      # Alternative: search last N days
     include_boe: bool = True
     include_news: bool = True
-    include_rss: bool = True  # Include RSS sources (El País, Expansión, El Mundo)
+    include_rss: bool = True  # Include RSS news sources
 
 
 @router.post("/search")
-async def unified_search(request: UnifiedSearchRequest):
+async def search(
+    request: SearchRequest,
+    db: Session = Depends(deps.get_db)
+):
     """
-    Unified search endpoint with HYBRID PERFORMANCE OPTIMIZATION
+    MULTI-SOURCE SEARCH ENDPOINT
     
     **Features:**
-    - Searches BOE, NewsAPI, and RSS sources (El País, Expansión, El Mundo)
-    - HYBRID CLASSIFICATION: Fast keyword gate (µ-seconds) + Smart LLM fallback
-    - 80-90% performance improvement through intelligent keyword filtering
-    - Intelligent rate limit handling (NewsAPI limited to 30 days)
-    - Structured response format with confidence scores and performance stats
+    - BOE (Spanish official gazette) and news sources
+    - Intelligent rate limit handling (NewsAPI 30-day limit)
+    - Performance monitoring and statistics
+    - Structured response format with confidence scores
+    - Database persistence of search results
     
-    **Parameters:**
-    - **company_name**: Name of the company to search for
-    - **start_date**: Start date in YYYY-MM-DD format (optional)
-    - **end_date**: End date in YYYY-MM-DD format (optional)
-    - **days_back**: Search last N days if dates not specified (default: 7)
-    - **include_boe**: Whether to include BOE results (default: True)
-    - **include_news**: Whether to include NewsAPI results (default: True)
-    - **include_rss**: Whether to include RSS sources (default: True)
-    
-    **Returns:**
-    Combined results from all sources with Cloud Gemini risk assessment
+    **Expected Performance:**
+    - Total response time: 3-10 seconds
+    - Hybrid classification with keyword gate efficiency
     """
+    
+    overall_start_time = time.time()
+    
     try:
-        orchestrator = StreamlinedSearchOrchestrator()
+        # Initialize components using factory
+        orchestrator = get_search_orchestrator()
         classifier = OptimizedHybridClassifier()
         
         # Configure which agents to use
@@ -64,18 +67,20 @@ async def unified_search(request: UnifiedSearchRequest):
         if request.include_news:
             active_agents.append("newsapi")
         if request.include_rss:
+            # Add working RSS agents
             active_agents.extend([
-                "elpais", "expansion", "elmundo",
-                "abc", "lavanguardia", "elconfidencial"
+                "elpais", "expansion", "elmundo", "abc", "lavanguardia", 
+                "elconfidencial", "eldiario", "europapress"
             ])
             
         if not active_agents:
             raise HTTPException(
                 status_code=400,
-                detail="At least one source must be enabled"
+                detail="At least one source (BOE, news, or RSS) must be enabled"
             )
         
-        # Perform search across selected sources
+        # STEP 1: SEARCH
+        search_start_time = time.time()
         search_results = await orchestrator.search_all(
             query=request.company_name,
             start_date=request.start_date,
@@ -83,355 +88,181 @@ async def unified_search(request: UnifiedSearchRequest):
             days_back=request.days_back,
             active_agents=active_agents
         )
+        search_time = time.time() - search_start_time
         
-        # Process and classify results
+        # STEP 2: DATABASE INTEGRATION - Save raw results
+        db_start_time = time.time()
+        db_stats = db_integration.save_search_results(
+            db, search_results, request.company_name, request.company_name
+        )
+        db_time = time.time() - db_start_time
+        
+        # STEP 3: CLASSIFICATION
+        classification_start_time = time.time()
         classified_results = []
         
-        for source_name, source_data in search_results.items():
-            if source_name == "boe" and source_data.get("results"):
-                for result in source_data["results"]:
-                    try:
-                        # Classify with Cloud Gemini
-                        classification = await classifier.classify_document(
-                            text=result.get("text", result.get("summary", "")),
-                            title=result.get("title", ""),
-                            source="BOE",
-                            section=result.get("section", "")
-                        )
-                        
-                        classified_result = {
-                            "source": "BOE",
-                            "date": result.get("fechaPublicacion", result.get("date")),
-                            "title": result.get("titulo", result.get("title", "")),
-                            "summary": result.get("summary"),
-                            "risk_level": classification.get("label", "Unknown"),
-                            "confidence": classification.get("confidence", 0.5),
-                            "url": result.get("url_html", result.get("url", "")),
-                            # BOE-specific fields
-                            "identificador": result.get("identificador"),
-                            "seccion": result.get("seccion_codigo"),
-                            "seccion_nombre": result.get("seccion_nombre")
-                        }
-                        classified_results.append(classified_result)
-                        
-                    except Exception as e:
-                        print(f"Error classifying BOE result: {e}")
-                        # Fallback classification
-                        classified_result = {
-                            "source": "BOE",
-                            "date": result.get("fechaPublicacion", result.get("date")),
-                            "title": result.get("titulo", result.get("title", "")),
-                            "summary": result.get("summary"),
-                            "risk_level": "Unknown",
-                            "confidence": 0.3,
-                            "url": result.get("url_html", result.get("url", "")),
-                            "identificador": result.get("identificador"),
-                            "seccion": result.get("seccion_codigo"),
-                            "seccion_nombre": result.get("seccion_nombre")
-                        }
-                        classified_results.append(classified_result)
-            
-            elif source_name == "newsapi" and source_data.get("articles"):
-                for article in source_data["articles"]:
-                    try:
-                        # Classify with Cloud Gemini
-                        classification = await classifier.classify_document(
-                            text=article.get("content", article.get("description", "")),
-                            title=article.get("title", ""),
-                            source="News"
-                        )
-                        
-                        classified_result = {
-                            "source": "News",
-                            "date": article.get("publishedAt", article.get("published_at")),
-                            "title": article.get("title", ""),
-                            "summary": article.get("description"),
-                            "risk_level": classification.get("label", "Unknown"),
-                            "confidence": classification.get("confidence", 0.5),
-                            "url": article.get("url", ""),
-                            # News-specific fields
-                            "author": article.get("author"),
-                            "source_name": article.get("source", {}).get("name") if isinstance(article.get("source"), dict) else article.get("source")
-                        }
-                        classified_results.append(classified_result)
-                        
-                    except Exception as e:
-                        print(f"Error classifying news result: {e}")
-                        # Fallback classification
-                        classified_result = {
-                            "source": "News",
-                            "date": article.get("publishedAt", article.get("published_at")),
-                            "title": article.get("title", ""),
-                            "summary": article.get("description"),
-                            "risk_level": "Unknown",
-                            "confidence": 0.3,
-                            "url": article.get("url", ""),
-                            "author": article.get("author"),
-                            "source_name": article.get("source", {}).get("name") if isinstance(article.get("source"), dict) else article.get("source")
-                        }
-                        classified_results.append(classified_result)
-            
-            elif source_name == "elpais" and source_data.get("articles"):
-                for article in source_data["articles"]:
-                    try:
-                        # Classify with Cloud Gemini
-                        classification = await classifier.classify_document(
-                            text=article.get("content", article.get("description", "")),
-                            title=article.get("title", ""),
-                            source="El País"
-                        )
-                        
-                        classified_result = {
-                            "source": "El País",
-                            "date": article.get("publishedAt", article.get("published_at")),
-                            "title": article.get("title", ""),
-                            "summary": article.get("description"),
-                            "risk_level": classification.get("label", "Unknown"),
-                            "confidence": classification.get("confidence", 0.5),
-                            "url": article.get("url", ""),
-                            # El País-specific fields
-                            "author": article.get("author"),
-                            "category": article.get("category"),
-                            "source_name": "El País"
-                        }
-                        classified_results.append(classified_result)
-                        
-                    except Exception as e:
-                        print(f"Error classifying El País result: {e}")
-                        # Fallback classification
-                        classified_result = {
-                            "source": "El País",
-                            "date": article.get("publishedAt", article.get("published_at")),
-                            "title": article.get("title", ""),
-                            "summary": article.get("description"),
-                            "risk_level": "Unknown",
-                            "confidence": 0.3,
-                            "url": article.get("url", ""),
-                            "author": article.get("author"),
-                            "category": article.get("category"),
-                            "source_name": "El País"
-                        }
-                        classified_results.append(classified_result)
-            
-            elif source_name == "expansion" and source_data.get("articles"):
-                for article in source_data["articles"]:
-                    try:
-                        # Classify with Cloud Gemini
-                        classification = await classifier.classify_document(
-                            text=article.get("content", article.get("description", "")),
-                            title=article.get("title", ""),
-                            source="Expansión"
-                        )
-                        
-                        classified_result = {
-                            "source": "Expansión",
-                            "date": article.get("publishedAt", article.get("published_at")),
-                            "title": article.get("title", ""),
-                            "summary": article.get("description"),
-                            "risk_level": classification.get("label", "Unknown"),
-                            "confidence": classification.get("confidence", 0.5),
-                            "url": article.get("url", ""),
-                            # Expansión-specific fields
-                            "author": article.get("author"),
-                            "category": article.get("category"),
-                            "source_name": "Expansión"
-                        }
-                        classified_results.append(classified_result)
-                        
-                    except Exception as e:
-                        print(f"Error classifying Expansión result: {e}")
-                        # Fallback classification
-                        classified_result = {
-                            "source": "Expansión",
-                            "date": article.get("publishedAt", article.get("published_at")),
-                            "title": article.get("title", ""),
-                            "summary": article.get("description"),
-                            "risk_level": "Unknown",
-                            "confidence": 0.3,
-                            "url": article.get("url", ""),
-                            "author": article.get("author"),
-                            "category": article.get("category"),
-                            "source_name": "Expansión"
-                        }
-                        classified_results.append(classified_result)
-            
-            elif source_name == "elmundo" and source_data.get("articles"):
-                for article in source_data["articles"]:
-                    try:
-                        # Classify with Cloud Gemini
-                        classification = await classifier.classify_document(
-                            text=article.get("content", article.get("description", "")),
-                            title=article.get("title", ""),
-                            source="El Mundo"
-                        )
-                        
-                        classified_result = {
-                            "source": "El Mundo",
-                            "date": article.get("publishedAt", article.get("published_at")),
-                            "title": article.get("title", ""),
-                            "summary": article.get("description"),
-                            "risk_level": classification.get("label", "Unknown"),
-                            "confidence": classification.get("confidence", 0.5),
-                            "url": article.get("url", ""),
-                            # El Mundo-specific fields
-                            "author": article.get("author"),
-                            "category": article.get("category"),
-                            "source_name": "El Mundo"
-                        }
-                        classified_results.append(classified_result)
-                        
-                    except Exception as e:
-                        print(f"Error classifying El Mundo result: {e}")
-                        # Fallback classification
-                        classified_result = {
-                            "source": "El Mundo",
-                            "date": article.get("publishedAt", article.get("published_at")),
-                            "title": article.get("title", ""),
-                            "summary": article.get("description"),
-                            "risk_level": "Unknown",
-                            "confidence": 0.3,
-                            "url": article.get("url", ""),
-                            "author": article.get("author"),
-                            "category": article.get("category"),
-                            "source_name": "El Mundo"
-                        }
-                        classified_results.append(classified_result)
-            
-            elif source_name == "abc" and source_data.get("articles"):
-                for article in source_data["articles"]:
+        # Process BOE results
+        if "boe" in search_results and search_results["boe"].get("results"):
+            for result in search_results["boe"]["results"]:
+                try:
+                    classification = await classifier.classify_document(
+                        text=result.get("text", result.get("summary", "")),
+                        title=result.get("titulo", ""),
+                        source="BOE",
+                        section=result.get("seccion_codigo", "")
+                    )
+                    
+                    classified_result = {
+                        "source": "BOE",
+                        "date": result.get("fechaPublicacion"),
+                        "title": result.get("titulo", ""),
+                        "summary": result.get("summary"),
+                        "risk_level": classification.get("label", "Unknown"),
+                        "confidence": classification.get("confidence", 0.5),
+                        "method": classification.get("method", "unknown"),
+                        "processing_time_ms": classification.get("processing_time_ms", 0),
+                        "url": result.get("url_html", ""),
+                        "identificador": result.get("identificador"),
+                        "seccion": result.get("seccion_codigo"),
+                        "seccion_nombre": result.get("seccion_nombre")
+                    }
+                    classified_results.append(classified_result)
+                    
+                except Exception as e:
+                    classified_result = {
+                        "source": "BOE",
+                        "date": result.get("fechaPublicacion"),
+                        "title": result.get("titulo", ""),
+                        "summary": result.get("summary"),
+                        "risk_level": "Unknown",
+                        "confidence": 0.3,
+                        "method": "error_fallback",
+                        "processing_time_ms": 0,
+                        "url": result.get("url_html", ""),
+                        "identificador": result.get("identificador"),
+                        "seccion": result.get("seccion_codigo"),
+                        "seccion_nombre": result.get("seccion_nombre"),
+                        "error": str(e)
+                    }
+                    classified_results.append(classified_result)
+        
+        # Process News results
+        if "newsapi" in search_results and search_results["newsapi"].get("articles"):
+            for article in search_results["newsapi"]["articles"]:
+                try:
+                    classification = await classifier.classify_document(
+                        text=article.get("content", article.get("description", "")),
+                        title=article.get("title", ""),
+                        source="News"
+                    )
+                    
+                    classified_result = {
+                        "source": "News",
+                        "date": article.get("publishedAt"),
+                        "title": article.get("title", ""),
+                        "summary": article.get("description"),
+                        "risk_level": classification.get("label", "Unknown"),
+                        "confidence": classification.get("confidence", 0.5),
+                        "method": classification.get("method", "unknown"),
+                        "processing_time_ms": classification.get("processing_time_ms", 0),
+                        "url": article.get("url", ""),
+                        "author": article.get("author"),
+                        "source_name": article.get("source", "Unknown")
+                    }
+                    classified_results.append(classified_result)
+                    
+                except Exception as e:
+                    classified_result = {
+                        "source": "News",
+                        "date": article.get("publishedAt"),
+                        "title": article.get("title", ""),
+                        "summary": article.get("description"),
+                        "risk_level": "Unknown",
+                        "confidence": 0.3,
+                        "method": "error_fallback",
+                        "processing_time_ms": 0,
+                        "url": article.get("url", ""),
+                        "author": article.get("author"),
+                        "source_name": article.get("source", "Unknown"),
+                        "error": str(e)
+                    }
+                    classified_results.append(classified_result)
+        
+        # Process RSS results
+        rss_agents = ["elpais", "expansion", "elmundo", "abc", "lavanguardia", 
+                     "elconfidencial", "eldiario", "europapress"]
+        for agent_name in rss_agents:
+            if agent_name in search_results and search_results[agent_name].get("articles"):
+                for article in search_results[agent_name]["articles"]:
                     try:
                         classification = await classifier.classify_document(
                             text=article.get("content", article.get("description", "")),
                             title=article.get("title", ""),
-                            source="ABC"
+                            source=f"RSS-{agent_name.upper()}"
                         )
+                        
                         classified_result = {
-                            "source": "ABC",
-                            "date": article.get("publishedAt", article.get("published_at")),
+                            "source": f"RSS-{agent_name.upper()}",
+                            "date": article.get("publishedAt"),
                             "title": article.get("title", ""),
                             "summary": article.get("description"),
                             "risk_level": classification.get("label", "Unknown"),
                             "confidence": classification.get("confidence", 0.5),
+                            "method": classification.get("method", "unknown"),
+                            "processing_time_ms": classification.get("processing_time_ms", 0),
                             "url": article.get("url", ""),
                             "author": article.get("author"),
                             "category": article.get("category"),
-                            "source_name": "ABC"
+                            "source_name": article.get("source_name", f"RSS-{agent_name.upper()}")
                         }
                         classified_results.append(classified_result)
+                        
                     except Exception as e:
-                        print(f"Error classifying ABC result: {e}")
                         classified_result = {
-                            "source": "ABC",
-                            "date": article.get("publishedAt", article.get("published_at")),
+                            "source": f"RSS-{agent_name.upper()}",
+                            "date": article.get("publishedAt"),
                             "title": article.get("title", ""),
                             "summary": article.get("description"),
                             "risk_level": "Unknown",
                             "confidence": 0.3,
+                            "method": "error_fallback",
+                            "processing_time_ms": 0,
                             "url": article.get("url", ""),
                             "author": article.get("author"),
                             "category": article.get("category"),
-                            "source_name": "ABC"
-                        }
-                        classified_results.append(classified_result)
-            
-            elif source_name == "lavanguardia" and source_data.get("articles"):
-                for article in source_data["articles"]:
-                    try:
-                        classification = await classifier.classify_document(
-                            text=article.get("content", article.get("description", "")),
-                            title=article.get("title", ""),
-                            source="La Vanguardia"
-                        )
-                        classified_result = {
-                            "source": "La Vanguardia",
-                            "date": article.get("publishedAt", article.get("published_at")),
-                            "title": article.get("title", ""),
-                            "summary": article.get("description"),
-                            "risk_level": classification.get("label", "Unknown"),
-                            "confidence": classification.get("confidence", 0.5),
-                            "url": article.get("url", ""),
-                            "author": article.get("author"),
-                            "category": article.get("category"),
-                            "source_name": "La Vanguardia"
-                        }
-                        classified_results.append(classified_result)
-                    except Exception as e:
-                        print(f"Error classifying La Vanguardia result: {e}")
-                        classified_result = {
-                            "source": "La Vanguardia",
-                            "date": article.get("publishedAt", article.get("published_at")),
-                            "title": article.get("title", ""),
-                            "summary": article.get("description"),
-                            "risk_level": "Unknown",
-                            "confidence": 0.3,
-                            "url": article.get("url", ""),
-                            "author": article.get("author"),
-                            "category": article.get("category"),
-                            "source_name": "La Vanguardia"
-                        }
-                        classified_results.append(classified_result)
-            
-            elif source_name == "elconfidencial" and source_data.get("articles"):
-                for article in source_data["articles"]:
-                    try:
-                        classification = await classifier.classify_document(
-                            text=article.get("content", article.get("description", "")),
-                            title=article.get("title", ""),
-                            source="El Confidencial"
-                        )
-                        classified_result = {
-                            "source": "El Confidencial",
-                            "date": article.get("publishedAt", article.get("published_at")),
-                            "title": article.get("title", ""),
-                            "summary": article.get("description"),
-                            "risk_level": classification.get("label", "Unknown"),
-                            "confidence": classification.get("confidence", 0.5),
-                            "url": article.get("url", ""),
-                            "author": article.get("author"),
-                            "category": article.get("category"),
-                            "source_name": "El Confidencial"
-                        }
-                        classified_results.append(classified_result)
-                    except Exception as e:
-                        print(f"Error classifying El Confidencial result: {e}")
-                        classified_result = {
-                            "source": "El Confidencial",
-                            "date": article.get("publishedAt", article.get("published_at")),
-                            "title": article.get("title", ""),
-                            "summary": article.get("description"),
-                            "risk_level": "Unknown",
-                            "confidence": 0.3,
-                            "url": article.get("url", ""),
-                            "author": article.get("author"),
-                            "category": article.get("category"),
-                            "source_name": "El Confidencial"
+                            "source_name": article.get("source_name", f"RSS-{agent_name.upper()}"),
+                            "error": str(e)
                         }
                         classified_results.append(classified_result)
         
-        # Filter out results with None/invalid dates and sort by date (most recent first)
+        classification_time = time.time() - classification_start_time
+        
+        # STEP 4: RESPONSE PREPARATION
         valid_results = []
+        
+        # Validate and format dates
         for result in classified_results:
             date_val = result.get("date")
             if date_val:
-                # Ensure consistent ISO format
                 try:
                     if isinstance(date_val, str):
-                        # Handle different date formats
                         if "T" in date_val:
-                            result["date"] = date_val  # Already ISO format
+                            result["date"] = date_val
                         else:
-                            # Convert YYYY-MM-DD to ISO
                             parsed_date = datetime.datetime.strptime(date_val, "%Y-%m-%d")
                             result["date"] = parsed_date.isoformat() + "Z"
                     valid_results.append(result)
-                except Exception as e:
-                    print(f"Error parsing date {date_val}: {e}")
-                    continue
+                except Exception:
+                    result["date_parse_error"] = True
+                    valid_results.append(result)
         
         # Sort by date, most recent first
-        valid_results.sort(key=lambda x: x["date"], reverse=True)
+        valid_results.sort(key=lambda x: x.get("date", ""), reverse=True)
         
-        # Build response according to exact specifications
+        # Calculate total time
+        total_time = time.time() - overall_start_time
+        
+        # Build response with database stats
         response = {
             "company_name": request.company_name,
             "search_date": datetime.datetime.now().isoformat(),
@@ -445,22 +276,30 @@ async def unified_search(request: UnifiedSearchRequest):
                 "total_results": len(valid_results),
                 "boe_results": len([r for r in valid_results if r["source"] == "BOE"]),
                 "news_results": len([r for r in valid_results if r["source"] == "News"]),
-                "elpais_results": len([r for r in valid_results if r["source"] == "El País"]),
-                "expansion_results": len([r for r in valid_results if r["source"] == "Expansión"]),
-                "elmundo_results": len([r for r in valid_results if r["source"] == "El Mundo"]),
-                "abc_results": len([r for r in valid_results if r["source"] == "ABC"]),
-                "lavanguardia_results": len([r for r in valid_results if r["source"] == "La Vanguardia"]),
-                "elconfidencial_results": len([r for r in valid_results if r["source"] == "El Confidencial"]),
+                "rss_results": len([r for r in valid_results if r["source"].startswith("RSS-")]),
                 "high_risk_results": len([r for r in valid_results if r["risk_level"] == "High-Legal"]),
                 "sources_searched": active_agents
             },
-            "performance": classifier.get_performance_stats()
+            "performance": {
+                **classifier.get_performance_stats(),
+                "total_time_seconds": f"{total_time:.2f}",
+                "search_time_seconds": f"{search_time:.2f}",
+                "classification_time_seconds": f"{classification_time:.2f}",
+                "database_time_seconds": f"{db_time:.2f}"
+            },
+            "database_stats": {
+                "raw_docs_saved": db_stats["raw_docs_saved"],
+                "events_created": db_stats["events_created"],
+                "total_processed": db_stats["total_processed"],
+                "errors": db_stats["errors"][:5]
+            }
         }
         
         return response
         
     except Exception as e:
-        # Return error response with partial results if possible
+        total_time = time.time() - overall_start_time
+        
         error_response = {
             "company_name": request.company_name,
             "search_date": datetime.datetime.now().isoformat(),
@@ -475,14 +314,19 @@ async def unified_search(request: UnifiedSearchRequest):
                 "total_results": 0,
                 "boe_results": 0,
                 "news_results": 0,
-                "elpais_results": 0,
-                "expansion_results": 0,
-                "elmundo_results": 0,
-                "abc_results": 0,
-                "lavanguardia_results": 0,
-                "elconfidencial_results": 0,
+                "rss_results": 0,
                 "high_risk_results": 0,
                 "sources_searched": []
+            },
+            "performance": {
+                "total_time_seconds": f"{total_time:.2f}",
+                "error": "Search failed before completion"
+            },
+            "database_stats": {
+                "raw_docs_saved": 0,
+                "events_created": 0,
+                "total_processed": 0,
+                "errors": [str(e)]
             }
         }
         
@@ -492,77 +336,55 @@ async def unified_search(request: UnifiedSearchRequest):
 @router.get("/search/health")
 async def search_health():
     """
-    Health check for search services
+    Health check for search system
     """
     try:
-        orchestrator = StreamlinedSearchOrchestrator()
+        orchestrator = get_search_orchestrator()
         classifier = OptimizedHybridClassifier()
         
         return {
             "status": "healthy",
-            "message": "Search services operational (HYBRID PERFORMANCE MODE)",
-            "services": {
-                "orchestrator": "available",
-                "hybrid_classifier": "available",
-                "boe_agent": "available",
-                "newsapi_agent": "available",
-                "elpais_agent": "available",
-                "expansion_agent": "available",
-                "elmundo_agent": "available",
-                "abc_agent": "available",
-                "lavanguardia_agent": "available",
-                "elconfidencial_agent": "available"
-            },
-            "performance": classifier.get_performance_stats()
+            "message": "Search system is operational",
+            "orchestrator_type": type(orchestrator).__name__,
+            "classifier_type": type(classifier).__name__,
+            "features": [
+                "Multi-source search",
+                "Hybrid classification",
+                "Rate limit handling",
+                "Performance monitoring",
+                "Database persistence"
+            ],
+            "sources_available": [
+                "BOE (Spanish Official Gazette)",
+                "NewsAPI (International news)",
+                "RSS feeds (Spanish news sources)"
+            ]
         }
+        
     except Exception as e:
         return {
-            "status": "degraded",
-            "message": f"Search services partially available: {str(e)}",
-            "services": {
-                "orchestrator": "unknown",
-                "hybrid_classifier": "unknown",
-                "boe_agent": "unknown",
-                "newsapi_agent": "unknown",
-                "elpais_agent": "unknown",
-                "expansion_agent": "unknown",
-                "elmundo_agent": "unknown",
-                "abc_agent": "unknown",
-                "lavanguardia_agent": "unknown",
-                "elconfidencial_agent": "unknown"
-            }
+            "status": "unhealthy",
+            "error": str(e),
+            "message": "Search system is not operational"
         }
 
 
-@router.get("/search/performance")
-async def search_performance():
+@router.get("/search/database-stats")
+async def get_database_stats(db: Session = Depends(deps.get_db)):
     """
-    Get detailed performance statistics for the OPTIMIZED hybrid classifier
+    Get database statistics for search results
     """
     try:
-        classifier = OptimizedHybridClassifier()
-        stats = classifier.get_performance_stats()
+        stats = db_integration.get_database_stats(db)
         
         return {
-            "status": "success", 
-            "message": "Performance statistics for OPTIMIZED STREAMLINED search system",
-            "architecture": {
-                "search_stage": "Streamlined agents - Fast data fetching only",
-                "classification_stage_1": "Optimized keyword gate (µ-seconds) - 90%+ efficiency",
-                "classification_stage_2": "Smart LLM routing (only for truly ambiguous cases)",
-                "optimization": "Removed classification loops + optimized patterns"
-            },
-            "statistics": stats,
-            "improvements": {
-                "search_optimization": "No classification during search loops",
-                "keyword_patterns": "Enhanced patterns for Spanish D&O risks",
-                "smart_routing": "Only legal-looking ambiguous content sent to LLM",
-                "expected_performance": "90%+ improvement over previous system"
-            }
+            "status": "success",
+            "message": "Database statistics retrieved successfully",
+            "statistics": stats
         }
         
     except Exception as e:
         return {
             "status": "error",
-            "message": f"Could not retrieve performance stats: {str(e)}"
+            "message": f"Could not retrieve database stats: {str(e)}"
         } 

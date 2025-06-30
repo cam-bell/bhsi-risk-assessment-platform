@@ -1,11 +1,14 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import companies, streamlined_search, analysis
+from app.api.v1.endpoints import companies, streamlined_search, analysis, search
 
 api_router = APIRouter()
 
 # Search endpoints - Main functionality (streamlined search)
 # Updated to use streamlined search for better performance
-api_router.include_router(streamlined_search.router, tags=["search"])
+api_router.include_router(streamlined_search.router, prefix="/streamlined", tags=["search"])
+
+# Legacy search endpoints (for backward compatibility)
+api_router.include_router(search.router, tags=["search"])
 
 # Company analysis endpoints
 api_router.include_router(companies.router, prefix="/companies", tags=["companies"])
