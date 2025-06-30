@@ -90,7 +90,8 @@ export interface BatchUploadResponse {
 export const riskAssessmentApi = createApi({
   reducerPath: "riskAssessmentApi",
   baseQuery: axiosBaseQuery({
-    baseUrl: import.meta.env.VITE_API_BASE_URL || "http://localhost:8000",
+    baseUrl:
+      import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1",
   }),
   tagTypes: ["Search", "SavedResults"],
   endpoints: (builder) => ({

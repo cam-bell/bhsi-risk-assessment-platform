@@ -29,6 +29,7 @@ import {
   Bell,
   LogOut,
   User,
+  BarChart3,
 } from "lucide-react";
 import { useAuth } from "../auth/useAuth";
 import { NotificationCenter } from "./NotificationSystem";
@@ -42,6 +43,7 @@ interface LayoutProps {
 const navigationItems = [
   { id: "dashboard", label: "Dashboard", icon: Dashboard, path: "/dashboard" },
   { id: "search", label: "Risk Assessment", icon: Search, path: "/" },
+  { id: "analytics", label: "Analytics", icon: BarChart3, path: "/analytics" },
   { id: "batch", label: "Batch Upload", icon: FileUp, path: "/batch" },
   {
     id: "history",
@@ -103,6 +105,7 @@ const Layout = ({ children, currentPage = "search" }: LayoutProps) => {
   const getCurrentPage = () => {
     if (location.pathname === "/dashboard") return "dashboard";
     if (location.pathname === "/") return "search";
+    if (location.pathname === "/analytics") return "analytics";
     if (location.pathname === "/batch") return "batch";
     if (location.pathname === "/history") return "history";
     if (location.pathname === "/settings") return "settings";
