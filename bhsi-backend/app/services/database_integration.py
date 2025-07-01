@@ -6,16 +6,16 @@ Integrates with existing CRUD operations to persist search data
 
 import logging
 import json
-import hashlib
-from typing import Dict, Any, List, Optional
-from datetime import datetime, date
+from typing import Dict, Any, List
+from datetime import datetime
 from sqlalchemy.orm import Session
 
 from app.crud.raw_docs import raw_docs
 from app.crud.events import events
-from app.core.config import settings
 from app.agents.search.rss_adapter import rss_article_to_rawdoc
-from app.agents.search.yahoo_finance_adapter import yahoo_finance_data_to_rawdoc
+from app.agents.search.yahoo_finance_adapter import (
+    yahoo_finance_data_to_rawdoc
+)
 
 logger = logging.getLogger(__name__)
 
@@ -75,12 +75,20 @@ class DatabaseIntegrationService:
                 stats["errors"].extend(news_stats["errors"])
             
             # Process RSS results
-            rss_sources = ["elpais", "expansion", "elmundo", "abc", "lavanguardia", 
-                          "elconfidencial", "eldiario", "europapress"]
+            rss_sources = [
+                "elpais", "expansion", "elmundo", "abc", "lavanguardia",
+                "elconfidencial", "eldiario", "europapress"
+            ]
             for source in rss_sources:
-                if source in search_results and search_results[source].get("articles"):
+                if (
+                    source in search_results and
+                    search_results[source].get("articles")
+                ):
                     rss_stats = self._process_rss_results(
-                        db, search_results[source]["articles"], source, company_name
+                        db,
+                        search_results[source]["articles"],
+                        source,
+                        company_name
                     )
                     stats["raw_docs_saved"] += rss_stats["raw_docs_saved"]
                     stats["events_created"] += rss_stats["events_created"]
@@ -88,16 +96,24 @@ class DatabaseIntegrationService:
                     stats["errors"].extend(rss_stats["errors"])
             
             # Process Yahoo Finance results
-            if "yahoo_finance" in search_results and search_results["yahoo_finance"].get("financial_data"):
+            if (
+                "yahoo_finance" in search_results and
+                search_results["yahoo_finance"].get("financial_data")
+            ):
                 yahoo_stats = self._process_yahoo_finance_results(
-                    db, search_results["yahoo_finance"]["financial_data"], company_name
+                    db,
+                    search_results["yahoo_finance"]["financial_data"],
+                    company_name
                 )
                 stats["raw_docs_saved"] += yahoo_stats["raw_docs_saved"]
+                stats["events_created"] += yahoo_stats["events_created"]
                 stats["total_processed"] += yahoo_stats["total_processed"]
                 stats["errors"].extend(yahoo_stats["errors"])
             
-            logger.info(f"Database integration complete for '{company_name}': "
-                       f"{stats['raw_docs_saved']} raw docs, {stats['events_created']} events")
+            logger.info(
+                f"Database integration complete for '{company_name}': "
+                f"{stats['raw_docs_saved']} raw docs, {stats['events_created']} events"
+            )
             
         except Exception as e:
             logger.error(f"Database integration failed: {e}")
@@ -126,7 +142,9 @@ class DatabaseIntegrationService:
                     "seccion_codigo": result.get("seccion_codigo", ""),
                     "seccion_nombre": result.get("seccion_nombre", "")
                 }
-                payload_bytes = json.dumps(payload_data, ensure_ascii=False).encode('utf-8')
+                payload_bytes = json.dumps(
+                    payload_data, ensure_ascii=False
+                ).encode('utf-8')
                 
                 # Save to raw_docs
                 meta = {
@@ -138,7 +156,10 @@ class DatabaseIntegrationService:
                 }
                 
                 raw_doc, is_new = self.raw_docs_crud.create_with_dedup(
-                    db, source="BOE", payload=payload_bytes, meta=meta
+                    db,
+                    source="BOE",
+                    payload=payload_bytes,
+                    meta=meta
                 )
                 
                 if is_new:
@@ -152,10 +173,10 @@ class DatabaseIntegrationService:
                                 pub_date = datetime.strptime(
                                     result["fechaPublicacion"], "%Y-%m-%d"
                                 ).date()
-                            except:
+                            except Exception:
                                 pass
                         
-                        event = self.events_crud.create_from_raw(
+                        self.events_crud.create_from_raw(
                             db,
                             raw_id=raw_doc.raw_id,
                             source="BOE",
@@ -197,7 +218,9 @@ class DatabaseIntegrationService:
                     "url": article.get("url", ""),
                     "source": article.get("source", {}).get("name", "Unknown")
                 }
-                payload_bytes = json.dumps(payload_data, ensure_ascii=False).encode('utf-8')
+                payload_bytes = json.dumps(
+                    payload_data, ensure_ascii=False
+                ).encode('utf-8')
                 
                 # Save to raw_docs
                 meta = {
@@ -209,7 +232,10 @@ class DatabaseIntegrationService:
                 }
                 
                 raw_doc, is_new = self.raw_docs_crud.create_with_dedup(
-                    db, source="NewsAPI", payload=payload_bytes, meta=meta
+                    db,
+                    source="NewsAPI",
+                    payload=payload_bytes,
+                    meta=meta
                 )
                 
                 if is_new:
@@ -220,13 +246,14 @@ class DatabaseIntegrationService:
                         pub_date = None
                         if article.get("publishedAt"):
                             try:
-                                # Handle ISO format dates
                                 pub_str = article["publishedAt"].split("T")[0]
-                                pub_date = datetime.strptime(pub_str, "%Y-%m-%d").date()
-                            except:
+                                pub_date = datetime.strptime(
+                                    pub_str, "%Y-%m-%d"
+                                ).date()
+                            except Exception:
                                 pass
                         
-                        event = self.events_crud.create_from_raw(
+                        self.events_crud.create_from_raw(
                             db,
                             raw_id=raw_doc.raw_id,
                             source="NewsAPI",
@@ -266,7 +293,30 @@ class DatabaseIntegrationService:
                 )
                 if is_new:
                     stats["raw_docs_saved"] += 1
-                    # (Optional: create event from raw doc if needed)
+                    # Create event from raw doc
+                    try:
+                        pub_date = None
+                        if article.get("publishedAt"):
+                            try:
+                                pub_str = article["publishedAt"].split("T")[0]
+                                pub_date = datetime.strptime(
+                                    pub_str, "%Y-%m-%d"
+                                ).date()
+                            except Exception:
+                                pass
+                        self.events_crud.create_from_raw(
+                            db,
+                            raw_id=raw_doc.raw_id,
+                            source=source_name.upper(),
+                            title=article.get("title", ""),
+                            text=article.get("content", article.get("description", "")),
+                            section=article.get("category", None),
+                            pub_date=pub_date,
+                            url=article.get("url", "")
+                        )
+                        stats["events_created"] += 1
+                    except Exception as e:
+                        stats["errors"].append(f"Event creation error: {str(e)}")
                 stats["total_processed"] += 1
             except Exception as e:
                 stats["errors"].append(f"RSS result processing error: {str(e)}")
@@ -279,7 +329,7 @@ class DatabaseIntegrationService:
         company_name: str
     ) -> dict:
         """Process and save Yahoo Finance results"""
-        stats = {"raw_docs_saved": 0, "total_processed": 0, "errors": []}
+        stats = {"raw_docs_saved": 0, "events_created": 0, "total_processed": 0, "errors": []}
         for financial_data in financial_data_list:
             try:
                 rawdoc_data = yahoo_finance_data_to_rawdoc(financial_data)
@@ -288,6 +338,27 @@ class DatabaseIntegrationService:
                 )
                 if is_new:
                     stats["raw_docs_saved"] += 1
+                    # Create event from raw doc
+                    try:
+                        # Use company_name and ticker as title, risk_level as section
+                        title = f"{financial_data.get('company_name', '')} ({financial_data.get('ticker', '')})"
+                        text = f"Risk Level: {financial_data.get('risk_level', '')}\nRisk Score: {financial_data.get('risk_score', '')}\nMarket Cap: {financial_data.get('market_cap', '')}\nCurrent Price: {financial_data.get('current_price', '')} {financial_data.get('currency', '')}"
+                        section = financial_data.get('risk_level', None)
+                        pub_date = None  # Yahoo Finance may not have a date
+                        url = financial_data.get('url', '')
+                        self.events_crud.create_from_raw(
+                            db,
+                            raw_id=raw_doc.raw_id,
+                            source="YAHOO_FINANCE",
+                            title=title,
+                            text=text,
+                            section=section,
+                            pub_date=pub_date,
+                            url=url
+                        )
+                        stats["events_created"] += 1
+                    except Exception as e:
+                        stats["errors"].append(f"Event creation error: {str(e)}")
                 stats["total_processed"] += 1
             except Exception as e:
                 stats["errors"].append(f"Yahoo Finance result processing error: {str(e)}")
