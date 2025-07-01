@@ -14,6 +14,8 @@ from sqlalchemy.orm import Session
 from app.crud.raw_docs import raw_docs
 from app.crud.events import events
 from app.core.config import settings
+from app.agents.search.rss_adapter import rss_article_to_rawdoc
+from app.agents.search.yahoo_finance_adapter import yahoo_finance_data_to_rawdoc
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +86,15 @@ class DatabaseIntegrationService:
                     stats["events_created"] += rss_stats["events_created"]
                     stats["total_processed"] += rss_stats["total_processed"]
                     stats["errors"].extend(rss_stats["errors"])
+            
+            # Process Yahoo Finance results
+            if "yahoo_finance" in search_results and search_results["yahoo_finance"].get("financial_data"):
+                yahoo_stats = self._process_yahoo_finance_results(
+                    db, search_results["yahoo_finance"]["financial_data"], company_name
+                )
+                stats["raw_docs_saved"] += yahoo_stats["raw_docs_saved"]
+                stats["total_processed"] += yahoo_stats["total_processed"]
+                stats["errors"].extend(yahoo_stats["errors"])
             
             logger.info(f"Database integration complete for '{company_name}': "
                        f"{stats['raw_docs_saved']} raw docs, {stats['events_created']} events")
@@ -240,74 +251,46 @@ class DatabaseIntegrationService:
     def _process_rss_results(
         self, 
         db: Session, 
-        rss_results: List[Dict[str, Any]], 
+        rss_results: List[dict], 
         source_name: str, 
         company_name: str
-    ) -> Dict[str, Any]:
+    ) -> dict:
         """Process and save RSS results"""
         stats = {"raw_docs_saved": 0, "events_created": 0, "total_processed": 0, "errors": []}
-        
         for article in rss_results:
             try:
-                # Create payload for raw_docs
-                payload_data = {
-                    "title": article.get("title", ""),
-                    "description": article.get("description", ""),
-                    "content": article.get("content", ""),
-                    "publishedAt": article.get("publishedAt", ""),
-                    "url": article.get("url", ""),
-                    "source_name": article.get("source_name", source_name.upper())
-                }
-                payload_bytes = json.dumps(payload_data, ensure_ascii=False).encode('utf-8')
-                
-                # Save to raw_docs
-                meta = {
-                    "company_name": company_name,
-                    "url": article.get("url", ""),
-                    "pub_date": article.get("publishedAt", ""),
-                    "source_name": article.get("source_name", source_name.upper()),
-                    "author": article.get("author", ""),
-                    "category": article.get("category", "")
-                }
-                
+                # Use the generic RSS adapter
+                rawdoc_data = rss_article_to_rawdoc(article, source_name.upper())
                 raw_doc, is_new = self.raw_docs_crud.create_with_dedup(
-                    db, source=f"RSS-{source_name.upper()}", payload=payload_bytes, meta=meta
+                    db, source=rawdoc_data["source"], payload=rawdoc_data["payload"], meta=rawdoc_data["meta"]
                 )
-                
                 if is_new:
                     stats["raw_docs_saved"] += 1
-                    
-                    # Create event from raw doc
-                    try:
-                        pub_date = None
-                        if article.get("publishedAt"):
-                            try:
-                                # Handle ISO format dates
-                                pub_str = article["publishedAt"].split("T")[0]
-                                pub_date = datetime.strptime(pub_str, "%Y-%m-%d").date()
-                            except:
-                                pass
-                        
-                        event = self.events_crud.create_from_raw(
-                            db,
-                            raw_id=raw_doc.raw_id,
-                            source=f"RSS-{source_name.upper()}",
-                            title=article.get("title", ""),
-                            text=article.get("content", article.get("description", "")),
-                            section=None,
-                            pub_date=pub_date,
-                            url=article.get("url", "")
-                        )
-                        stats["events_created"] += 1
-                        
-                    except Exception as e:
-                        stats["errors"].append(f"Event creation error: {str(e)}")
-                
+                    # (Optional: create event from raw doc if needed)
                 stats["total_processed"] += 1
-                
             except Exception as e:
                 stats["errors"].append(f"RSS result processing error: {str(e)}")
-        
+        return stats
+    
+    def _process_yahoo_finance_results(
+        self,
+        db: Session,
+        financial_data_list: list,
+        company_name: str
+    ) -> dict:
+        """Process and save Yahoo Finance results"""
+        stats = {"raw_docs_saved": 0, "total_processed": 0, "errors": []}
+        for financial_data in financial_data_list:
+            try:
+                rawdoc_data = yahoo_finance_data_to_rawdoc(financial_data)
+                raw_doc, is_new = self.raw_docs_crud.create_with_dedup(
+                    db, source=rawdoc_data["source"], payload=rawdoc_data["payload"], meta=rawdoc_data["meta"]
+                )
+                if is_new:
+                    stats["raw_docs_saved"] += 1
+                stats["total_processed"] += 1
+            except Exception as e:
+                stats["errors"].append(f"Yahoo Finance result processing error: {str(e)}")
         return stats
     
     def get_database_stats(self, db: Session) -> Dict[str, Any]:

@@ -5,7 +5,7 @@ STREAMLINED Search API Endpoints - Ultra-fast search with optimized hybrid class
 
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from typing import Dict, Any, List, Optional
+from typing import Optional
 import datetime
 import time
 from sqlalchemy.orm import Session
@@ -14,8 +14,6 @@ from app.agents.search.orchestrator_factory import get_search_orchestrator
 from app.agents.analysis.optimized_hybrid_classifier import OptimizedHybridClassifier
 from app.services.database_integration import db_integration
 from app.api import deps
-from app.agents.search.boe_adapter import boe_to_rawdoc_dict
-from app.crud.raw_docs import raw_docs
 
 router = APIRouter()
 
@@ -117,7 +115,6 @@ async def streamlined_search(
                         source="BOE",
                         section=boe_result.get("seccion_codigo", "")
                     )
-                    
                     classified_result = {
                         "source": "BOE",
                         "date": boe_result.get("fechaPublicacion"),
@@ -134,17 +131,6 @@ async def streamlined_search(
                         "seccion_nombre": boe_result.get("seccion_nombre")
                     }
                     classified_results.append(classified_result)
-                    
-                    # Store BOE results in raw_docs table
-                    rawdoc_data = boe_to_rawdoc_dict(boe_result)
-                    # Use CRUD utility to insert with deduplication
-                    raw_docs.create_with_dedup(
-                        db,
-                        source=rawdoc_data["source"],
-                        payload=rawdoc_data["payload"],
-                        meta=rawdoc_data["meta"]
-                    )
-                    
                 except Exception as e:
                     # Simple fallback - don't slow down the entire response
                     classified_result = {
@@ -174,7 +160,6 @@ async def streamlined_search(
                         title=article.get("title", ""),
                         source="News"
                     )
-                    
                     classified_result = {
                         "source": "News",
                         "date": article.get("publishedAt"),
@@ -190,7 +175,6 @@ async def streamlined_search(
                         "source_name": article.get("source", "Unknown")
                     }
                     classified_results.append(classified_result)
-                    
                 except Exception as e:
                     # Simple fallback
                     classified_result = {
