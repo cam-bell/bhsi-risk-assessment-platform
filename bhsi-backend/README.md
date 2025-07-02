@@ -5,18 +5,22 @@ A high-performance corporate risk assessment system that combines Bank of Spain 
 ## 🏗️ **SYSTEM ARCHITECTURE**
 
 ### **Core Design Philosophy**
+
 The system follows a **streamlined architecture** optimized for performance:
+
 1. **Fast Data Fetching** - Search agents fetch raw data without classification
 2. **Bulk Hybrid Classification** - Optimized keyword gate + smart LLM routing
 3. **Cloud-Native Services** - Microservices for scalability and reliability
 4. **Intelligent Fallbacks** - Multiple classification tiers for optimal speed
 
 ### **Main Application Entry Point**
+
 ```
 main.py                    # ← Single entry point for the entire application
 ```
 
 ### **API Structure**
+
 ```
 app/
 ├── api/v1/
@@ -27,6 +31,7 @@ app/
 ```
 
 ### **Search Components (Ultra-Fast)**
+
 ```
 app/agents/search/
 ├── streamlined_orchestrator.py      # Coordinates fast search agents
@@ -37,6 +42,7 @@ app/agents/search/
 ```
 
 ### **Analysis Components (Optimized Hybrid)**
+
 ```
 app/agents/analysis/
 ├── optimized_hybrid_classifier.py   # 90%+ keyword gate + LLM routing
@@ -49,6 +55,7 @@ app/agents/analysis/
 ```
 
 ### **Database Layer**
+
 ```
 app/
 ├── models/                         # SQLAlchemy ORM models
@@ -70,6 +77,7 @@ app/
 ```
 
 ### **Core Configuration**
+
 ```
 app/core/
 ├── config.py                       # Application configuration
@@ -77,6 +85,7 @@ app/core/
 ```
 
 ### **Cloud Microservices**
+
 ```
 app/services/                       # Google Cloud Run microservices
 ├── gemini/                         # Gemini AI classification service
@@ -100,18 +109,22 @@ app/services/                       # Google Cloud Run microservices
 ## 🚀 **PERFORMANCE OPTIMIZATIONS**
 
 ### **Problem Solved**
+
 The original system was extremely slow (2+ minutes per search) because:
+
 - BOE and NewsAPI agents called slow LLM classifier for every document in search loops
 - Multiple redundant classification processes
 - Inefficient fallback mechanisms
 
 ### **Solution Implemented**
+
 1. **Streamlined Search Phase** - Fast data fetching only, no classification
 2. **Optimized Hybrid Classification** - 90%+ handled by µ-second keyword gate
 3. **Smart LLM Routing** - Only truly ambiguous cases sent to expensive LLM
 4. **Bulk Processing** - Classify all results after search completion
 
 ### **Performance Results**
+
 - ⚡ **Response Time:** 3-10 seconds (vs previous 2+ minutes)
 - 🎯 **Keyword Efficiency:** 90%+ cases handled in µ-seconds
 - 🧠 **LLM Usage:** <10% of cases require expensive LLM analysis
@@ -120,11 +133,13 @@ The original system was extremely slow (2+ minutes per search) because:
 ## 📡 **API ENDPOINTS**
 
 ### **🔍 Main Search API**
+
 ```http
 POST /api/v1/search
 ```
 
 **Request:**
+
 ```json
 {
   "company_name": "Banco Santander",
@@ -136,6 +151,7 @@ POST /api/v1/search
 ```
 
 **Response Structure:**
+
 ```json
 {
   "company_name": "Banco Santander",
@@ -173,12 +189,14 @@ POST /api/v1/search
 ```
 
 ### **🏢 Company Analysis API**
+
 ```http
 POST /api/v1/companies/analyze
 GET  /api/v1/companies/system/status
 ```
 
 ### **📊 System Health & Performance**
+
 ```http
 GET  /                           # API overview
 GET  /health                     # Health check
@@ -190,12 +208,13 @@ GET  /docs                       # Interactive API documentation
 ## 🧠 **AI CLASSIFICATION SYSTEM**
 
 ### **Optimized Hybrid Architecture**
+
 ```
 📄 DOCUMENT
        ↓
 🚀 STAGE 1: Keyword Gate (µ-seconds - 90%+ efficiency)
    ├─ Section Codes: JUS, CNMC, AEPD, CNMV, BDE → High-Legal
-   ├─ High-Risk Patterns: "concurso", "sanción grave" → High-Legal  
+   ├─ High-Risk Patterns: "concurso", "sanción grave" → High-Legal
    ├─ Medium-Risk Patterns: "requerimiento", "advertencia" → Medium-Legal
    ├─ Low-Risk Patterns: "circular", "normativa" → Low-Legal
    └─ Non-Legal Patterns: "deportes", "beneficios" → No-Legal
@@ -207,13 +226,16 @@ GET  /docs                       # Interactive API documentation
 ```
 
 ### **Risk Classification Categories**
+
 - **High-Legal:** Bankruptcy, criminal sanctions, severe regulatory violations
 - **Medium-Legal:** Administrative sanctions, regulatory warnings, compliance issues
 - **Low-Legal:** Regulatory notices, administrative procedures, licensing
 - **No-Legal:** Business news, sports, entertainment, routine operations
 
 ### **Spanish D&O Risk Patterns**
+
 The keyword gate is specifically optimized for Spanish legal terminology:
+
 - **Bankruptcy:** "concurso de acreedores", "administración concursal", "suspensión de pagos"
 - **Sanctions:** "sanción grave", "expediente sancionador", "multa"
 - **Legal Proceedings:** "sentencia penal", "proceso penal", "delito societario"
@@ -223,14 +245,15 @@ The keyword gate is specifically optimized for Spanish legal terminology:
 
 ### **Deployed Google Cloud Run Services**
 
-| Service | URL | Purpose | Status |
-|---------|-----|---------|--------|
-| **Gemini AI** | `https://gemini-service-185303190462.europe-west1.run.app` | Advanced text classification | ✅ Active |
-| **Embedder** | `https://embedder-service-185303190462.europe-west1.run.app` | Document embeddings | ✅ Active |
-| **Vector Search** | `https://vector-search-185303190462.europe-west1.run.app` | Similarity search | ✅ Active |
-| **BigQuery Analytics** | `https://bigquery-analytics-185303190462.europe-west1.run.app` | Data analytics | ✅ Active |
+| Service                | URL                                                            | Purpose                      | Status    |
+| ---------------------- | -------------------------------------------------------------- | ---------------------------- | --------- |
+| **Gemini AI**          | `https://gemini-service-185303190462.europe-west1.run.app`     | Advanced text classification | ✅ Active |
+| **Embedder**           | `https://embedder-service-185303190462.europe-west1.run.app`   | Document embeddings          | ✅ Active |
+| **Vector Search**      | `https://vector-search-185303190462.europe-west1.run.app`      | Similarity search            | ✅ Active |
+| **BigQuery Analytics** | `https://bigquery-analytics-185303190462.europe-west1.run.app` | Data analytics               | ✅ Active |
 
 ### **Service Integration Flow**
+
 1. **Primary Classification:** Cloud Gemini for contextual analysis
 2. **Embedding Generation:** Cloud Embedder for semantic search
 3. **Vector Storage:** Cloud Vector Search for similarity matching
@@ -239,6 +262,7 @@ The keyword gate is specifically optimized for Spanish legal terminology:
 ## 📝 **DATA SOURCES**
 
 ### **BOE (Boletín Oficial del Estado)**
+
 - **Source:** Official Spanish government gazette
 - **Coverage:** Legal proceedings, regulatory changes, company sanctions
 - **API:** Direct integration with BOE's public API
@@ -246,6 +270,7 @@ The keyword gate is specifically optimized for Spanish legal terminology:
 - **Date Range:** Supports historical data, weekend/holiday aware
 
 ### **NewsAPI**
+
 - **Source:** International news aggregator
 - **Coverage:** Spanish language business and financial news
 - **API:** RESTful API with authentication
@@ -255,6 +280,7 @@ The keyword gate is specifically optimized for Spanish legal terminology:
 ## 🔧 **DEVELOPMENT & DEPLOYMENT**
 
 ### **Quick Start**
+
 ```bash
 # Development server
 cd bhsi-backend
@@ -271,6 +297,7 @@ python quick_optimized_test.py
 ```
 
 ### **Environment Variables**
+
 ```bash
 # Required for cloud services
 GOOGLE_CLOUD_PROJECT=bhsi-corporate-analysis
@@ -288,6 +315,7 @@ OLLAMA_HOST=http://localhost:11434
 ```
 
 ### **Dependencies**
+
 - **FastAPI:** Modern async web framework
 - **SQLAlchemy:** Database ORM
 - **Pydantic:** Data validation and serialization
@@ -298,12 +326,14 @@ OLLAMA_HOST=http://localhost:11434
 ## 📊 **DATABASE SCHEMA**
 
 ### **Tables**
+
 - **companies:** Company entities and metadata
 - **events:** Risk events and classifications
 - **raw_docs:** Raw document storage for processing
 - **users:** User management and authentication
 
 ### **Key Relationships**
+
 - Company → Events (one-to-many)
 - Events → Raw Documents (many-to-many)
 - Users → Companies (many-to-many access control)
@@ -311,6 +341,7 @@ OLLAMA_HOST=http://localhost:11434
 ## 🔍 **MONITORING & PERFORMANCE**
 
 ### **Built-in Metrics**
+
 - Classification method distribution
 - Processing time breakdowns
 - Keyword gate efficiency rates
@@ -318,6 +349,7 @@ OLLAMA_HOST=http://localhost:11434
 - Search performance metrics
 
 ### **Health Checks**
+
 - Service availability monitoring
 - Database connection health
 - Cloud service status
@@ -326,6 +358,7 @@ OLLAMA_HOST=http://localhost:11434
 ## 📚 **TESTING**
 
 ### **Test Suite Coverage**
+
 ```bash
 tests/
 ├── agents/
@@ -337,10 +370,26 @@ tests/
 ```
 
 ### **Performance Benchmarks**
+
 - Classification speed tests (<5ms average)
 - Search performance validation
 - Keyword gate efficiency verification
 - End-to-end response time monitoring
+
+## Google Cloud Authentication for Local Development
+
+To use BigQuery and other Google Cloud services locally, you must authenticate with your Google account:
+
+1. Install the [Google Cloud SDK](https://cloud.google.com/sdk/docs/install) if you haven't already.
+2. Run the following command in your terminal:
+
+   ```sh
+   gcloud auth application-default login
+   ```
+
+   This will open a browser window for you to log in. Once complete, your local environment will have the necessary credentials to access Google Cloud services (including BigQuery) using your IAM permissions.
+
+**Note:** This is for development only. Production should use a service account with appropriate permissions.
 
 ---
 
@@ -348,4 +397,4 @@ tests/
 
 **Architecture:** Streamlined microservices with optimized hybrid AI classification
 
-**Performance:** 90%+ improvement through intelligent keyword filtering and cloud optimization 
+**Performance:** 90%+ improvement through intelligent keyword filtering and cloud optimization

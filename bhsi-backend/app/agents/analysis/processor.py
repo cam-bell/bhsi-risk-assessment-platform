@@ -297,6 +297,65 @@ class DataProcessor:
         }
 
 
+class EventNormalizer:
+    """Normalizes raw documents from any source into canonical events."""
+    def __init__(self):
+        self.logger = logging.getLogger(__name__)
+
+    def normalize_and_create_event(self, db, raw_doc, source):
+        # Parse payload
+        try:
+            payload_str = raw_doc.payload.decode('utf-8')
+            item = json.loads(payload_str)
+        except Exception as e:
+            self.logger.error(f"Failed to decode payload for {raw_doc.raw_id}: {e}")
+            return None
+
+        # Extract fields based on source
+        if source == "BOE":
+            title = item.get("titulo", "").strip()
+            section = item.get("seccion_codigo", "").strip()
+            text = item.get("text", title)
+            pub_date = item.get("fechaPublicacion") or item.get("fecha_publicacion")
+            url = item.get("url_html", "")
+        elif source == "NEWSAPI":
+            title = item.get("title", "").strip()
+            section = None
+            text = item.get("content", item.get("description", title))
+            pub_date = item.get("publishedAt")
+            url = item.get("url", "")
+        else:  # RSS and others
+            title = item.get("title", "").strip()
+            section = item.get("category", None)
+            text = item.get("content", item.get("description", title))
+            pub_date = item.get("publishedAt")
+            url = item.get("url", "")
+
+        # Parse date
+        parsed_date = None
+        if pub_date:
+            try:
+                if "T" in pub_date:
+                    pub_date = pub_date.split("T")[0]
+                parsed_date = datetime.strptime(pub_date, "%Y-%m-%d").date()
+            except Exception:
+                pass
+
+        # Create event
+        from app.crud.events import events
+        event = events.create_from_raw(
+            db,
+            raw_id=raw_doc.raw_id,
+            source=source,
+            title=title,
+            text=text,
+            section=section,
+            pub_date=parsed_date,
+            url=url
+        )
+        return event
+
+
 # CLI interface
 if __name__ == "__main__":
     processor = BOEDocumentProcessor()

@@ -12,10 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.crud.raw_docs import raw_docs
 from app.crud.events import events
-from app.agents.search.rss_adapter import rss_article_to_rawdoc
-from app.agents.search.yahoo_finance_adapter import (
-    yahoo_finance_data_to_rawdoc
-)
+from app.agents.analysis.processor import EventNormalizer
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +23,7 @@ class DatabaseIntegrationService:
     def __init__(self):
         self.raw_docs_crud = raw_docs
         self.events_crud = events
+        self.normalizer = EventNormalizer()
     
     def save_search_results(
         self,
@@ -115,11 +113,20 @@ class DatabaseIntegrationService:
                 f"{stats['raw_docs_saved']} raw docs, {stats['events_created']} events"
             )
             
+            # CloudEmbeddingAgent().process_unembedded_events()
+            
         except Exception as e:
             logger.error(f"Database integration failed: {e}")
             stats["errors"].append(f"Integration error: {str(e)}")
         
         return stats
+    
+    def build_rawdoc_dict(self, source, payload_bytes, meta):
+        return {
+            "source": source,
+            "payload": payload_bytes,
+            "meta": meta
+        }
     
     def _process_boe_results(
         self, 
@@ -129,7 +136,6 @@ class DatabaseIntegrationService:
     ) -> Dict[str, Any]:
         """Process and save BOE results"""
         stats = {"raw_docs_saved": 0, "events_created": 0, "total_processed": 0, "errors": []}
-        
         for result in boe_results:
             try:
                 # Create payload for raw_docs
@@ -142,11 +148,7 @@ class DatabaseIntegrationService:
                     "seccion_codigo": result.get("seccion_codigo", ""),
                     "seccion_nombre": result.get("seccion_nombre", "")
                 }
-                payload_bytes = json.dumps(
-                    payload_data, ensure_ascii=False
-                ).encode('utf-8')
-                
-                # Save to raw_docs
+                payload_bytes = json.dumps(payload_data, ensure_ascii=False).encode('utf-8')
                 meta = {
                     "company_name": company_name,
                     "url": result.get("url_html", ""),
@@ -154,14 +156,11 @@ class DatabaseIntegrationService:
                     "section": result.get("seccion_codigo", ""),
                     "identificador": result.get("identificador", "")
                 }
-                
+                rawdoc_dict = self.build_rawdoc_dict("BOE", payload_bytes, meta)
                 raw_doc, is_new = self.raw_docs_crud.create_with_dedup(
                     db,
-                    source="BOE",
-                    payload=payload_bytes,
-                    meta=meta
+                    **rawdoc_dict
                 )
-                
                 if is_new:
                     stats["raw_docs_saved"] += 1
                     
@@ -175,27 +174,14 @@ class DatabaseIntegrationService:
                                 ).date()
                             except Exception:
                                 pass
-                        
-                        self.events_crud.create_from_raw(
-                            db,
-                            raw_id=raw_doc.raw_id,
-                            source="BOE",
-                            title=result.get("titulo", ""),
-                            text=result.get("text", ""),
-                            section=result.get("seccion_codigo", ""),
-                            pub_date=pub_date,
-                            url=result.get("url_html", "")
-                        )
-                        stats["events_created"] += 1
-                        
+                        event = self.normalizer.normalize_and_create_event(db, raw_doc, "BOE")
+                        if event:
+                            stats["events_created"] += 1
                     except Exception as e:
                         stats["errors"].append(f"Event creation error: {str(e)}")
-                
                 stats["total_processed"] += 1
-                
             except Exception as e:
                 stats["errors"].append(f"BOE result processing error: {str(e)}")
-        
         return stats
     
     def _process_news_results(
@@ -206,7 +192,6 @@ class DatabaseIntegrationService:
     ) -> Dict[str, Any]:
         """Process and save NewsAPI results"""
         stats = {"raw_docs_saved": 0, "events_created": 0, "total_processed": 0, "errors": []}
-        
         for article in news_results:
             try:
                 # Create payload for raw_docs
@@ -216,28 +201,21 @@ class DatabaseIntegrationService:
                     "content": article.get("content", ""),
                     "publishedAt": article.get("publishedAt", ""),
                     "url": article.get("url", ""),
-                    "source": article.get("source", {}).get("name", "Unknown")
+                    "source": (article.get("source") or {}).get("name", "Unknown")
                 }
-                payload_bytes = json.dumps(
-                    payload_data, ensure_ascii=False
-                ).encode('utf-8')
-                
-                # Save to raw_docs
+                payload_bytes = json.dumps(payload_data, ensure_ascii=False).encode('utf-8')
                 meta = {
                     "company_name": company_name,
                     "url": article.get("url", ""),
                     "pub_date": article.get("publishedAt", ""),
-                    "source_name": article.get("source", {}).get("name", "Unknown"),
+                    "source_name": (article.get("source") or {}).get("name", "Unknown"),
                     "author": article.get("author", "")
                 }
-                
+                rawdoc_dict = self.build_rawdoc_dict("NewsAPI", payload_bytes, meta)
                 raw_doc, is_new = self.raw_docs_crud.create_with_dedup(
                     db,
-                    source="NewsAPI",
-                    payload=payload_bytes,
-                    meta=meta
+                    **rawdoc_dict
                 )
-                
                 if is_new:
                     stats["raw_docs_saved"] += 1
                     
@@ -252,27 +230,14 @@ class DatabaseIntegrationService:
                                 ).date()
                             except Exception:
                                 pass
-                        
-                        self.events_crud.create_from_raw(
-                            db,
-                            raw_id=raw_doc.raw_id,
-                            source="NewsAPI",
-                            title=article.get("title", ""),
-                            text=article.get("content", article.get("description", "")),
-                            section=None,
-                            pub_date=pub_date,
-                            url=article.get("url", "")
-                        )
-                        stats["events_created"] += 1
-                        
+                        event = self.normalizer.normalize_and_create_event(db, raw_doc, "NewsAPI")
+                        if event:
+                            stats["events_created"] += 1
                     except Exception as e:
                         stats["errors"].append(f"Event creation error: {str(e)}")
-                
                 stats["total_processed"] += 1
-                
             except Exception as e:
                 stats["errors"].append(f"News result processing error: {str(e)}")
-        
         return stats
     
     def _process_rss_results(
@@ -287,9 +252,18 @@ class DatabaseIntegrationService:
         for article in rss_results:
             try:
                 # Use the generic RSS adapter
-                rawdoc_data = rss_article_to_rawdoc(article, source_name.upper())
+                payload_bytes = json.dumps(article, ensure_ascii=False).encode('utf-8')
+                meta = {
+                    "company_name": company_name,
+                    "url": article.get("url", ""),
+                    "pub_date": article.get("publishedAt", ""),
+                    "source_name": source_name.upper(),
+                    "author": article.get("author", "")
+                }
+                rawdoc_dict = self.build_rawdoc_dict(source_name.upper(), payload_bytes, meta)
                 raw_doc, is_new = self.raw_docs_crud.create_with_dedup(
-                    db, source=rawdoc_data["source"], payload=rawdoc_data["payload"], meta=rawdoc_data["meta"]
+                    db,
+                    **rawdoc_dict
                 )
                 if is_new:
                     stats["raw_docs_saved"] += 1
@@ -304,17 +278,9 @@ class DatabaseIntegrationService:
                                 ).date()
                             except Exception:
                                 pass
-                        self.events_crud.create_from_raw(
-                            db,
-                            raw_id=raw_doc.raw_id,
-                            source=source_name.upper(),
-                            title=article.get("title", ""),
-                            text=article.get("content", article.get("description", "")),
-                            section=article.get("category", None),
-                            pub_date=pub_date,
-                            url=article.get("url", "")
-                        )
-                        stats["events_created"] += 1
+                        event = self.normalizer.normalize_and_create_event(db, raw_doc, source_name.upper())
+                        if event:
+                            stats["events_created"] += 1
                     except Exception as e:
                         stats["errors"].append(f"Event creation error: {str(e)}")
                 stats["total_processed"] += 1
@@ -332,31 +298,26 @@ class DatabaseIntegrationService:
         stats = {"raw_docs_saved": 0, "events_created": 0, "total_processed": 0, "errors": []}
         for financial_data in financial_data_list:
             try:
-                rawdoc_data = yahoo_finance_data_to_rawdoc(financial_data)
+                payload_bytes = json.dumps(financial_data, ensure_ascii=False).encode('utf-8')
+                meta = {
+                    "company_name": company_name,
+                    "url": financial_data.get("url", ""),
+                    "ticker": financial_data.get("ticker", ""),
+                    "risk_level": financial_data.get("risk_level", ""),
+                    "market_cap": financial_data.get("market_cap", ""),
+                }
+                rawdoc_dict = self.build_rawdoc_dict("YAHOO_FINANCE", payload_bytes, meta)
                 raw_doc, is_new = self.raw_docs_crud.create_with_dedup(
-                    db, source=rawdoc_data["source"], payload=rawdoc_data["payload"], meta=rawdoc_data["meta"]
+                    db,
+                    **rawdoc_dict
                 )
                 if is_new:
                     stats["raw_docs_saved"] += 1
                     # Create event from raw doc
                     try:
-                        # Use company_name and ticker as title, risk_level as section
-                        title = f"{financial_data.get('company_name', '')} ({financial_data.get('ticker', '')})"
-                        text = f"Risk Level: {financial_data.get('risk_level', '')}\nRisk Score: {financial_data.get('risk_score', '')}\nMarket Cap: {financial_data.get('market_cap', '')}\nCurrent Price: {financial_data.get('current_price', '')} {financial_data.get('currency', '')}"
-                        section = financial_data.get('risk_level', None)
-                        pub_date = None  # Yahoo Finance may not have a date
-                        url = financial_data.get('url', '')
-                        self.events_crud.create_from_raw(
-                            db,
-                            raw_id=raw_doc.raw_id,
-                            source="YAHOO_FINANCE",
-                            title=title,
-                            text=text,
-                            section=section,
-                            pub_date=pub_date,
-                            url=url
-                        )
-                        stats["events_created"] += 1
+                        event = self.normalizer.normalize_and_create_event(db, raw_doc, "YAHOO_FINANCE")
+                        if event:
+                            stats["events_created"] += 1
                     except Exception as e:
                         stats["errors"].append(f"Event creation error: {str(e)}")
                 stats["total_processed"] += 1

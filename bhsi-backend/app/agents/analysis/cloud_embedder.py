@@ -18,6 +18,7 @@ sys.path.insert(0, str(backend_dir))
 
 from app.db.session import SessionLocal
 from app.crud.events import events
+from app.agents.analysis.embedder import BOEEmbeddingAgent
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +53,6 @@ class CloudEmbeddingAgent:
         self.local_agent = None
         if not (self.vector_service_available and self.embedder_service_available):
             try:
-                from .embedder import BOEEmbeddingAgent
                 self.local_agent = BOEEmbeddingAgent()
                 logger.info("✅ Local embedding fallback initialized")
             except Exception as e:

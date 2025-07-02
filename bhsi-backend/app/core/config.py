@@ -71,8 +71,24 @@ class Settings(BaseSettings):
     
     # Demo Configuration
     USE_MOCK_DATA: bool = False  # Set to True for demo mode, False for production
-    MOCK_MODE_ENABLED: bool = True  # Enable mock data system for demo
-    USE_MOCK_ORCHESTRATOR: bool = os.getenv("USE_MOCK_ORCHESTRATOR", "false").lower() in ("1", "true", "yes")
+    MOCK_MODE_ENABLED: bool = False  # Enable mock data system for demo
+    USE_MOCK_ORCHESTRATOR: bool = (
+        os.getenv("USE_MOCK_ORCHESTRATOR", "false").lower() 
+        in ("1", "true", "yes")
+    )
+    
+    # BigQuery
+    BIGQUERY_PROJECT: str = "solid-topic-443216-b2"
+    BIGQUERY_DATASET: str = "risk_monitoring"
+    BIGQUERY_RAW_DOCS_TABLE: str = "raw_docs"
+
+    # Database selection logic
+    USE_BIGQUERY: bool = (
+        os.getenv("USE_BIGQUERY", "0").lower() in ("1", "true", "yes")
+    )
+
+    def is_bigquery_enabled(self) -> bool:
+        return self.USE_BIGQUERY
     
     class Config:
         case_sensitive = True

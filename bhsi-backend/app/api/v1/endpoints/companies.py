@@ -12,9 +12,11 @@ from app.agents.analysis.optimized_hybrid_classifier import (
 )
 from app.agents.analytics.analytics_service import AnalyticsService
 from app.crud.company import company as company_crud
+from app.crud.assessment import assessment as assessment_crud
 import logging
 from app.core.config import settings
 from app.agents.analytics.mock_analytics import generate_mock_analytics, generate_mock_risk_trends, generate_mock_comparison
+import uuid
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -143,30 +145,35 @@ async def analyze_company(
             "performance": performance_stats
         }
         
-        # Format for database storage
-        formatted_results = {
+        # Only save company metadata to Company table
+        company_metadata = {
             "name": company.name,
+            "vat": getattr(company, "vat", None),
+        }
+        db_company = company_crud.get_by_name(db, name=company.name)
+        if db_company:
+            company_crud.update(db, db_obj=db_company, obj_in=company_metadata)
+        else:
+            db_company = company_crud.create(db, obj_in=company_metadata)
+
+        # Save assessment to BigQuery/SQLite
+        assessment_dict = {
+            "id": str(uuid.uuid4()),
+            "company_id": getattr(db_company, "id", str(uuid.uuid4())),
+            "user_id": "system",
             "turnover": analysis["risk_assessment"]["turnover"],
             "shareholding": analysis["risk_assessment"]["shareholding"],
             "bankruptcy": analysis["risk_assessment"]["bankruptcy"],
             "legal": analysis["risk_assessment"]["legal"],
             "corruption": analysis["risk_assessment"]["corruption"],
             "overall": analysis["risk_assessment"]["overall"],
-            "analysis_summary": str(analysis["analysis_summary"]),
-            "google_results": "[]",  # Not used in streamlined system
-            "bing_results": "[]",    # Not used in streamlined system
+            "google_results": "[]",
+            "bing_results": "[]",
             "gov_results": str(boe_results),
-            "news_results": str(news_results)
+            "news_results": str(news_results),
+            "analysis_summary": str(analysis["analysis_summary"]),
         }
-        logger.info(f"company_crud type before get_by_name: {type(company_crud)}")
-        logger.info(f"company_crud dir before get_by_name: {dir(company_crud)}")
-        # Create or update company record
-        db_company = company_crud.get_by_name(db, name=company.name)
-        if db_company:
-            company_crud.update(db, db_obj=db_company, 
-                              obj_in=formatted_results)
-        else:
-            company_crud.create(db, obj_in=formatted_results)
+        assessment_crud.create(db, obj_in=assessment_dict)
         
         return analysis
     
