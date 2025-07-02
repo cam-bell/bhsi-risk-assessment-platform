@@ -1,7 +1,10 @@
 # Python Backend
 bhsi-backend/__pycache__/
+bhsi-backend/**/__pycache__/
 bhsi-backend/*.py[cod]
+bhsi-backend/**/*.py[cod]
 bhsi-backend/*$py.class
+bhsi-backend/**/*$py.class
 bhsi-backend/*.so
 bhsi-backend/.Python
 bhsi-backend/build/

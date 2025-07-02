@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
   Box,
   Card,
@@ -27,9 +27,6 @@ import {
   CheckCircle,
   XCircle,
   Info,
-  TrendingUp,
-  TrendingDown,
-  Minus,
   FileText,
   Shield,
   DollarSign,
@@ -41,7 +38,7 @@ interface ManagementSummaryProps {
 }
 
 const StatusIcon: React.FC<{
-  status:
+  status?:
     | "healthy"
     | "concerning"
     | "critical"
@@ -50,7 +47,8 @@ const StatusIcon: React.FC<{
     | "non_compliant"
     | "positive"
     | "neutral"
-    | "negative";
+    | "negative"
+    | undefined;
 }> = ({ status }) => {
   switch (status) {
     case "healthy":
@@ -70,7 +68,7 @@ const StatusIcon: React.FC<{
   }
 };
 
-const SeverityChip: React.FC<{ severity: "low" | "medium" | "high" }> = ({
+const SeverityChip: React.FC<{ severity?: "low" | "medium" | "high" }> = ({
   severity,
 }) => {
   const colors = {
@@ -79,6 +77,7 @@ const SeverityChip: React.FC<{ severity: "low" | "medium" | "high" }> = ({
     high: "error",
   } as const;
 
+  if (!severity) return null;
   return (
     <Chip
       label={severity.toUpperCase()}
@@ -92,11 +91,19 @@ const SeverityChip: React.FC<{ severity: "low" | "medium" | "high" }> = ({
 const ManagementSummary: React.FC<ManagementSummaryProps> = ({
   companyName,
 }) => {
-  const {
-    data: summary,
-    isLoading,
-    error,
-  } = useGetManagementSummaryMutation({ company_name: companyName });
+  const [getManagementSummary, { data: summary, isLoading, error }] =
+    useGetManagementSummaryMutation();
+
+  useEffect(() => {
+    if (companyName) {
+      getManagementSummary({
+        company_name: companyName,
+        classification_results: [],
+        include_evidence: true,
+        language: "es",
+      });
+    }
+  }, [companyName, getManagementSummary]);
 
   if (isLoading) {
     return (
@@ -136,7 +143,9 @@ const ManagementSummary: React.FC<ManagementSummaryProps> = ({
         </Typography>
         <Typography variant="body2" color="text.secondary" gutterBottom>
           {summary.company_name} • Generated{" "}
-          {new Date(summary.generated_at).toLocaleString()}
+          {summary.generated_at
+            ? new Date(summary.generated_at).toLocaleString()
+            : "-"}
         </Typography>
       </Box>
 
@@ -150,7 +159,7 @@ const ManagementSummary: React.FC<ManagementSummaryProps> = ({
                 <Typography variant="h6">Executive Summary</Typography>
               </Box>
               <Typography variant="body1" sx={{ lineHeight: 1.6 }}>
-                {summary.summary.executive_summary}
+                {summary.executive_summary || "-"}
               </Typography>
             </CardContent>
           </Card>
@@ -165,40 +174,46 @@ const ManagementSummary: React.FC<ManagementSummaryProps> = ({
                 <Typography variant="h6">Key Risks</Typography>
               </Box>
               <Stack spacing={2}>
-                {summary.summary.key_risks.map((risk, index) => (
-                  <Box key={index}>
-                    <Box
-                      display="flex"
-                      justifyContent="space-between"
-                      alignItems="center"
-                      mb={1}
-                    >
-                      <Typography variant="subtitle2" fontWeight="medium">
-                        {risk.risk_type}
+                {summary.key_risks?.length ? (
+                  summary.key_risks.map((risk, index) => (
+                    <Box key={index}>
+                      <Box
+                        display="flex"
+                        justifyContent="space-between"
+                        alignItems="center"
+                        mb={1}
+                      >
+                        <Typography variant="subtitle2" fontWeight="medium">
+                          {risk.risk_type}
+                        </Typography>
+                        <SeverityChip severity={risk.severity} />
+                      </Box>
+                      <Typography variant="body2" color="text.secondary" mb={1}>
+                        {risk.description}
                       </Typography>
-                      <SeverityChip severity={risk.severity} />
+                      <List dense>
+                        {risk.recommendations?.map((rec, recIndex) => (
+                          <ListItem key={recIndex} sx={{ py: 0.5 }}>
+                            <ListItemIcon sx={{ minWidth: 20 }}>
+                              <Info size={12} color="#2196f3" />
+                            </ListItemIcon>
+                            <ListItemText
+                              primary={rec}
+                              primaryTypographyProps={{ variant: "caption" }}
+                            />
+                          </ListItem>
+                        ))}
+                      </List>
+                      {index < summary.key_risks.length - 1 && (
+                        <Divider sx={{ mt: 2 }} />
+                      )}
                     </Box>
-                    <Typography variant="body2" color="text.secondary" mb={1}>
-                      {risk.description}
-                    </Typography>
-                    <List dense>
-                      {risk.recommendations.map((rec, recIndex) => (
-                        <ListItem key={recIndex} sx={{ py: 0.5 }}>
-                          <ListItemIcon sx={{ minWidth: 20 }}>
-                            <Info size={12} color="#2196f3" />
-                          </ListItemIcon>
-                          <ListItemText
-                            primary={rec}
-                            primaryTypographyProps={{ variant: "caption" }}
-                          />
-                        </ListItem>
-                      ))}
-                    </List>
-                    {index < summary.summary.key_risks.length - 1 && (
-                      <Divider sx={{ mt: 2 }} />
-                    )}
-                  </Box>
-                ))}
+                  ))
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    No key risks found.
+                  </Typography>
+                )}
               </Stack>
             </CardContent>
           </Card>
@@ -213,9 +228,9 @@ const ManagementSummary: React.FC<ManagementSummaryProps> = ({
                 <Typography variant="h6">Financial Health</Typography>
               </Box>
               <Box display="flex" alignItems="center" mb={2}>
-                <StatusIcon status={summary.summary.financial_health.status} />
+                <StatusIcon status={summary.financial_health?.status} />
                 <Typography variant="subtitle1" fontWeight="medium" ml={1}>
-                  {summary.summary.financial_health.status.toUpperCase()}
+                  {summary.financial_health?.status?.toUpperCase() || "-"}
                 </Typography>
               </Box>
               <TableContainer component={Paper} variant="outlined">
@@ -228,29 +243,37 @@ const ManagementSummary: React.FC<ManagementSummaryProps> = ({
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {summary.summary.financial_health.indicators.map(
-                      (indicator, index) => (
-                        <TableRow key={index}>
-                          <TableCell>
-                            <Typography variant="body2">
-                              {indicator.indicator}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" fontWeight="medium">
-                              {indicator.value}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Box display="flex" alignItems="center">
-                              <StatusIcon status={indicator.status} />
-                              <Typography variant="body2" ml={0.5}>
-                                {indicator.status.toUpperCase()}
+                    {summary.financial_health?.indicators?.length ? (
+                      summary.financial_health.indicators.map(
+                        (indicator, index) => (
+                          <TableRow key={index}>
+                            <TableCell>
+                              <Typography variant="body2">
+                                {indicator.indicator}
                               </Typography>
-                            </Box>
-                          </TableCell>
-                        </TableRow>
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" fontWeight="medium">
+                                {indicator.value}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Box display="flex" alignItems="center">
+                                <StatusIcon status={indicator.status} />
+                                <Typography variant="body2" ml={0.5}>
+                                  {indicator.status?.toUpperCase()}
+                                </Typography>
+                              </Box>
+                            </TableCell>
+                          </TableRow>
+                        )
                       )
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={3} align="center">
+                          No indicators found.
+                        </TableCell>
+                      </TableRow>
                     )}
                   </TableBody>
                 </Table>
@@ -268,42 +291,48 @@ const ManagementSummary: React.FC<ManagementSummaryProps> = ({
                 <Typography variant="h6">Compliance Status</Typography>
               </Box>
               <Box display="flex" alignItems="center" mb={2}>
-                <StatusIcon
-                  status={summary.summary.compliance_status.overall}
-                />
+                <StatusIcon status={summary.compliance_status?.overall} />
                 <Typography variant="subtitle1" fontWeight="medium" ml={1}>
                   Overall:{" "}
-                  {summary.summary.compliance_status.overall
-                    .replace("_", " ")
-                    .toUpperCase()}
+                  {summary.compliance_status?.overall
+                    ?.replace("_", " ")
+                    .toUpperCase() || "-"}
                 </Typography>
               </Box>
               <Grid container spacing={2}>
-                {summary.summary.compliance_status.areas.map((area, index) => (
-                  <Grid item xs={12} md={6} key={index}>
-                    <Paper variant="outlined" sx={{ p: 2 }}>
-                      <Box
-                        display="flex"
-                        justifyContent="space-between"
-                        alignItems="center"
-                        mb={1}
-                      >
-                        <Typography variant="subtitle2" fontWeight="medium">
-                          {area.area}
-                        </Typography>
-                        <Box display="flex" alignItems="center">
-                          <StatusIcon status={area.status} />
-                          <Typography variant="caption" ml={0.5}>
-                            {area.status.replace("_", " ").toUpperCase()}
+                {summary.compliance_status?.areas?.length ? (
+                  summary.compliance_status.areas.map((area, index) => (
+                    <Grid item xs={12} md={6} key={index}>
+                      <Paper variant="outlined" sx={{ p: 2 }}>
+                        <Box
+                          display="flex"
+                          justifyContent="space-between"
+                          alignItems="center"
+                          mb={1}
+                        >
+                          <Typography variant="subtitle2" fontWeight="medium">
+                            {area.area}
                           </Typography>
+                          <Box display="flex" alignItems="center">
+                            <StatusIcon status={area.status} />
+                            <Typography variant="caption" ml={0.5}>
+                              {area.status?.replace("_", " ").toUpperCase()}
+                            </Typography>
+                          </Box>
                         </Box>
-                      </Box>
-                      <Typography variant="body2" color="text.secondary">
-                        {area.details}
-                      </Typography>
-                    </Paper>
+                        <Typography variant="body2" color="text.secondary">
+                          {area.details}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                  ))
+                ) : (
+                  <Grid item xs={12}>
+                    <Typography variant="body2" color="text.secondary">
+                      No compliance areas found.
+                    </Typography>
                   </Grid>
-                ))}
+                )}
               </Grid>
             </CardContent>
           </Card>

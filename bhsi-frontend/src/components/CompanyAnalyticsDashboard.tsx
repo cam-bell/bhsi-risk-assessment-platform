@@ -127,6 +127,17 @@ const CompanyAnalyticsDashboard: React.FC<CompanyAnalyticsDashboardProps> = ({
     );
   }
 
+  const historical =
+    analytics.trends && analytics.trends.historical_comparison
+      ? analytics.trends.historical_comparison
+      : {
+          current_period: 0,
+          previous_period: 0,
+          change_percentage: 0,
+        };
+
+  const recentEvents = analytics.recent_events || [];
+
   return (
     <Box>
       {/* Header */}
@@ -258,19 +269,15 @@ const CompanyAnalyticsDashboard: React.FC<CompanyAnalyticsDashboardProps> = ({
                     alignItems="center"
                   >
                     <Typography variant="caption" color="text.secondary">
-                      Current:{" "}
-                      {analytics.trends.historical_comparison.current_period}
+                      Current: {historical.current_period}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      Previous:{" "}
-                      {analytics.trends.historical_comparison.previous_period}
+                      Previous: {historical.previous_period}
                     </Typography>
                   </Box>
                   <LinearProgress
                     variant="determinate"
-                    value={Math.abs(
-                      analytics.trends.historical_comparison.change_percentage
-                    )}
+                    value={Math.abs(historical.change_percentage)}
                     sx={{
                       mt: 1,
                       height: 6,
@@ -278,8 +285,7 @@ const CompanyAnalyticsDashboard: React.FC<CompanyAnalyticsDashboardProps> = ({
                       backgroundColor: "grey.200",
                       "& .MuiLinearProgress-bar": {
                         backgroundColor:
-                          analytics.trends.historical_comparison
-                            .change_percentage > 0
+                          historical.change_percentage > 0
                             ? "#f44336"
                             : "#4caf50",
                       },
@@ -291,14 +297,8 @@ const CompanyAnalyticsDashboard: React.FC<CompanyAnalyticsDashboardProps> = ({
                     mt={0.5}
                     display="block"
                   >
-                    {analytics.trends.historical_comparison.change_percentage >
-                    0
-                      ? "+"
-                      : ""}
-                    {analytics.trends.historical_comparison.change_percentage.toFixed(
-                      1
-                    )}
-                    % change
+                    {historical.change_percentage > 0 ? "+" : ""}
+                    {historical.change_percentage.toFixed(1)}% change
                   </Typography>
                 </Box>
               </Stack>
@@ -375,7 +375,7 @@ const CompanyAnalyticsDashboard: React.FC<CompanyAnalyticsDashboardProps> = ({
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {analytics.recent_events.map((event, index) => (
+                    {recentEvents.map((event, index) => (
                       <TableRow key={index}>
                         <TableCell>
                           <Typography variant="body2">
@@ -407,7 +407,7 @@ const CompanyAnalyticsDashboard: React.FC<CompanyAnalyticsDashboardProps> = ({
                   </TableBody>
                 </Table>
               </TableContainer>
-              {analytics.recent_events.length === 0 && (
+              {recentEvents.length === 0 && (
                 <Box textAlign="center" py={3}>
                   <Typography variant="body2" color="text.secondary">
                     No recent events found

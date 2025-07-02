@@ -100,32 +100,43 @@ export interface ManagementSummaryRequest {
 
 export interface ManagementSummaryResponse {
   company_name: string;
-  summary: {
-    executive_summary: string;
-    key_risks: Array<{
-      risk_type: string;
-      description: string;
-      severity: "low" | "medium" | "high";
-      recommendations: string[];
-    }>;
-    financial_health: {
-      status: "healthy" | "concerning" | "critical";
-      indicators: Array<{
-        indicator: string;
-        value: string;
-        status: "positive" | "neutral" | "negative";
-      }>;
-    };
-    compliance_status: {
-      overall: "compliant" | "partial" | "non_compliant";
-      areas: Array<{
-        area: string;
-        status: "compliant" | "partial" | "non_compliant";
-        details: string;
-      }>;
-    };
-  };
+  overall_risk: string;
+  executive_summary: string;
+  risk_breakdown: Record<
+    string,
+    {
+      level: string;
+      reasoning: string;
+      evidence: string[];
+      confidence: number;
+    }
+  >;
+  key_findings: string[];
+  recommendations: string[];
   generated_at: string;
+  method: string;
+  key_risks: Array<{
+    risk_type: string;
+    description: string;
+    severity: "low" | "medium" | "high";
+    recommendations: string[];
+  }>;
+  financial_health: {
+    status: "healthy" | "concerning" | "critical";
+    indicators: Array<{
+      indicator: string;
+      value: string;
+      status: "positive" | "neutral" | "negative";
+    }>;
+  };
+  compliance_status: {
+    overall: "compliant" | "partial" | "non_compliant";
+    areas: Array<{
+      area: string;
+      status: "compliant" | "partial" | "non_compliant";
+      details: string;
+    }>;
+  };
 }
 
 export interface AnalyticsHealthResponse {
