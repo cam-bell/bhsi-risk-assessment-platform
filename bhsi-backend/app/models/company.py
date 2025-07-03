@@ -14,6 +14,9 @@ class RiskLevel(str, enum.Enum):
 class Company(Base):
     vat = Column(String, primary_key=True, index=True)
     name = Column(String, index=True, nullable=False)
+    description = Column(String, nullable=True)
+    sector = Column(String, nullable=True)
+    client_tier = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

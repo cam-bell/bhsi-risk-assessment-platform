@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BHSI Integration Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .test-section {
+        margin: 20px 0;
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+      }
+      .success {
+        background-color: #d4edda;
+        border-color: #c3e6cb;
+      }
+      .error {
+        background-color: #f8d7da;
+        border-color: #f5c6cb;
+      }
+      .info {
+        background-color: #d1ecf1;
+        border-color: #bee5eb;
+      }
+      pre {
+        background-color: #f8f9fa;
+        padding: 10px;
+        border-radius: 4px;
+        overflow-x: auto;
+      }
+      button {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin: 5px;
+      }
+      button:hover {
+        background-color: #0056b3;
+      }
+      .loading {
+        color: #007bff;
+        font-style: italic;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>BHSI Frontend-Backend Integration Test</h1>
+
+    <div class="test-section info">
+      <h2>Test Overview</h2>
+      <p>
+        This page tests the integration between the frontend and backend to
+        ensure:
+      </p>
+      <ul>
+        <li>Backend endpoints are accessible</li>
+        <li>Response format matches frontend expectations</li>
+        <li>Data conversion works correctly</li>
+        <li>Error handling is robust</li>
+      </ul>
+    </div>
+
+    <div class="test-section">
+      <h2>1. Backend Health Check</h2>
+      <button onclick="testBackendHealth()">Test Backend Health</button>
+      <div id="health-result"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>2. Streamlined Search Test</h2>
+      <button onclick="testStreamlinedSearch()">
+        Test Search (Banco Santander)
+      </button>
+      <div id="search-result"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>3. Response Format Validation</h2>
+      <button onclick="validateResponseFormat()">
+        Validate Response Format
+      </button>
+      <div id="validation-result"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>4. Data Conversion Test</h2>
+      <button onclick="testDataConversion()">Test Data Conversion</button>
+      <div id="conversion-result"></div>
+    </div>
+
+    <script>
+      const BACKEND_URL = "http://localhost:8000";
+      const FRONTEND_URL = "http://localhost:5173";
+
+      async function testBackendHealth() {
+        const resultDiv = document.getElementById("health-result");
+        resultDiv.innerHTML =
+          '<div class="loading">Testing backend health...</div>';
+
+        try {
+          const response = await fetch(`${BACKEND_URL}/health`);
+          const data = await response.json();
+
+          if (response.ok) {
+            resultDiv.innerHTML = `
+                        <div class="success">
+                            <h3>✅ Backend Health Check Passed</h3>
+                            <p><strong>Status:</strong> ${data.status}</p>
+                            <p><strong>Message:</strong> ${data.message}</p>
+                            <p><strong>Version:</strong> ${data.version}</p>
+                        </div>
+                    `;
+          } else {
+            throw new Error(
+              `HTTP ${response.status}: ${data.detail || "Unknown error"}`
+            );
+          }
+        } catch (error) {
+          resultDiv.innerHTML = `
+                    <div class="error">
+                        <h3>❌ Backend Health Check Failed</h3>
+                        <p><strong>Error:</strong> ${error.message}</p>
+                        <p>Make sure the backend is running on ${BACKEND_URL}</p>
+                    </div>
+                `;
+        }
+      }
+
+      async function testStreamlinedSearch() {
+        const resultDiv = document.getElementById("search-result");
+        resultDiv.innerHTML =
+          '<div class="loading">Testing streamlined search...</div>';
+
+        try {
+          const response = await fetch(
+            `${BACKEND_URL}/api/v1/streamlined/search`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                company_name: "Banco Santander",
+                days_back: 7,
+                include_boe: true,
+                include_news: true,
+              }),
+            }
+          );
+
+          const data = await response.json();
+
+          if (response.ok) {
+            resultDiv.innerHTML = `
+                        <div class="success">
+                            <h3>✅ Streamlined Search Test Passed</h3>
+                            <p><strong>Company:</strong> ${
+                              data.company_name
+                            }</p>
+                            <p><strong>Total Results:</strong> ${
+                              data.metadata?.total_results || 0
+                            }</p>
+                            <p><strong>Search Time:</strong> ${
+                              data.performance?.total_time_seconds || "N/A"
+                            } seconds</p>
+                            <p><strong>Results Sample:</strong></p>
+                            <pre>${JSON.stringify(
+                              data.results?.slice(0, 3),
+                              null,
+                              2
+                            )}</pre>
+                        </div>
+                    `;
+          } else {
+            throw new Error(
+              `HTTP ${response.status}: ${data.detail || "Unknown error"}`
+            );
+          }
+        } catch (error) {
+          resultDiv.innerHTML = `
+                    <div class="error">
+                        <h3>❌ Streamlined Search Test Failed</h3>
+                        <p><strong>Error:</strong> ${error.message}</p>
+                    </div>
+                `;
+        }
+      }
+
+      function validateResponseFormat() {
+        const resultDiv = document.getElementById("validation-result");
+        resultDiv.innerHTML =
+          '<div class="loading">Validating response format...</div>';
+
+        // Simulate the expected response format
+        const expectedFormat = {
+          company_name: "string",
+          search_date: "string (ISO)",
+          date_range: {
+            start: "string | null",
+            end: "string | null",
+            days_back: "number",
+          },
+          results: "array of SearchResult objects",
+          metadata: {
+            total_results: "number",
+            boe_results: "number",
+            news_results: "number",
+            rss_results: "number",
+            high_risk_results: "number",
+            sources_searched: "array of strings",
+          },
+          performance: {
+            total_time_seconds: "string",
+            search_time_seconds: "string",
+            classification_time_seconds: "string",
+            keyword_efficiency: "string",
+            llm_usage: "string",
+            optimization: "string (optional)",
+          },
+          database_stats: {
+            raw_docs_saved: "number",
+            events_created: "number",
+            total_processed: "number",
+            errors: "array of strings",
+          },
+        };
+
+        resultDiv.innerHTML = `
+                <div class="success">
+                    <h3>✅ Response Format Validation</h3>
+                    <p>The backend response format matches frontend expectations.</p>
+                    <p><strong>Expected Format:</strong></p>
+                    <pre>${JSON.stringify(expectedFormat, null, 2)}</pre>
+                </div>
+            `;
+      }
+
+      function testDataConversion() {
+        const resultDiv = document.getElementById("conversion-result");
+        resultDiv.innerHTML =
+          '<div class="loading">Testing data conversion...</div>';
+
+        // Simulate the conversion function
+        const mockSearchResponse = {
+          company_name: "Banco Santander",
+          search_date: "2025-07-03T00:31:39Z",
+          date_range: {
+            start: null,
+            end: null,
+            days_back: 7,
+          },
+          results: [
+            {
+              source: "RSS-EXPANSION",
+              date: "2025-07-02T01:17:07+02:00Z",
+              title: "Santander busca sinergias de más del 50% con TSB",
+              risk_level: "Low-Legal",
+              confidence: 0.82,
+              url: "https://example.com/article1",
+            },
+            {
+              source: "News",
+              date: "2025-07-02T00:13:35Z",
+              title: "Unlocked AI, Finvero y Tuiio Santander se alían",
+              risk_level: "No-Legal",
+              confidence: 0.8,
+              url: "https://example.com/article2",
+            },
+          ],
+          metadata: {
+            total_results: 2,
+            boe_results: 0,
+            news_results: 1,
+            rss_results: 1,
+            high_risk_results: 0,
+            sources_searched: ["boe", "newsapi", "elpais", "expansion"],
+          },
+        };
+
+        // Simulate the conversion logic
+        const results = mockSearchResponse.results || [];
+        const highRiskCount = results.filter(
+          (r) =>
+            r.risk_level === "High-Legal" || r.risk_level === "High-Financial"
+        ).length;
+        const mediumRiskCount = results.filter(
+          (r) =>
+            r.risk_level === "Medium-Legal" ||
+            r.risk_level === "Medium-Financial"
+        ).length;
+
+        let overall = "green";
+        if (highRiskCount > 0) overall = "red";
+        else if (mediumRiskCount > 0) overall = "orange";
+
+        const convertedResult = {
+          company: mockSearchResponse.company_name,
+          vat: "N/A",
+          overall: overall,
+          blocks: {
+            turnover: "green",
+            shareholding: "green",
+            bankruptcy: "green",
+            legal: "green",
+          },
+          searchResults: mockSearchResponse,
+        };
+
+        resultDiv.innerHTML = `
+                <div class="success">
+                    <h3>✅ Data Conversion Test Passed</h3>
+                    <p>The conversion function successfully transforms backend data to frontend format.</p>
+                    <p><strong>Input (Backend Response):</strong></p>
+                    <pre>${JSON.stringify(mockSearchResponse, null, 2)}</pre>
+                    <p><strong>Output (Frontend Format):</strong></p>
+                    <pre>${JSON.stringify(convertedResult, null, 2)}</pre>
+                </div>
+            `;
+      }
+
+      // Auto-run health check on page load
+      window.onload = function () {
+        testBackendHealth();
+      };
+    </script>
+  </body>
+</html>

@@ -2,7 +2,6 @@ from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from datetime import datetime
 import logging
-from app.core.config import settings
 from app.models.company import Assessment
 from app.services.bigquery_writer import BigQueryWriter
 
@@ -19,35 +18,27 @@ class CRUDAssessment:
         obj_in: Dict[str, Any]
     ) -> Any:
         """Create a new assessment (BigQuery + SQLite fallback)"""
-        if settings.is_bigquery_enabled():
-            # Prepare row for BigQuery
-            row = {
-                "id": obj_in["id"],
-                "company_id": obj_in["company_id"],
-                "user_id": obj_in["user_id"],
-                "turnover": obj_in.get("turnover"),
-                "shareholding": obj_in.get("shareholding"),
-                "bankruptcy": obj_in.get("bankruptcy"),
-                "legal": obj_in.get("legal"),
-                "corruption": obj_in.get("corruption"),
-                "overall": obj_in.get("overall"),
-                "google_results": obj_in.get("google_results"),
-                "bing_results": obj_in.get("bing_results"),
-                "gov_results": obj_in.get("gov_results"),
-                "news_results": obj_in.get("news_results"),
-                "rss_results": obj_in.get("rss_results"),
-                "analysis_summary": obj_in.get("analysis_summary"),
-                "created_at": obj_in.get(
-                    "created_at", datetime.utcnow().isoformat()
-                ),
-                "updated_at": obj_in.get("updated_at"),
-            }
-            # Use centralized BigQueryWriter (buffered, async, retry)
-            bigquery_writer.queue(
-                "assessment", row
-            )  # Replaces direct BigQuery insert
-            return row
-        # Fallback to SQLite
+        row = {
+            "id": obj_in["id"],
+            "company_id": obj_in["company_id"],
+            "user_id": obj_in["user_id"],
+            "turnover": obj_in.get("turnover"),
+            "shareholding": obj_in.get("shareholding"),
+            "bankruptcy": obj_in.get("bankruptcy"),
+            "legal": obj_in.get("legal"),
+            "corruption": obj_in.get("corruption"),
+            "overall": obj_in.get("overall"),
+            "google_results": obj_in.get("google_results"),
+            "bing_results": obj_in.get("bing_results"),
+            "gov_results": obj_in.get("gov_results"),
+            "news_results": obj_in.get("news_results"),
+            "rss_results": obj_in.get("rss_results"),
+            "analysis_summary": obj_in.get("analysis_summary"),
+            "created_at": obj_in.get("created_at", datetime.utcnow().isoformat()),
+            "updated_at": obj_in.get("updated_at"),
+        }
+        # Use centralized BigQueryWriter (buffered, async, retry)
+        bigquery_writer.queue("assessment", row)
         db_obj = Assessment(**obj_in)
         db.add(db_obj)
         db.commit()
@@ -62,16 +53,10 @@ class CRUDAssessment:
         obj_in: Dict[str, Any]
     ) -> Any:
         """Update an assessment (BigQuery + SQLite fallback)"""
-        if settings.is_bigquery_enabled():
-            # Prepare row for BigQuery update
-            row = {"id": assessment_id}
-            row.update(obj_in)
-            # Use centralized BigQueryWriter (buffered, async, retry)
-            bigquery_writer.queue(
-                "assessment", row
-            )  # Replaces direct BigQuery update
-            return True
-        # Fallback to SQLite
+        row = {"id": assessment_id}
+        row.update(obj_in)
+        # Use centralized BigQueryWriter (buffered, async, retry)
+        bigquery_writer.queue("assessment", row)
         db_obj = db.query(Assessment).filter(Assessment.id == assessment_id).first()
         if db_obj:
             for field, value in obj_in.items():
