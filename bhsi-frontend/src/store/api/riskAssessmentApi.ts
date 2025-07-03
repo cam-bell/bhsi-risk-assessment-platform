@@ -98,7 +98,7 @@ export const riskAssessmentApi = createApi({
     // Main search endpoint matching the actual API specification
     searchCompany: builder.mutation<SearchResponse, SearchRequest>({
       query: (data) => ({
-        url: "/search",
+        url: "/streamlined/search",
         method: "POST",
         data,
       }),
@@ -138,7 +138,7 @@ export const riskAssessmentApi = createApi({
         }
 
         return {
-          url: "/search",
+          url: "/streamlined/search",
           method: "POST",
           data: searchData,
         };

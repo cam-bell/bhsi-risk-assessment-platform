@@ -31,6 +31,7 @@ class SearchRequest(BaseModel):
     include_boe: bool = True
     include_news: bool = True
     include_rss: bool = True  # Include RSS news sources
+    rss_feeds: Optional[list[str]] = None  # List of selected RSS feeds
 
 
 @router.post("/search")
@@ -67,11 +68,13 @@ async def search(
         if request.include_news:
             active_agents.append("newsapi")
         if request.include_rss:
-            # Add working RSS agents
-            active_agents.extend([
-                "elpais", "expansion", "elmundo", "abc", "lavanguardia", 
-                "elconfidencial", "eldiario", "europapress"
-            ])
+            # Use selected RSS feeds if provided, else all
+            rss_agents = request.rss_feeds if request.rss_feeds else [
+                "elpais", "expansion", "elmundo", "abc",
+                "lavanguardia", "elconfidencial", "eldiario",
+                "europapress"
+            ]
+            active_agents.extend(rss_agents)
             
         if not active_agents:
             raise HTTPException(
@@ -189,8 +192,6 @@ async def search(
                     classified_results.append(classified_result)
         
         # Process RSS results
-        rss_agents = ["elpais", "expansion", "elmundo", "abc", "lavanguardia", 
-                     "elconfidencial", "eldiario", "europapress"]
         for agent_name in rss_agents:
             if agent_name in search_results and search_results[agent_name].get("articles"):
                 for article in search_results[agent_name]["articles"]:

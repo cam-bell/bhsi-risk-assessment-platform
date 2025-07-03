@@ -3,7 +3,6 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from app.agents.analysis.management_summarizer import ManagementSummarizer
 from app.core.config import settings
-from app.agents.analytics.mock_analytics import generate_mock_management_summary
 import logging
 
 logger = logging.getLogger(__name__)
@@ -49,27 +48,17 @@ async def generate_management_summary(
     **Input**: Classification results from the search endpoint
     **Output**: Executive summary with risk breakdown and recommendations
     """
-    if settings.USE_MOCK_ORCHESTRATOR:
-        logger.info(f"Returning MOCK management summary for: {request.company_name}")
-        return generate_mock_management_summary(request.company_name)
     try:
         logger.info(f"Generating management summary for {request.company_name}")
-        
-        # Initialize management summarizer
         summarizer = ManagementSummarizer()
-        
-        # Generate comprehensive summary
         summary = await summarizer.generate_summary(
             company_name=request.company_name,
             classification_results=request.classification_results,
             include_evidence=request.include_evidence,
             language=request.language
         )
-        
         logger.info("✅ Management summary generated successfully")
-        
         return ManagementSummaryResponse(**summary)
-        
     except Exception as e:
         logger.error(
             f"Failed to generate management summary for "

@@ -32,10 +32,7 @@ import {
   DollarSign,
 } from "lucide-react";
 import { useGetManagementSummaryMutation } from "../store/api/analyticsApi";
-
-interface ManagementSummaryProps {
-  companyName: string;
-}
+import { useCompanies } from "../context/CompaniesContext";
 
 const StatusIcon: React.FC<{
   status?:
@@ -88,22 +85,18 @@ const SeverityChip: React.FC<{ severity?: "low" | "medium" | "high" }> = ({
   );
 };
 
-const ManagementSummary: React.FC<ManagementSummaryProps> = ({
-  companyName,
-}) => {
+const ManagementSummary: React.FC = () => {
+  const { selectedCompany } = useCompanies();
   const [getManagementSummary, { data: summary, isLoading, error }] =
     useGetManagementSummaryMutation();
 
   useEffect(() => {
-    if (companyName) {
+    if (selectedCompany) {
       getManagementSummary({
-        company_name: companyName,
-        classification_results: [],
-        include_evidence: true,
-        language: "es",
+        company_name: selectedCompany,
       });
     }
-  }, [companyName, getManagementSummary]);
+  }, [selectedCompany, getManagementSummary]);
 
   if (isLoading) {
     return (
@@ -121,7 +114,8 @@ const ManagementSummary: React.FC<ManagementSummaryProps> = ({
   if (error) {
     return (
       <Alert severity="error" sx={{ mb: 2 }}>
-        Error loading management summary for {companyName}. Please try again.
+        Error loading management summary for {selectedCompany}. Please try
+        again.
       </Alert>
     );
   }
@@ -129,7 +123,7 @@ const ManagementSummary: React.FC<ManagementSummaryProps> = ({
   if (!summary) {
     return (
       <Alert severity="info" sx={{ mb: 2 }}>
-        No management summary available for {companyName}.
+        No management summary available for {selectedCompany}.
       </Alert>
     );
   }

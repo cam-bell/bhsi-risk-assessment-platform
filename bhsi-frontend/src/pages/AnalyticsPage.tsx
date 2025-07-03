@@ -10,6 +10,11 @@ import {
   Tab,
   Paper,
   Alert,
+  Tooltip,
+  Avatar,
+  InputAdornment,
+  Autocomplete,
+  TextField,
 } from "@mui/material";
 import {
   BarChart3,
@@ -20,11 +25,13 @@ import {
   Shield,
   Activity,
   Users,
+  Search,
 } from "lucide-react";
 import CompanyAnalyticsDashboard from "../components/CompanyAnalyticsDashboard";
 import ManagementSummary from "../components/ManagementSummary";
 import RiskTrendsChart from "../components/RiskTrendsChart";
 import CompanyComparison from "../components/CompanyComparison";
+import CompanySearchBar from "../components/CompanySearchBar";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -51,9 +58,36 @@ function TabPanel(props: TabPanelProps) {
 const AnalyticsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [selectedCompany, setSelectedCompany] = useState("");
+  const [analyticsData, setAnalyticsData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
+  };
+
+  const handleCompanyInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSelectedCompany(e.target.value);
+  };
+
+  const fetchAnalytics = async () => {
+    setLoading(true);
+    setError(null);
+    setAnalyticsData(null);
+    try {
+      const response = await fetch(
+        `/api/v1/companies/${encodeURIComponent(
+          selectedCompany
+        )}/analytics?include_trends=true&include_sectors=false`
+      );
+      if (!response.ok) throw new Error("Failed to fetch analytics");
+      const data = await response.json();
+      setAnalyticsData(data);
+    } catch (err: any) {
+      setError(err.message || "Unknown error");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const analyticsFeatures = [
@@ -90,7 +124,7 @@ const AnalyticsPage: React.FC = () => {
   return (
     <Box>
       {/* Header */}
-      <Box mb={4}>
+      <Box mb={2}>
         <Typography variant="h3" fontWeight="bold" gutterBottom>
           Analytics Dashboard
         </Typography>
@@ -98,93 +132,49 @@ const AnalyticsPage: React.FC = () => {
           Comprehensive risk analytics and insights for informed decision making
         </Typography>
       </Box>
-
-      {/* Feature Overview Cards */}
-      <Grid container spacing={3} mb={4}>
-        {analyticsFeatures.map((feature, index) => {
-          const Icon = feature.icon;
-          return (
-            <Grid item xs={12} sm={6} md={3} key={index}>
-              <Card
-                sx={{
-                  height: "100%",
-                  cursor: "pointer",
-                  transition: "all 0.2s ease-in-out",
-                  "&:hover": {
-                    transform: "translateY(-2px)",
-                    boxShadow: 3,
-                  },
-                }}
-                onClick={() => setActiveTab(index)}
-              >
-                <CardContent sx={{ textAlign: "center", py: 3 }}>
-                  <Box
-                    sx={{
-                      width: 60,
-                      height: 60,
-                      borderRadius: "50%",
-                      backgroundColor: `${feature.color}20`,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      mx: "auto",
-                      mb: 2,
-                    }}
-                  >
-                    <Icon size={28} color={feature.color} />
-                  </Box>
-                  <Typography variant="h6" fontWeight="bold" gutterBottom>
-                    {feature.title}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {feature.description}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-          );
-        })}
-      </Grid>
-
-      {/* Company Selection for Company-specific Analytics */}
-      {(activeTab === 0 || activeTab === 1) && (
-        <Card sx={{ mb: 3 }}>
+      {/* Summary Banner */}
+      <Box mb={3}>
+        <Card sx={{ background: "#f5f7fa", boxShadow: 0 }}>
           <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Select Company
+            <Typography variant="subtitle1" color="primary" fontWeight="medium">
+              Select a company and explore its analytics, management summary,
+              risk trends, and comparisons using the tabs below.
             </Typography>
-            <Box display="flex" gap={2} alignItems="center">
-              <input
-                type="text"
-                placeholder="Enter company name (e.g., 'Banco Santander')"
-                value={selectedCompany}
-                onChange={(e) => setSelectedCompany(e.target.value)}
-                style={{
-                  flex: 1,
-                  padding: "12px 16px",
-                  border: "1px solid #ddd",
-                  borderRadius: "4px",
-                  fontSize: "14px",
-                }}
-              />
-              <Button
-                variant="contained"
-                disabled={!selectedCompany.trim()}
-                onClick={() => {}}
-              >
-                Load Analytics
-              </Button>
+          </CardContent>
+        </Card>
+      </Box>
+      <Box display="flex" gap={2} mb={2}>
+        <TextField
+          label="Company Name"
+          value={selectedCompany}
+          onChange={handleCompanyInput}
+          fullWidth
+        />
+        <Button
+          variant="contained"
+          onClick={fetchAnalytics}
+          disabled={!selectedCompany.trim() || loading}
+        >
+          {loading ? "Loading..." : "Load Analytics"}
+        </Button>
+      </Box>
+      {analyticsData && (
+        <Card sx={{ mb: 3, background: "#e3f2fd" }}>
+          <CardContent sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+            <Avatar sx={{ bgcolor: "primary.main", width: 48, height: 48 }}>
+              <Building2 size={28} />
+            </Avatar>
+            <Box>
+              <Typography variant="h6" fontWeight="bold">
+                {analyticsData.company_name}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Analytics loaded. Explore tabs for more insights.
+              </Typography>
             </Box>
-            {!selectedCompany && (
-              <Alert severity="info" sx={{ mt: 2 }}>
-                Enter a company name to view its analytics and management
-                summary
-              </Alert>
-            )}
           </CardContent>
         </Card>
       )}
-
       {/* Analytics Tabs */}
       <Paper sx={{ width: "100%" }}>
         <Tabs
@@ -193,86 +183,83 @@ const AnalyticsPage: React.FC = () => {
           aria-label="analytics tabs"
           sx={{ borderBottom: 1, borderColor: "divider" }}
         >
-          <Tab
-            label={
-              <Box display="flex" alignItems="center" gap={1}>
-                <Building2 size={16} />
-                Company Analytics
-              </Box>
-            }
-          />
-          <Tab
-            label={
-              <Box display="flex" alignItems="center" gap={1}>
-                <FileText size={16} />
-                Management Summary
-              </Box>
-            }
-          />
-          <Tab
-            label={
-              <Box display="flex" alignItems="center" gap={1}>
-                <TrendingUp size={16} />
-                Risk Trends
-              </Box>
-            }
-          />
-          <Tab
-            label={
-              <Box display="flex" alignItems="center" gap={1}>
-                <GitCompare size={16} />
-                Company Comparison
-              </Box>
-            }
-          />
+          <Tooltip
+            title="Comprehensive risk analysis and insights for individual companies"
+            arrow
+          >
+            <Tab
+              label={
+                <Box display="flex" alignItems="center" gap={1}>
+                  <Building2 size={16} />
+                  Company Analytics
+                </Box>
+              }
+            />
+          </Tooltip>
+          <Tooltip
+            title="Executive summaries with key risks, financial health, and compliance status"
+            arrow
+          >
+            <Tab
+              label={
+                <Box display="flex" alignItems="center" gap={1}>
+                  <FileText size={16} />
+                  Management Summary
+                </Box>
+              }
+            />
+          </Tooltip>
+          <Tooltip
+            title="System-wide risk trends, sector insights, and risk factor analysis"
+            arrow
+          >
+            <Tab
+              label={
+                <Box display="flex" alignItems="center" gap={1}>
+                  <TrendingUp size={16} />
+                  Risk Trends
+                </Box>
+              }
+            />
+          </Tooltip>
+          <Tooltip
+            title="Compare risk profiles across multiple companies side by side"
+            arrow
+          >
+            <Tab
+              label={
+                <Box display="flex" alignItems="center" gap={1}>
+                  <GitCompare size={16} />
+                  Company Comparison
+                </Box>
+              }
+            />
+          </Tooltip>
         </Tabs>
-
         <TabPanel value={activeTab} index={0}>
-          {selectedCompany ? (
-            <CompanyAnalyticsDashboard companyName={selectedCompany} />
-          ) : (
-            <Box textAlign="center" py={4}>
-              <Building2
-                size={48}
-                color="#9e9e9e"
-                style={{ marginBottom: 16 }}
-              />
-              <Typography variant="h6" color="text.secondary" gutterBottom>
-                Select a Company
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Enter a company name above to view its comprehensive analytics
-              </Typography>
-            </Box>
-          )}
+          <Box sx={{ minHeight: 400, p: 2 }}>
+            <CompanyAnalyticsDashboard
+              analyticsData={analyticsData}
+              loading={loading}
+              error={error}
+              companyName={selectedCompany}
+            />
+          </Box>
         </TabPanel>
-
         <TabPanel value={activeTab} index={1}>
-          {selectedCompany ? (
-            <ManagementSummary companyName={selectedCompany} />
-          ) : (
-            <Box textAlign="center" py={4}>
-              <FileText
-                size={48}
-                color="#9e9e9e"
-                style={{ marginBottom: 16 }}
-              />
-              <Typography variant="h6" color="text.secondary" gutterBottom>
-                Select a Company
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Enter a company name above to view its management summary
-              </Typography>
-            </Box>
-          )}
+          <Box sx={{ minHeight: 400, p: 2 }}>
+            <ManagementSummary />
+          </Box>
         </TabPanel>
-
         <TabPanel value={activeTab} index={2}>
-          <RiskTrendsChart />
+          <Box sx={{ minHeight: 400, p: 2 }}>
+            <RiskTrendsChart />
+          </Box>
         </TabPanel>
-
         <TabPanel value={activeTab} index={3}>
-          <CompanyComparison />
+          <Box sx={{ minHeight: 400, p: 2 }}>
+            <CompanyComparison />
+          </Box>
         </TabPanel>
       </Paper>
     </Box>

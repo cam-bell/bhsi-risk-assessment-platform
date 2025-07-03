@@ -164,23 +164,17 @@ export const analyticsApi = createApi({
     "CompanyComparison",
   ],
   endpoints: (builder) => ({
-    // Get comprehensive analytics for a company
-    getCompanyAnalytics: builder.query<
-      CompanyAnalyticsResponse,
-      CompanyAnalyticsRequest
+    // Get management summary for a company
+    getManagementSummary: builder.mutation<
+      ManagementSummaryResponse,
+      ManagementSummaryRequest
     >({
-      query: ({
-        company_name,
-        include_trends = true,
-        include_sectors = false,
-      }) => ({
-        url: `/companies/${encodeURIComponent(company_name)}/analytics`,
-        method: "GET",
-        params: { include_trends, include_sectors },
+      query: (body) => ({
+        url: "/analysis/management-summary",
+        method: "POST",
+        data: body,
       }),
-      providesTags: (result, error, { company_name }) => [
-        { type: "Analytics", id: company_name },
-      ],
+      invalidatesTags: ["ManagementSummary"],
     }),
 
     // Get system-wide risk trends
@@ -205,19 +199,6 @@ export const analyticsApi = createApi({
       providesTags: ["CompanyComparison"],
     }),
 
-    // Get management summary for a company
-    getManagementSummary: builder.mutation<
-      ManagementSummaryResponse,
-      ManagementSummaryRequest
-    >({
-      query: (body) => ({
-        url: "/analysis/management-summary",
-        method: "POST",
-        data: body,
-      }),
-      invalidatesTags: ["ManagementSummary"],
-    }),
-
     // Health check for analytics services
     getAnalyticsHealth: builder.query<AnalyticsHealthResponse, void>({
       query: () => ({
@@ -240,10 +221,9 @@ export const analyticsApi = createApi({
 
 // Export hooks for usage in functional components
 export const {
-  useGetCompanyAnalyticsQuery,
+  useGetManagementSummaryMutation,
   useGetRiskTrendsQuery,
   useCompareCompaniesQuery,
-  useGetManagementSummaryMutation,
   useGetAnalyticsHealthQuery,
   useGetSystemStatusQuery,
 } = analyticsApi;

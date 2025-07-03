@@ -8,6 +8,7 @@ import logging
 import httpx
 from typing import Dict, Any, List
 from datetime import datetime
+from app.agents.search.streamlined_yahoo_finance_agent import StreamlinedYahooFinanceAgent
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +88,9 @@ class ManagementSummarizer:
             Dict containing the management summary
         """
         
+        # --- Integrate Yahoo Finance Agent for financial health ---
+        financial_health = await self._get_financial_health(company_name)
+        # ---
         try:
             # Try cloud-based summary first
             logger.info(f"Attempting cloud summary for {company_name}")
@@ -94,20 +98,20 @@ class ManagementSummarizer:
                 company_name, classification_results, include_evidence, language
             )
             summary["method"] = "cloud_gemini_analysis"
-            return summary
-            
         except Exception as e:
             logger.warning(
                 f"Cloud summary failed for {company_name}: {e}, "
                 "falling back to template"
             )
-            
-            # Fallback to template-based summary
             summary = self._template_summary(
                 company_name, classification_results, include_evidence, language
             )
             summary["method"] = "template_analysis"
-            return summary
+        # --- Always include financial_health, key_risks, compliance_status ---
+        summary["financial_health"] = financial_health
+        summary["key_risks"] = self._extract_key_risks(classification_results)
+        summary["compliance_status"] = self._default_compliance_status()
+        return summary
     
     async def _cloud_gemini_summary(
         self, 
@@ -405,3 +409,57 @@ class ManagementSummarizer:
             logger.warning(f"Cloud Gemini health check failed: {e}")
         
         return status 
+
+    async def _get_financial_health(self, company_name: str) -> dict:
+        agent = StreamlinedYahooFinanceAgent()
+        try:
+            result = await agent.search(company_name)
+            if result.get("financial_data"):
+                data = result["financial_data"][0]
+                status_map = {"High": "critical", "Medium": "concerning", "Low": "healthy"}
+                status = status_map.get(data.get("risk_level", "Low"), "healthy")
+                indicators = []
+                if "price_change_7d" in data:
+                    indicators.append({
+                        "indicator": "7d Price Change",
+                        "value": f"{data['price_change_7d']['percentage']:.2f}%",
+                        "status": "negative" if data['price_change_7d']['percentage'] < -5 else "positive"
+                    })
+                if "revenue_change_yoy" in data:
+                    indicators.append({
+                        "indicator": "YoY Revenue Change",
+                        "value": f"{data['revenue_change_yoy']['percentage']:.2f}%",
+                        "status": "negative" if data['revenue_change_yoy']['percentage'] < 0 else "positive"
+                    })
+                for ri in data.get("risk_indicators", []):
+                    indicators.append({
+                        "indicator": ri["type"].replace("_", " ").title(),
+                        "value": ri["description"],
+                        "status": "negative" if ri["severity"] == "high" else "neutral"
+                    })
+                return {"status": status, "indicators": indicators}
+            else:
+                return {"status": "healthy", "indicators": []}
+        except Exception as e:
+            logger.warning(f"Yahoo Finance agent failed: {e}")
+            return {"status": "healthy", "indicators": []}
+
+    def _extract_key_risks(self, classification_results: List[Dict[str, Any]]) -> list:
+        # Example: Extract high/medium risk results as key risks
+        key_risks = []
+        for result in classification_results:
+            if result.get("risk_level") in ("High-Legal", "Medium-Legal"):
+                key_risks.append({
+                    "risk_type": result.get("risk_level", "Unknown"),
+                    "description": result.get("summary", result.get("title", "-")),
+                    "severity": "high" if result.get("risk_level") == "High-Legal" else "medium",
+                    "recommendations": ["Review with legal team"]
+                })
+        return key_risks
+
+    def _default_compliance_status(self) -> dict:
+        # Placeholder: always return compliant with no areas
+        return {
+            "overall": "compliant",
+            "areas": []
+        } 

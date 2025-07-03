@@ -72,10 +72,6 @@ class Settings(BaseSettings):
     # Demo Configuration
     USE_MOCK_DATA: bool = False  # Set to True for demo mode, False for production
     MOCK_MODE_ENABLED: bool = False  # Enable mock data system for demo
-    USE_MOCK_ORCHESTRATOR: bool = (
-        os.getenv("USE_MOCK_ORCHESTRATOR", "false").lower() 
-        in ("1", "true", "yes")
-    )
     
     # BigQuery
     BIGQUERY_PROJECT: str = "solid-topic-443216-b2"

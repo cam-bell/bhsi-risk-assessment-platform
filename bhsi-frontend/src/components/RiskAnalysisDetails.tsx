@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   Box,
   Card,
@@ -35,6 +35,8 @@ import {
   Share,
 } from "lucide-react";
 import { SearchResponse } from "../store/api/riskAssessmentApi";
+import CircularProgress from "@mui/material/CircularProgress";
+import axios from "axios";
 
 interface RiskFactor {
   category: string;
@@ -60,6 +62,48 @@ interface RiskAnalysisDetailsProps {
   riskFactors: RiskFactor[];
   confidence: number;
   searchResults?: SearchResponse;
+}
+
+interface WikidataCompanyInfo {
+  founded?: string;
+  employees?: string;
+  revenue?: string;
+  headquarters?: string;
+}
+
+async function fetchWikidataCompanyInfo(
+  companyName: string
+): Promise<WikidataCompanyInfo | null> {
+  const endpoint = "https://query.wikidata.org/sparql";
+  const query = `
+    SELECT ?founded ?employees ?revenue ?hqLabel WHERE {
+      ?company rdfs:label "${companyName}"@en;
+              wdt:P31 wd:Q4830453.
+      OPTIONAL { ?company wdt:P571 ?founded. }
+      OPTIONAL { ?company wdt:P1128 ?employees. }
+      OPTIONAL { ?company wdt:P2139 ?revenue. }
+      OPTIONAL { ?company wdt:P159 ?hq. }
+      SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+    }
+    LIMIT 1
+  `;
+  const url = `${endpoint}?query=${encodeURIComponent(query)}&format=json`;
+  try {
+    const res = await axios.get(url, {
+      headers: { Accept: "application/sparql-results+json" },
+    });
+    const bindings = res.data.results.bindings[0];
+    if (!bindings) return null;
+    return {
+      founded: bindings.founded?.value?.split("T")[0],
+      employees: bindings.employees?.value,
+      revenue: bindings.revenue?.value,
+      headquarters: bindings.hqLabel?.value,
+    };
+  } catch (e) {
+    console.error("Wikidata fetch error:", e);
+    return null;
+  }
 }
 
 // Function to convert backend search results to risk analysis format
@@ -349,6 +393,26 @@ const RiskAnalysisDetails = ({
 }: RiskAnalysisDetailsProps = mockData) => {
   const riskColors = getRiskColor(overallRisk);
 
+  // Wikidata integration
+  const [wikidata, setWikidata] = useState<WikidataCompanyInfo | null>(null);
+  const [loadingWikidata, setLoadingWikidata] = useState(false);
+
+  useEffect(() => {
+    let ignore = false;
+    if (company?.name) {
+      setLoadingWikidata(true);
+      fetchWikidataCompanyInfo(company.name).then((data) => {
+        if (!ignore) {
+          setWikidata(data);
+          setLoadingWikidata(false);
+        }
+      });
+    }
+    return () => {
+      ignore = true;
+    };
+  }, [company?.name]);
+
   return (
     <Box sx={{ maxWidth: "100%", mx: "auto", p: 3 }}>
       {/* Header Card */}
@@ -444,7 +508,11 @@ const RiskAnalysisDetails = ({
                 </Typography>
               </Box>
               <Typography variant="body1" fontWeight="medium">
-                {company.founded}
+                {loadingWikidata ? (
+                  <CircularProgress size={16} />
+                ) : (
+                  wikidata?.founded || company.founded || "Not available"
+                )}
               </Typography>
             </Grid>
 
@@ -456,7 +524,11 @@ const RiskAnalysisDetails = ({
                 </Typography>
               </Box>
               <Typography variant="body1" fontWeight="medium">
-                {company.employees}
+                {loadingWikidata ? (
+                  <CircularProgress size={16} />
+                ) : (
+                  wikidata?.employees || company.employees || "Not available"
+                )}
               </Typography>
             </Grid>
 
@@ -468,7 +540,11 @@ const RiskAnalysisDetails = ({
                 </Typography>
               </Box>
               <Typography variant="body1" fontWeight="medium">
-                {company.revenue}
+                {loadingWikidata ? (
+                  <CircularProgress size={16} />
+                ) : (
+                  wikidata?.revenue || company.revenue || "Not available"
+                )}
               </Typography>
             </Grid>
 
@@ -480,7 +556,13 @@ const RiskAnalysisDetails = ({
                 </Typography>
               </Box>
               <Typography variant="body1" fontWeight="medium">
-                {company.headquarters}
+                {loadingWikidata ? (
+                  <CircularProgress size={16} />
+                ) : (
+                  wikidata?.headquarters ||
+                  company.headquarters ||
+                  "Not available"
+                )}
               </Typography>
             </Grid>
           </Grid>

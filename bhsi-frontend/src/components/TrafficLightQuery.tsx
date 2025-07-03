@@ -24,6 +24,10 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  Checkbox,
+  ListItemText,
+  FormControlLabel,
+  Chip,
 } from "@mui/material";
 import {
   Search,
@@ -132,13 +136,24 @@ const convertSearchResultsToTrafficLight = (
   };
 };
 
+const RSS_FEEDS = [
+  { value: "elpais", label: "El País" },
+  { value: "expansion", label: "Expansión" },
+  { value: "elmundo", label: "El Mundo" },
+  { value: "abc", label: "ABC" },
+  { value: "lavanguardia", label: "La Vanguardia" },
+  { value: "elconfidencial", label: "El Confidencial" },
+  { value: "eldiario", label: "El Diario" },
+  { value: "europapress", label: "Europa Press" },
+];
+
 const TrafficLightQuery = () => {
   const { user } = useAuth();
   const { addAssessedCompany } = useCompanies();
   const [query, setQuery] = useState("");
-  const [dataSource, setDataSource] = useState<"BOE" | "NewsAPI" | "both">(
-    "both"
-  );
+  const [boeEnabled, setBoeEnabled] = useState(true);
+  const [newsEnabled, setNewsEnabled] = useState(true);
+  const [rssEnabled, setRssEnabled] = useState(false);
   const [dateRangeType, setDateRangeType] = useState<"preset" | "custom">(
     "preset"
   );
@@ -150,6 +165,9 @@ const TrafficLightQuery = () => {
   const [savedResults, setSavedResults] = useState<SavedResult[]>([]);
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
+  const [selectedRssFeeds, setSelectedRssFeeds] = useState<string[]>(
+    RSS_FEEDS.map((f) => f.value)
+  );
 
   // RTK Query hook for API calls
   const [searchCompany, { isLoading }] = useSearchCompanyMutation();
@@ -174,12 +192,6 @@ const TrafficLightQuery = () => {
       }
     }
   }, [user]);
-
-  const handleDataSourceChange = (
-    event: SelectChangeEvent<"BOE" | "NewsAPI" | "both">
-  ) => {
-    setDataSource(event.target.value as "BOE" | "NewsAPI" | "both");
-  };
 
   const handleDateRangeTypeChange = (
     event: React.MouseEvent<HTMLElement>,
@@ -208,6 +220,11 @@ const TrafficLightQuery = () => {
     if (value === "" || isValidDateFormat(value)) {
       setEndDate(value);
     }
+  };
+
+  const handleRssFeedsChange = (event: SelectChangeEvent<string[]>) => {
+    const value = event.target.value as string[];
+    setSelectedRssFeeds(value);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -242,8 +259,10 @@ const TrafficLightQuery = () => {
       // Prepare search request
       const searchRequest = {
         company_name: query.trim(),
-        include_boe: dataSource === "BOE" || dataSource === "both",
-        include_news: dataSource === "NewsAPI" || dataSource === "both",
+        include_boe: boeEnabled,
+        include_news: newsEnabled,
+        include_rss: false,
+        rss_feeds: [],
         ...(dateRangeType === "preset"
           ? { days_back: daysBack }
           : { start_date: startDate, end_date: endDate }),
@@ -259,7 +278,7 @@ const TrafficLightQuery = () => {
       // Add metadata
       const resultWithMetadata: TrafficLightResponse = {
         ...trafficLightResult,
-        dataSource,
+        dataSource: boeEnabled ? "BOE" : newsEnabled ? "NewsAPI" : "both",
         dateRange:
           dateRangeType === "preset"
             ? { type: "preset" as const, daysBack }
@@ -356,202 +375,317 @@ const TrafficLightQuery = () => {
           {activeTab === 0 ? (
             <>
               <Typography variant="h6" gutterBottom>
-                Enter Company Details
+                Risk Assessment Search
               </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                Search for company risk information across multiple data sources
+              </Typography>
+
               <form onSubmit={handleSubmit}>
-                <Box
-                  sx={{
-                    display: "flex",
-                    flexDirection: { xs: "column", sm: "row" },
-                    gap: 2,
-                    alignItems: { xs: "stretch", sm: "flex-end" },
-                    mb: 2,
-                  }}
-                >
+                {/* Company Search Section */}
+                <Card variant="outlined" sx={{ mb: 3, p: 2 }}>
+                  <Typography
+                    variant="subtitle1"
+                    gutterBottom
+                    sx={{ fontWeight: 600 }}
+                  >
+                    Company Information
+                  </Typography>
                   <TextField
                     label="Company Name or VAT Number"
                     variant="outlined"
                     fullWidth
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Try: ACME, TECH, RISK, or NOVA"
+                    placeholder="Enter company name (e.g., Real Madrid, Banco Santander) or VAT number"
                     disabled={isLoading}
                     InputProps={{
                       sx: { borderRadius: 2 },
+                      startAdornment: (
+                        <Search
+                          style={{ marginRight: 8, color: "text.secondary" }}
+                        />
+                      ),
                     }}
-                    sx={{ flex: 1 }}
                   />
-                  <FormControl sx={{ minWidth: { xs: "100%", sm: "200px" } }}>
-                    <InputLabel>Data Source</InputLabel>
-                    <Select
-                      value={dataSource}
-                      label="Data Source"
-                      onChange={handleDataSourceChange}
-                      disabled={isLoading}
-                      sx={{ borderRadius: 2 }}
-                    >
-                      <MenuItem value="BOE">
-                        <Box
-                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                        >
-                          <Database size={16} />
-                          BOE (Boletín Oficial del Estado)
-                        </Box>
-                      </MenuItem>
-                      <MenuItem value="NewsAPI">
-                        <Box
-                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                        >
-                          <Newspaper size={16} />
-                          NewsAPI
-                        </Box>
-                      </MenuItem>
-                      <MenuItem value="both">
-                        <Box
-                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                        >
-                          <Globe size={16} />
-                          Both Sources
-                        </Box>
-                      </MenuItem>
-                    </Select>
-                  </FormControl>
-                </Box>
+                </Card>
 
-                {/* Date Range Section */}
-                <Accordion
-                  sx={{
-                    mb: 2,
-                    borderRadius: 2,
-                    "&:before": { display: "none" },
-                  }}
-                >
-                  <AccordionSummary
-                    expandIcon={<ChevronDown />}
+                {/* Data Sources Section */}
+                <Card variant="outlined" sx={{ mb: 3, p: 2 }}>
+                  <Typography
+                    variant="subtitle1"
+                    gutterBottom
+                    sx={{ fontWeight: 600 }}
+                  >
+                    Data Sources
+                  </Typography>
+                  <Box
                     sx={{
-                      borderRadius: 2,
-                      "& .MuiAccordionSummary-content": {
-                        alignItems: "center",
-                      },
+                      display: "grid",
+                      gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" },
+                      gap: 2,
+                      mb: 2,
                     }}
                   >
-                    <Calendar size={18} style={{ marginRight: 8 }} />
-                    <Typography variant="subtitle2">Date Range</Typography>
-                    <Typography
-                      variant="caption"
-                      sx={{ ml: 2, color: "text.secondary" }}
+                    {/* BOE Source */}
+                    <Card
+                      variant="outlined"
+                      sx={{
+                        p: 2,
+                        cursor: "pointer",
+                        border: boeEnabled
+                          ? "2px solid #1976d2"
+                          : "1px solid #e0e0e0",
+                        backgroundColor: boeEnabled ? "#f3f8ff" : "transparent",
+                        transition: "all 0.2s",
+                      }}
+                      onClick={() => setBoeEnabled((prev) => !prev)}
                     >
-                      {dateRangeType === "preset"
-                        ? `Last ${daysBack} days`
-                        : startDate && endDate
-                        ? `${startDate} to ${endDate}`
-                        : "Custom range"}
-                    </Typography>
-                  </AccordionSummary>
-                  <AccordionDetails>
-                    <Box
-                      sx={{ display: "flex", flexDirection: "column", gap: 2 }}
-                    >
-                      <ToggleButtonGroup
-                        value={dateRangeType}
-                        exclusive
-                        onChange={handleDateRangeTypeChange}
-                        size="small"
-                        sx={{ mb: 2 }}
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1,
+                          mb: 1,
+                        }}
                       >
-                        <ToggleButton value="preset">Quick Select</ToggleButton>
-                        <ToggleButton value="custom">Custom Range</ToggleButton>
-                      </ToggleButtonGroup>
+                        <Database size={20} color="#1976d2" />
+                        <Typography
+                          variant="subtitle2"
+                          sx={{ fontWeight: 600 }}
+                        >
+                          BOE (Official Gazette)
+                        </Typography>
+                      </Box>
+                      <Typography variant="caption" color="text.secondary">
+                        Spanish government publications, legal notices, and
+                        official announcements
+                      </Typography>
+                    </Card>
+                    {/* NewsAPI Source */}
+                    <Card
+                      variant="outlined"
+                      sx={{
+                        p: 2,
+                        cursor: "pointer",
+                        border: newsEnabled
+                          ? "2px solid #1976d2"
+                          : "1px solid #e0e0e0",
+                        backgroundColor: newsEnabled
+                          ? "#f3f8ff"
+                          : "transparent",
+                        transition: "all 0.2s",
+                      }}
+                      onClick={() => setNewsEnabled((prev) => !prev)}
+                    >
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1,
+                          mb: 1,
+                        }}
+                      >
+                        <Newspaper size={20} color="#1976d2" />
+                        <Typography
+                          variant="subtitle2"
+                          sx={{ fontWeight: 600 }}
+                        >
+                          NewsAPI
+                        </Typography>
+                      </Box>
+                      <Typography variant="caption" color="text.secondary">
+                        International news sources and business publications
+                      </Typography>
+                    </Card>
+                    {/* RSS Feeds - Disabled for Demo */}
+                    <Card
+                      variant="outlined"
+                      sx={{
+                        p: 2,
+                        cursor: "not-allowed",
+                        border: "1px solid #e0e0e0",
+                        backgroundColor: "#f5f5f5",
+                        opacity: 0.6,
+                        transition: "all 0.2s",
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 1,
+                          mb: 1,
+                        }}
+                      >
+                        <Globe size={20} color="#9e9e9e" />
+                        <Typography
+                          variant="subtitle2"
+                          sx={{ fontWeight: 600, color: "#9e9e9e" }}
+                        >
+                          RSS Feeds (Demo Disabled)
+                        </Typography>
+                      </Box>
+                      <Typography variant="caption" color="text.secondary">
+                        Spanish news sources - disabled for demo performance
+                      </Typography>
+                    </Card>
+                  </Box>
 
-                      {dateRangeType === "preset" ? (
-                        <FormControl sx={{ maxWidth: 300 }}>
-                          <InputLabel>Period</InputLabel>
-                          <Select
-                            value={daysBack}
-                            label="Period"
-                            onChange={handleDaysBackChange}
-                            disabled={isLoading}
-                          >
-                            <MenuItem value={7}>Last 7 days</MenuItem>
-                            <MenuItem value={14}>Last 2 weeks</MenuItem>
-                            <MenuItem value={30}>Last 30 days</MenuItem>
-                            <MenuItem value={60}>Last 2 months</MenuItem>
-                            <MenuItem value={90}>Last 3 months</MenuItem>
-                            <MenuItem value={180}>Last 6 months</MenuItem>
-                            <MenuItem value={365}>Last year</MenuItem>
-                          </Select>
-                        </FormControl>
-                      ) : (
+                  {/* RSS Feed Selection */}
+                  {rssEnabled && (
+                    <Accordion sx={{ mt: 2, "&:before": { display: "none" } }}>
+                      <AccordionSummary expandIcon={<ChevronDown />}>
+                        <Typography variant="subtitle2">
+                          Select RSS Feeds ({selectedRssFeeds.length} selected)
+                        </Typography>
+                      </AccordionSummary>
+                      <AccordionDetails>
                         <Box
                           sx={{
-                            display: "flex",
-                            flexDirection: { xs: "column", sm: "row" },
-                            gap: 2,
+                            display: "grid",
+                            gridTemplateColumns: {
+                              xs: "1fr",
+                              sm: "repeat(2, 1fr)",
+                              md: "repeat(4, 1fr)",
+                            },
+                            gap: 1,
                           }}
                         >
-                          <TextField
-                            label="Start Date"
-                            type="date"
-                            value={startDate}
-                            onChange={handleStartDateChange}
-                            disabled={isLoading}
-                            placeholder="YYYY-MM-DD"
-                            InputLabelProps={{
-                              shrink: true,
-                            }}
-                            helperText="Format: YYYY-MM-DD (e.g., 2025-06-01)"
-                            sx={{ flex: 1 }}
-                          />
-                          <TextField
-                            label="End Date"
-                            type="date"
-                            value={endDate}
-                            onChange={handleEndDateChange}
-                            disabled={isLoading}
-                            placeholder="YYYY-MM-DD"
-                            InputLabelProps={{
-                              shrink: true,
-                            }}
-                            helperText="Format: YYYY-MM-DD (e.g., 2025-06-13)"
-                            sx={{ flex: 1 }}
-                          />
+                          {RSS_FEEDS.map((feed) => (
+                            <FormControlLabel
+                              key={feed.value}
+                              control={
+                                <Checkbox
+                                  checked={selectedRssFeeds.includes(
+                                    feed.value
+                                  )}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedRssFeeds([
+                                        ...selectedRssFeeds,
+                                        feed.value,
+                                      ]);
+                                    } else {
+                                      setSelectedRssFeeds(
+                                        selectedRssFeeds.filter(
+                                          (f) => f !== feed.value
+                                        )
+                                      );
+                                    }
+                                  }}
+                                  size="small"
+                                />
+                              }
+                              label={feed.label}
+                              sx={{ fontSize: "0.875rem" }}
+                            />
+                          ))}
                         </Box>
-                      )}
+                        <Box sx={{ mt: 2, display: "flex", gap: 1 }}>
+                          <Button
+                            size="small"
+                            onClick={() =>
+                              setSelectedRssFeeds(RSS_FEEDS.map((f) => f.value))
+                            }
+                            variant="outlined"
+                          >
+                            Select All
+                          </Button>
+                          <Button
+                            size="small"
+                            onClick={() => setSelectedRssFeeds([])}
+                            variant="outlined"
+                          >
+                            Clear All
+                          </Button>
+                        </Box>
+                      </AccordionDetails>
+                    </Accordion>
+                  )}
+                </Card>
 
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{ fontSize: "0.875rem" }}
+                {/* Date Range Section */}
+                <Card variant="outlined" sx={{ mb: 3, p: 2 }}>
+                  <Typography
+                    variant="subtitle1"
+                    gutterBottom
+                    sx={{ fontWeight: 600 }}
+                  >
+                    Date Range
+                  </Typography>
+
+                  <ToggleButtonGroup
+                    value={dateRangeType}
+                    exclusive
+                    onChange={handleDateRangeTypeChange}
+                    size="small"
+                    sx={{ mb: 2 }}
+                  >
+                    <ToggleButton value="preset">Quick Select</ToggleButton>
+                    <ToggleButton value="custom">Custom Range</ToggleButton>
+                  </ToggleButtonGroup>
+
+                  {dateRangeType === "preset" ? (
+                    <FormControl sx={{ minWidth: 200 }}>
+                      <InputLabel>Time Period</InputLabel>
+                      <Select
+                        value={daysBack}
+                        label="Time Period"
+                        onChange={handleDaysBackChange}
+                        disabled={isLoading}
                       >
-                        💡 <strong>Tip:</strong> Date range primarily affects
-                        NewsAPI results. BOE data is typically current and less
-                        time-sensitive.
-                      </Typography>
+                        <MenuItem value={7}>Last 7 days</MenuItem>
+                        <MenuItem value={14}>Last 2 weeks</MenuItem>
+                        <MenuItem value={30}>Last 30 days</MenuItem>
+                        <MenuItem value={60}>Last 2 months</MenuItem>
+                        <MenuItem value={90}>Last 3 months</MenuItem>
+                        <MenuItem value={180}>Last 6 months</MenuItem>
+                        <MenuItem value={365}>Last year</MenuItem>
+                      </Select>
+                    </FormControl>
+                  ) : (
+                    <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+                      <TextField
+                        label="Start Date"
+                        type="date"
+                        value={startDate}
+                        onChange={handleStartDateChange}
+                        disabled={isLoading}
+                        InputLabelProps={{ shrink: true }}
+                        sx={{ minWidth: 150 }}
+                      />
+                      <TextField
+                        label="End Date"
+                        type="date"
+                        value={endDate}
+                        onChange={handleEndDateChange}
+                        disabled={isLoading}
+                        InputLabelProps={{ shrink: true }}
+                        sx={{ minWidth: 150 }}
+                      />
                     </Box>
-                  </AccordionDetails>
-                </Accordion>
+                  )}
+                </Card>
 
-                <Box sx={{ display: "flex", justifyContent: "center" }}>
+                {/* Search Button */}
+                <Box sx={{ display: "flex", justifyContent: "center", mt: 3 }}>
                   <Button
-                    variant="contained"
-                    color="primary"
                     type="submit"
-                    disabled={isLoading}
+                    variant="contained"
+                    size="large"
+                    disabled={isLoading || !query.trim()}
                     startIcon={
-                      isLoading ? (
-                        <CircularProgress size={20} color="inherit" />
-                      ) : (
-                        <Search />
-                      )
+                      isLoading ? <CircularProgress size={20} /> : <Search />
                     }
                     sx={{
-                      minWidth: "200px",
-                      height: "56px",
-                      fontSize: "1.1rem",
-                      fontWeight: 600,
+                      minWidth: 200,
+                      borderRadius: 2,
+                      py: 1.5,
+                      px: 4,
                     }}
                   >
-                    {isLoading ? "Searching..." : "Get Score"}
+                    {isLoading ? "Searching..." : "Search for Risk Assessment"}
                   </Button>
                 </Box>
               </form>
@@ -565,7 +699,7 @@ const TrafficLightQuery = () => {
           ) : (
             <BatchUpload
               onSaveResults={handleSaveBatchResults}
-              dataSource={dataSource}
+              dataSource={boeEnabled ? "BOE" : newsEnabled ? "NewsAPI" : "both"}
               dateRange={
                 dateRangeType === "preset"
                   ? { type: "preset" as const, daysBack }
@@ -579,8 +713,55 @@ const TrafficLightQuery = () => {
       {/* Current Result Display */}
       {result && (
         <Card sx={{ mb: 4, position: "relative" }}>
-          <CardContent>
+          <CardContent sx={{ p: 3 }}>
+            {/* Search Summary */}
+            <Box sx={{ mb: 3, p: 2, bgcolor: "grey.50", borderRadius: 2 }}>
+              <Typography
+                variant="subtitle2"
+                gutterBottom
+                sx={{ fontWeight: 600 }}
+              >
+                Search Summary
+              </Typography>
+              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
+                <Chip
+                  label={`Company: ${result.company}`}
+                  variant="outlined"
+                  size="small"
+                />
+                <Chip
+                  label={`Sources: ${[
+                    boeEnabled ? "BOE" : null,
+                    newsEnabled ? "NewsAPI" : null,
+                    rssEnabled ? "RSS" : null,
+                  ]
+                    .filter(Boolean)
+                    .join(", ")}`}
+                  variant="outlined"
+                  size="small"
+                />
+                <Chip
+                  label={`Date Range: ${
+                    result.dateRange?.type === "preset"
+                      ? `Last ${result.dateRange.daysBack} days`
+                      : `${result.dateRange?.startDate} to ${result.dateRange?.endDate}`
+                  }`}
+                  variant="outlined"
+                  size="small"
+                />
+                {result.searchResults && (
+                  <Chip
+                    label={`Results: ${result.searchResults.results.length} articles`}
+                    variant="outlined"
+                    size="small"
+                    color="primary"
+                  />
+                )}
+              </Box>
+            </Box>
+
             <TrafficLightResult result={result} />
+
             <Zoom in={true}>
               <Fab
                 color="primary"
@@ -589,30 +770,16 @@ const TrafficLightQuery = () => {
                   position: "absolute",
                   top: 16,
                   right: 16,
-                  boxShadow: (theme) =>
-                    `0 4px 14px ${theme.palette.primary.main}40`,
-                  "&:hover": {
-                    transform: "scale(1.05)",
-                  },
+                  zIndex: 1,
                 }}
+                size="medium"
               >
-                <Tooltip title="Save Result" placement="left">
-                  <Save />
-                </Tooltip>
+                <Save />
               </Fab>
             </Zoom>
           </CardContent>
         </Card>
       )}
-
-      {/* Success Snackbar */}
-      <Snackbar
-        open={showSaveSuccess}
-        autoHideDuration={3000}
-        onClose={() => setShowSaveSuccess(false)}
-        message="Result saved successfully"
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-      />
     </Box>
   );
 };

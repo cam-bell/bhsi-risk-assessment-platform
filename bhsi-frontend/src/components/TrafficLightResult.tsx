@@ -30,6 +30,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Tooltip,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import {
@@ -49,6 +50,8 @@ import { type TrafficLightResponse } from "./TrafficLightQuery";
 import RiskAnalysisDetails, {
   convertSearchResultsToRiskAnalysis,
 } from "./RiskAnalysisDetails";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 
 interface TrafficLightResultProps {
   result: TrafficLightResponse;
@@ -134,6 +137,7 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
   const [visible, setVisible] = useState(false);
   const [showDetailedResults, setShowDetailedResults] = useState(false);
   const [showRiskAnalysis, setShowRiskAnalysis] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
 
   // Trigger animation after component mounts
   useEffect(() => {
@@ -143,17 +147,69 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
   // Get search results from the result
   const searchResults = result.searchResults?.results || [];
   const hasSearchResults = searchResults.length > 0;
+  const searchMeta =
+    result.searchResults && "metadata" in result.searchResults
+      ? result.searchResults.metadata
+      : {};
+  const searchDate =
+    result.searchResults?.search_date || new Date().toISOString();
+  const sourcesUsed = (searchMeta.sources_searched || []).join(", ") || "N/A";
 
   // Convert search results to risk analysis format
   const riskAnalysisData = result.searchResults
     ? convertSearchResultsToRiskAnalysis(result.searchResults)
     : null;
 
+  if (!hasSearchResults) {
+    return (
+      <Card sx={{ mt: 4, p: 4, textAlign: "center" }}>
+        <Typography variant="h6" color="text.secondary" gutterBottom>
+          No results found for this company.
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          Try another search or check your spelling.
+        </Typography>
+      </Card>
+    );
+  }
+
   return (
     <>
       <Grow in={visible} timeout={800}>
-        <Card>
-          <CardContent sx={{ p: 3 }}>
+        <Card sx={{ mt: 2, p: isMobile ? 1 : 3 }}>
+          {/* Summary Banner */}
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              background: theme.palette.grey[100],
+              borderRadius: 2,
+              px: isMobile ? 2 : 4,
+              py: 2,
+              mb: 3,
+              flexDirection: isMobile ? "column" : "row",
+              gap: isMobile ? 1 : 0,
+            }}
+          >
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <CheckCircleIcon color="success" sx={{ fontSize: 32, mr: 1 }} />
+              <Typography variant={isMobile ? "h6" : "h5"} fontWeight={700}>
+                {result.company}
+              </Typography>
+            </Box>
+            <Box sx={{ textAlign: isMobile ? "center" : "right" }}>
+              <Typography variant="body2" color="text.secondary">
+                <strong>Date:</strong>{" "}
+                {new Date(searchDate).toLocaleDateString()}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                <strong>Sources:</strong> {sourcesUsed}
+              </Typography>
+            </Box>
+          </Box>
+
+          <CardContent sx={{ p: 0 }}>
             <Box
               sx={{
                 display: "flex",
@@ -184,26 +240,34 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
                   color={colorMap[result.overall]}
                   sx={{
                     mt: 3,
-                    fontSize: "1.2rem",
+                    fontSize: isMobile ? "1.1rem" : "1.5rem",
                     fontWeight: "bold",
-                    py: 3,
-                    px: 2,
-                    minWidth: "180px",
+                    py: isMobile ? 2 : 3,
+                    px: isMobile ? 1 : 4,
+                    minWidth: isMobile ? "120px" : "200px",
+                    minHeight: isMobile ? "48px" : "64px",
+                    boxShadow: 3,
+                    letterSpacing: 2,
                     "& .MuiChip-label": {
                       px: 2,
                     },
                   }}
                 />
                 <Typography
-                  variant="body2"
-                  sx={{ mt: 2, textAlign: "center", maxWidth: 500 }}
+                  variant="body1"
+                  sx={{
+                    mt: 2,
+                    textAlign: "center",
+                    maxWidth: 500,
+                    color: theme.palette.success.main,
+                  }}
                 >
                   {result.overall === "green" &&
                     "Low risk profile. Recommended for renewal."}
                   {result.overall === "orange" &&
-                    "Medium risk profile. Recommended for review."}
+                    "Medium risk profile. Review recommended."}
                   {result.overall === "red" &&
-                    "High risk profile. Recommended for pre-cancellation."}
+                    "High risk profile. Caution advised."}
                 </Typography>
 
                 {/* Action Buttons */}
@@ -242,120 +306,92 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
               Detailed Parameters
             </Typography>
 
-            {isMobile ? (
-              // Mobile view - cards
-              <Grid container spacing={2}>
-                {Object.entries(result.blocks).map(([key, value]) => {
-                  const sourceInfo =
-                    dataSourcesMap[key as keyof typeof dataSourcesMap];
-                  return (
-                    <Grid item xs={12} key={key}>
-                      <Paper
-                        elevation={0}
-                        sx={{
-                          p: 2,
-                          borderRadius: 2,
-                          borderLeft: `6px solid ${
-                            theme.palette[colorMap[value]].main
-                          }`,
-                          backgroundColor: `${
-                            theme.palette[colorMap[value]].light
-                          }15`,
-                        }}
-                      >
+            {/* Parameter Table */}
+            <TableContainer component={Paper} sx={{ mt: 4, mb: 2 }}>
+              <Table size={isMobile ? "small" : "medium"}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Parameter</TableCell>
+                    <TableCell>Risk Level</TableCell>
+                    <TableCell>Data Source</TableCell>
+                    <TableCell>Last Updated</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {Object.keys(result.blocks).map((param) => (
+                    <TableRow key={param}>
+                      <TableCell>
                         <Box
-                          sx={{ display: "flex", alignItems: "center", mb: 1 }}
+                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
                         >
-                          {sourceInfo.icon}
-                          <Typography
-                            variant="subtitle2"
-                            sx={{ ml: 1, fontWeight: "bold" }}
-                          >
-                            {parameterMap[key as keyof typeof parameterMap]}
+                          {
+                            dataSourcesMap[param as keyof typeof dataSourcesMap]
+                              ?.icon
+                          }
+                          {parameterMap[param as keyof typeof parameterMap]}
+                        </Box>
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={result.blocks[
+                            param as keyof typeof result.blocks
+                          ].toUpperCase()}
+                          color={
+                            colorMap[
+                              result.blocks[param as keyof typeof result.blocks]
+                            ]
+                          }
+                          sx={{ fontWeight: "bold", letterSpacing: 1 }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 0.5,
+                          }}
+                        >
+                          <Typography variant="body2">
+                            {
+                              dataSourcesMap[
+                                param as keyof typeof dataSourcesMap
+                              ]?.primary
+                            }
                           </Typography>
-                          <Chip
-                            label={value.toUpperCase()}
-                            color={colorMap[value]}
-                            size="small"
-                            sx={{ ml: "auto" }}
+                          <InfoOutlinedIcon
+                            fontSize="small"
+                            color="action"
+                            titleAccess={
+                              dataSourcesMap[
+                                param as keyof typeof dataSourcesMap
+                              ]?.description
+                            }
                           />
                         </Box>
-                        <Typography variant="body2" color="text.secondary">
-                          {sourceInfo.description}
-                        </Typography>
-                      </Paper>
-                    </Grid>
-                  );
-                })}
-              </Grid>
-            ) : (
-              // Desktop view - table
-              <TableContainer
-                component={Paper}
-                elevation={0}
-                sx={{ borderRadius: 2 }}
-              >
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: "bold" }}>
-                        Parameter
                       </TableCell>
-                      <TableCell sx={{ fontWeight: "bold" }}>
-                        Risk Level
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: "bold" }}>
-                        Data Source
-                      </TableCell>
-                      <TableCell sx={{ fontWeight: "bold" }}>
-                        Last Updated
+                      <TableCell>
+                        <Tooltip
+                          title={`Last updated: ${
+                            dataSourcesMap[param as keyof typeof dataSourcesMap]
+                              ?.lastUpdated
+                          }`}
+                          placement="top"
+                        >
+                          <span>
+                            {
+                              dataSourcesMap[
+                                param as keyof typeof dataSourcesMap
+                              ]?.lastUpdated
+                            }
+                          </span>
+                        </Tooltip>
                       </TableCell>
                     </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {Object.entries(result.blocks).map(([key, value]) => {
-                      const sourceInfo =
-                        dataSourcesMap[key as keyof typeof dataSourcesMap];
-                      return (
-                        <TableRow key={key}>
-                          <TableCell>
-                            <Box sx={{ display: "flex", alignItems: "center" }}>
-                              {sourceInfo.icon}
-                              <Typography variant="body2" sx={{ ml: 1 }}>
-                                {parameterMap[key as keyof typeof parameterMap]}
-                              </Typography>
-                            </Box>
-                          </TableCell>
-                          <TableCell>
-                            <Chip
-                              label={value.toUpperCase()}
-                              color={colorMap[value]}
-                              size="small"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2">
-                              {sourceInfo.primary}
-                            </Typography>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              {sourceInfo.secondary.join(", ")}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2">
-                              {sourceInfo.lastUpdated}
-                            </Typography>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            )}
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
 
             {/* Search Results Summary Section */}
             {hasSearchResults && (
@@ -427,6 +463,43 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
                   </Grid>
                 </Grid>
               </Box>
+            )}
+
+            {/* View Details Button */}
+            <Box sx={{ textAlign: "center", mt: 2 }}>
+              <Button
+                variant="outlined"
+                startIcon={<BarChart3 />}
+                onClick={() => setShowDetails((prev) => !prev)}
+                sx={{ fontWeight: 600 }}
+              >
+                {showDetails ? "Hide Raw Results" : "View Raw Results"}
+              </Button>
+            </Box>
+            {showDetails && (
+              <Accordion expanded sx={{ mt: 2 }}>
+                <AccordionSummary expandIcon={<ChevronDown />}>
+                  <Typography variant="subtitle2">
+                    Raw Search Results
+                  </Typography>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <pre
+                    style={{
+                      fontSize: isMobile ? 10 : 13,
+                      whiteSpace: "pre-wrap",
+                      wordBreak: "break-all",
+                      background: "#f9f9f9",
+                      padding: 12,
+                      borderRadius: 6,
+                      maxHeight: 400,
+                      overflow: "auto",
+                    }}
+                  >
+                    {JSON.stringify(searchResults, null, 2)}
+                  </pre>
+                </AccordionDetails>
+              </Accordion>
             )}
           </CardContent>
         </Card>

@@ -18,6 +18,7 @@ email-validator>=2.0.0,<2.1.0
 # AI & NLP
 google-generativeai>=0.3.0
 spacy>=3.7.0,<3.9.0
+es-core-news-lg>=3.8.0  # Spanish language model for spaCy
 
 # Advanced AI/ML for BOE - Windows-compatible versions
 sentence-transformers>=2.2.0

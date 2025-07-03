@@ -1,4 +1,4 @@
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any
 from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 
@@ -9,7 +9,14 @@ class CompanyBase(BaseModel):
 
 
 class CompanyCreate(CompanyBase):
-    pass
+    # Search parameters for comprehensive data collection
+    start_date: Optional[str] = Field(None, description="Start date")
+    end_date: Optional[str] = Field(None, description="End date (YYYY-MM-DD)")
+    days_back: Optional[int] = Field(30, description="Days to look back")
+    include_boe: bool = Field(True, description="Include BOE search")
+    include_news: bool = Field(True, description="Include NewsAPI search")
+    include_rss: bool = Field(True, description="Include RSS news sources")
+    vat: Optional[str] = Field(None, description="Company VAT number")
 
 
 class CompanyUpdate(CompanyBase):

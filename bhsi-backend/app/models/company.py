@@ -2,6 +2,7 @@ from sqlalchemy import Column, String, DateTime, ForeignKey, Enum
 from sqlalchemy.sql import func
 from app.db.base import Base
 import enum
+import uuid
 
 
 class RiskLevel(str, enum.Enum):
@@ -11,18 +12,16 @@ class RiskLevel(str, enum.Enum):
 
 
 class Company(Base):
-    id = Column(String, primary_key=True, index=True)
+    vat = Column(String, primary_key=True, index=True)
     name = Column(String, index=True, nullable=False)
-    vat = Column(String, index=True)
-    vat_number = Column(String, unique=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
 
 class Assessment(Base):
-    id = Column(String, primary_key=True, index=True)
-    company_id = Column(String, ForeignKey("company.id"), nullable=False)
-    user_id = Column(String, ForeignKey("user.id"), nullable=False)
+    id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
+    company_id = Column(String, ForeignKey("company.vat"), nullable=False)
+    user_id = Column(String, nullable=False)
     
     # Risk scores
     turnover = Column(Enum(RiskLevel), nullable=False)
@@ -37,6 +36,7 @@ class Assessment(Base):
     bing_results = Column(String)    # JSON string
     gov_results = Column(String)     # JSON string
     news_results = Column(String)    # JSON string
+    rss_results = Column(String)    # JSON string for RSS results
     
     # Analysis
     analysis_summary = Column(String)
