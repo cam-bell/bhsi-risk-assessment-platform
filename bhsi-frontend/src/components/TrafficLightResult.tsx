@@ -31,6 +31,8 @@ import {
   DialogContent,
   DialogActions,
   Tooltip,
+  CircularProgress,
+  Alert,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import {
@@ -45,13 +47,18 @@ import {
   Eye,
   Search,
   BarChart3,
+  DollarSign,
+  Shield,
 } from "lucide-react";
-import { type TrafficLightResponse } from "./TrafficLightQuery";
+import DonutLargeIcon from "@mui/icons-material/DonutLarge";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import RiskAnalysisDetails, {
   convertSearchResultsToRiskAnalysis,
 } from "./RiskAnalysisDetails";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import { useGetManagementSummaryMutation } from "../store/api/analyticsApi";
+import StarsIcon from "@mui/icons-material/Stars";
 
 interface TrafficLightResultProps {
   result: TrafficLightResponse;
@@ -138,6 +145,11 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
   const [showDetailedResults, setShowDetailedResults] = useState(false);
   const [showRiskAnalysis, setShowRiskAnalysis] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [
+    getManagementSummary,
+    { data: summary, isLoading: summaryLoading, error: summaryError },
+  ] = useGetManagementSummaryMutation();
+  const [showSummary, setShowSummary] = useState(false);
 
   // Trigger animation after component mounts
   useEffect(() => {
@@ -148,12 +160,16 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
   const searchResults = result.searchResults?.results || [];
   const hasSearchResults = searchResults.length > 0;
   const searchMeta =
-    result.searchResults && "metadata" in result.searchResults
-      ? result.searchResults.metadata
+    result.searchResults &&
+    typeof result.searchResults === "object" &&
+    "metadata" in result.searchResults
+      ? (result.searchResults as any).metadata
       : {};
   const searchDate =
     result.searchResults?.search_date || new Date().toISOString();
-  const sourcesUsed = (searchMeta.sources_searched || []).join(", ") || "N/A";
+  const sourcesUsed = Array.isArray(searchMeta.sources_searched)
+    ? searchMeta.sources_searched.join(", ")
+    : "N/A";
 
   // Convert search results to risk analysis format
   const riskAnalysisData = result.searchResults
@@ -237,7 +253,7 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
                 </Typography>
                 <Chip
                   label={result.overall.toUpperCase()}
-                  color={colorMap[result.overall]}
+                  color={colorMap[result.overall as keyof typeof colorMap]}
                   sx={{
                     mt: 3,
                     fontSize: isMobile ? "1.1rem" : "1.5rem",
@@ -501,6 +517,413 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
                 </AccordionDetails>
               </Accordion>
             )}
+
+            {/* Add Management Summary button below the main result display, only if there are search results */}
+            {hasSearchResults && (
+              <Box sx={{ textAlign: "center", mt: 3 }}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={async () => {
+                    await getManagementSummary({
+                      company_name: result.company,
+                      classification_results: searchResults,
+                    });
+                    setShowSummary(true);
+                  }}
+                  disabled={summaryLoading || !searchResults.length}
+                >
+                  {summaryLoading ? "Loading..." : "Get Management Summary"}
+                </Button>
+                {summaryLoading && <CircularProgress sx={{ mt: 2 }} />}
+                {summaryError && (
+                  <Alert severity="error" sx={{ mt: 2 }}>
+                    Error loading management summary. Please try again.
+                  </Alert>
+                )}
+                {/* Management Summary display */}
+                {showSummary && summary ? (
+                  <Box sx={{ mt: 3, textAlign: "left" }}>
+                    {/* 1. Overall Risk Distribution */}
+                    <Card sx={{ mb: 3 }}>
+                      <CardContent>
+                        <Box display="flex" alignItems="center" gap={2} mb={2}>
+                          <DonutLargeIcon color="primary" />
+                          <Typography variant="h6">Overall Risk</Typography>
+                          <Chip
+                            label={summary.overall_risk?.toUpperCase() || "-"}
+                            color={
+                              summary.overall_risk === "red"
+                                ? "error"
+                                : summary.overall_risk === "orange"
+                                ? "warning"
+                                : "success"
+                            }
+                            sx={{ fontWeight: "bold", ml: 2 }}
+                          />
+                          <Typography
+                            variant="body2"
+                            color="text.secondary"
+                            ml={2}
+                          >
+                            Method: {summary.method}
+                          </Typography>
+                        </Box>
+                        {/* Show risk distribution if available */}
+                        {summary.risk_breakdown && (
+                          <Grid container spacing={2}>
+                            {Object.entries(summary.risk_breakdown).map(
+                              ([category, breakdown]: [string, any]) => (
+                                <Grid item xs={12} sm={6} md={3} key={category}>
+                                  <Paper
+                                    variant="outlined"
+                                    sx={{ p: 2, textAlign: "center" }}
+                                  >
+                                    <Typography
+                                      variant="subtitle2"
+                                      gutterBottom
+                                    >
+                                      {category.charAt(0).toUpperCase() +
+                                        category.slice(1)}
+                                    </Typography>
+                                    <Chip
+                                      label={breakdown.level?.toUpperCase()}
+                                      color={
+                                        breakdown.level === "red"
+                                          ? "error"
+                                          : breakdown.level === "orange"
+                                          ? "warning"
+                                          : "success"
+                                      }
+                                      sx={{ fontWeight: "bold", mb: 1 }}
+                                    />
+                                    <Typography
+                                      variant="body2"
+                                      color="text.secondary"
+                                      mb={1}
+                                    >
+                                      {breakdown.reasoning}
+                                    </Typography>
+                                    {Array.isArray(breakdown.evidence) &&
+                                      breakdown.evidence.length > 0 && (
+                                        <>
+                                          <Typography
+                                            variant="caption"
+                                            color="text.secondary"
+                                          >
+                                            Evidence:
+                                          </Typography>
+                                          <ul
+                                            style={{
+                                              margin: 0,
+                                              paddingLeft: 16,
+                                            }}
+                                          >
+                                            {breakdown.evidence
+                                              .slice(0, 2)
+                                              .map(
+                                                (ev: string, idx: number) => (
+                                                  <li key={idx}>
+                                                    <Typography variant="caption">
+                                                      {ev}
+                                                    </Typography>
+                                                  </li>
+                                                )
+                                              )}
+                                          </ul>
+                                        </>
+                                      )}
+                                    <Typography
+                                      variant="caption"
+                                      color="text.secondary"
+                                    >
+                                      Confidence:{" "}
+                                      {Math.round(
+                                        (breakdown.confidence || 0) * 100
+                                      )}
+                                      %
+                                    </Typography>
+                                  </Paper>
+                                </Grid>
+                              )
+                            )}
+                          </Grid>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* 2. Executive Summary */}
+                    <Card sx={{ mb: 3 }}>
+                      <CardContent>
+                        <Typography variant="h6" gutterBottom>
+                          Executive Summary
+                        </Typography>
+                        <Typography variant="body1" sx={{ mb: 2 }}>
+                          {summary.executive_summary}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+
+                    {/* 3. Key Risk Items */}
+                    {Array.isArray(summary.key_risks) &&
+                      summary.key_risks.length > 0 && (
+                        <Card sx={{ mb: 3 }}>
+                          <CardContent>
+                            <Typography variant="h6" gutterBottom>
+                              Key Risk Items
+                            </Typography>
+                            <Accordion>
+                              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                                <Typography variant="subtitle2">
+                                  Show/Hide Key Risks
+                                </Typography>
+                              </AccordionSummary>
+                              <AccordionDetails>
+                                <TableContainer
+                                  component={Paper}
+                                  variant="outlined"
+                                >
+                                  <Table size="small">
+                                    <TableHead>
+                                      <TableRow>
+                                        <TableCell>Risk Type</TableCell>
+                                        <TableCell>Description</TableCell>
+                                        <TableCell>Severity</TableCell>
+                                        <TableCell>Recommendations</TableCell>
+                                      </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                      {summary.key_risks.map(
+                                        (risk: any, idx: number) => (
+                                          <TableRow key={idx}>
+                                            <TableCell>
+                                              {risk.risk_type}
+                                            </TableCell>
+                                            <TableCell>
+                                              {risk.description}
+                                            </TableCell>
+                                            <TableCell>
+                                              <Chip
+                                                label={risk.severity?.toUpperCase()}
+                                                color={
+                                                  risk.severity === "high"
+                                                    ? "error"
+                                                    : risk.severity === "medium"
+                                                    ? "warning"
+                                                    : "success"
+                                                }
+                                                size="small"
+                                              />
+                                            </TableCell>
+                                            <TableCell>
+                                              {Array.isArray(
+                                                risk.recommendations
+                                              )
+                                                ? risk.recommendations.join(
+                                                    ", "
+                                                  )
+                                                : "-"}
+                                            </TableCell>
+                                          </TableRow>
+                                        )
+                                      )}
+                                    </TableBody>
+                                  </Table>
+                                </TableContainer>
+                              </AccordionDetails>
+                            </Accordion>
+                          </CardContent>
+                        </Card>
+                      )}
+
+                    {/* 4. Financial Health */}
+                    {summary.financial_health && (
+                      <Card sx={{ mb: 3 }}>
+                        <CardContent>
+                          <Box display="flex" alignItems="center" mb={2}>
+                            <DollarSign size={20} style={{ marginRight: 8 }} />
+                            <Typography variant="h6">
+                              Financial Health
+                            </Typography>
+                            <Chip
+                              label={summary.financial_health.status?.toUpperCase()}
+                              color={
+                                summary.financial_health.status === "critical"
+                                  ? "error"
+                                  : summary.financial_health.status ===
+                                    "concerning"
+                                  ? "warning"
+                                  : "success"
+                              }
+                              sx={{ ml: 2 }}
+                            />
+                          </Box>
+                          <TableContainer component={Paper} variant="outlined">
+                            <Table size="small">
+                              <TableHead>
+                                <TableRow>
+                                  <TableCell>Indicator</TableCell>
+                                  <TableCell>Value</TableCell>
+                                  <TableCell>Status</TableCell>
+                                </TableRow>
+                              </TableHead>
+                              <TableBody>
+                                {Array.isArray(
+                                  summary.financial_health.indicators
+                                ) &&
+                                summary.financial_health.indicators.length >
+                                  0 ? (
+                                  summary.financial_health.indicators.map(
+                                    (indicator: any, idx: number) => (
+                                      <TableRow key={idx}>
+                                        <TableCell>
+                                          {indicator.indicator}
+                                        </TableCell>
+                                        <TableCell>{indicator.value}</TableCell>
+                                        <TableCell>
+                                          <Chip
+                                            label={indicator.status?.toUpperCase()}
+                                            color={
+                                              indicator.status === "negative"
+                                                ? "error"
+                                                : indicator.status === "neutral"
+                                                ? "warning"
+                                                : "success"
+                                            }
+                                            size="small"
+                                          />
+                                        </TableCell>
+                                      </TableRow>
+                                    )
+                                  )
+                                ) : (
+                                  <TableRow>
+                                    <TableCell colSpan={3} align="center">
+                                      No indicators found.
+                                    </TableCell>
+                                  </TableRow>
+                                )}
+                              </TableBody>
+                            </Table>
+                          </TableContainer>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* 5. Compliance Status */}
+                    {summary.compliance_status && (
+                      <Card sx={{ mb: 3 }}>
+                        <CardContent>
+                          <Box display="flex" alignItems="center" mb={2}>
+                            <Shield size={20} style={{ marginRight: 8 }} />
+                            <Typography variant="h6">
+                              Compliance Status
+                            </Typography>
+                            <Chip
+                              label={summary.compliance_status.overall?.toUpperCase()}
+                              color={
+                                summary.compliance_status.overall ===
+                                "compliant"
+                                  ? "default"
+                                  : summary.compliance_status.overall ===
+                                    "partial"
+                                  ? "warning"
+                                  : "error"
+                              }
+                              sx={{ ml: 2 }}
+                            />
+                            <Typography
+                              variant="body2"
+                              color="text.secondary"
+                              ml={2}
+                            >
+                              {summary.compliance_status.overall === "compliant"
+                                ? "Compliant (coming soon)"
+                                : summary.compliance_status.overall?.replace(
+                                    "_",
+                                    " "
+                                  )}
+                            </Typography>
+                          </Box>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Gemini Key Findings and Recommendations */}
+                    {Array.isArray(summary.key_findings) &&
+                      summary.key_findings.length > 0 && (
+                        <Card
+                          sx={{
+                            mb: 3,
+                            borderLeft: "6px solid #673ab7",
+                            background: "#f8f6ff",
+                          }}
+                        >
+                          <CardContent>
+                            <Box display="flex" alignItems="center" mb={1}>
+                              <StarsIcon sx={{ color: "#673ab7", mr: 1 }} />
+                              <Typography
+                                variant="h6"
+                                color="primary"
+                                fontWeight={700}
+                              >
+                                Gemini Key Findings
+                              </Typography>
+                            </Box>
+                            <List>
+                              {summary.key_findings.map(
+                                (finding: string, idx: number) => (
+                                  <ListItem key={idx}>
+                                    <ListItemIcon>
+                                      <StarsIcon sx={{ color: "#9575cd" }} />
+                                    </ListItemIcon>
+                                    <ListItemText primary={finding} />
+                                  </ListItem>
+                                )
+                              )}
+                            </List>
+                          </CardContent>
+                        </Card>
+                      )}
+                    {Array.isArray(summary.recommendations) &&
+                      summary.recommendations.length > 0 && (
+                        <Card
+                          sx={{
+                            mb: 3,
+                            borderLeft: "6px solid #1976d2",
+                            background: "#f3f8ff",
+                          }}
+                        >
+                          <CardContent>
+                            <Box display="flex" alignItems="center" mb={1}>
+                              <StarsIcon sx={{ color: "#1976d2", mr: 1 }} />
+                              <Typography
+                                variant="h6"
+                                color="primary"
+                                fontWeight={700}
+                              >
+                                Gemini Recommendations
+                              </Typography>
+                            </Box>
+                            <List>
+                              {summary.recommendations.map(
+                                (rec: string, idx: number) => (
+                                  <ListItem key={idx}>
+                                    <ListItemIcon>
+                                      <StarsIcon sx={{ color: "#64b5f6" }} />
+                                    </ListItemIcon>
+                                    <ListItemText primary={rec} />
+                                  </ListItem>
+                                )
+                              )}
+                            </List>
+                          </CardContent>
+                        </Card>
+                      )}
+                  </Box>
+                ) : null}
+              </Box>
+            )}
           </CardContent>
         </Card>
       </Grow>
@@ -538,7 +961,7 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {searchResults.map((item, index) => (
+                    {searchResults.map((item: any, index: number) => (
                       <TableRow key={index}>
                         <TableCell>
                           <Chip

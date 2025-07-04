@@ -456,4 +456,38 @@ async def root():
             "generate": "/generate",
             "analyze_company": "/analyze_company"
         }
+    }
+
+async def generate_findings_and_recommendations(classification_results, company_name):
+    """Use Gemini to generate key findings and recommendations."""
+    if not client or not api_key or not model:
+        raise ValueError("Gemini client not configured")
+
+    # Combine document titles + summaries into one string
+    docs_text = "\n".join(
+        f"- {doc.get('title', '')}: {doc.get('summary', '')}"
+        for doc in classification_results[:10]  # limit for context
+    )
+
+    prompt = f"""
+Actúa como un analista de riesgos D&O para la empresa {company_name}.
+Con base en los siguientes documentos clasificados, identifica:
+
+1. Hallazgos clave relevantes para riesgos legales, financieros, regulatorios, o de operación.
+2. Recomendaciones para directivos o aseguradores de la empresa.
+
+DOCUMENTOS:
+{docs_text}
+
+Responde en formato JSON:
+{{
+  "key_findings": ["...", "..."],
+  "recommendations": ["...", "..."]
+}}
+"""
+
+    response = await generate_text(prompt)
+    return _extract_json_from_response(response) or {
+        "key_findings": [],
+        "recommendations": []
     } 

@@ -98,6 +98,28 @@ class ManagementSummarizer:
                 company_name, classification_results, include_evidence, language
             )
             summary["method"] = "cloud_gemini_analysis"
+            # --- Enrich summary with Gemini-generated findings and recommendations ---
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.post(
+                        f"{self.gemini_service_url}/generate_findings_and_recommendations",
+                        json={
+                            "classification_results": classification_results,
+                            "company_name": company_name
+                        }
+                    )
+                    if response.status_code == 200:
+                        findings_recs = response.json()
+                        summary["key_findings"] = findings_recs.get("key_findings", [])
+                        summary["recommendations"] = findings_recs.get("recommendations", [])
+                    else:
+                        logger.warning(f"Gemini findings/recs failed: {response.text}")
+                        summary["key_findings"] = []
+                        summary["recommendations"] = []
+            except Exception as e:
+                logger.warning(f"Failed to enrich summary with Gemini findings/recs: {e}")
+                summary["key_findings"] = []
+                summary["recommendations"] = []
         except Exception as e:
             logger.warning(
                 f"Cloud summary failed for {company_name}: {e}, "
