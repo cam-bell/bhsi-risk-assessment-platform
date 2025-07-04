@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Box,
   Card,
@@ -21,6 +21,8 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Button,
+  Fade,
 } from "@mui/material";
 import {
   AlertTriangle,
@@ -33,6 +35,14 @@ import {
 } from "lucide-react";
 import { useGetManagementSummaryMutation } from "../store/api/analyticsApi";
 import { useCompanies } from "../context/CompaniesContext";
+import SummaryHeader from "./ManagementSummary/SummaryHeader";
+import ExecutiveSummaryCard from "./ManagementSummary/ExecutiveSummaryCard";
+import RiskBreakdownGrid from "./ManagementSummary/RiskBreakdownGrid";
+import FinancialHealthPanel from "./ManagementSummary/FinancialHealthPanel";
+import KeyFindingsList from "./ManagementSummary/KeyFindingsList";
+import RecommendationsChecklist from "./ManagementSummary/RecommendationsChecklist";
+import KeyRisksPanel from "./ManagementSummary/KeyRisksPanel";
+import ComplianceStatusPanel from "./ManagementSummary/ComplianceStatusPanel";
 
 const StatusIcon: React.FC<{
   status?:
@@ -85,18 +95,34 @@ const SeverityChip: React.FC<{ severity?: "low" | "medium" | "high" }> = ({
   );
 };
 
-const ManagementSummary: React.FC = () => {
+const LANGUAGES = [
+  { code: "es", label: "Español" },
+  { code: "en", label: "English" },
+];
+
+const ManagementSummary: React.FC<{
+  companyName: string;
+  language: string;
+  languages: { code: string; label: string }[];
+  onLanguageChange: (lang: string) => void;
+}> = ({ companyName, language, languages, onLanguageChange }) => {
   const { selectedCompany } = useCompanies();
   const [getManagementSummary, { data: summary, isLoading, error }] =
     useGetManagementSummaryMutation();
 
   useEffect(() => {
-    if (selectedCompany) {
+    if (companyName) {
       getManagementSummary({
-        company_name: selectedCompany,
+        company_name: companyName,
+        language,
       });
     }
-  }, [selectedCompany, getManagementSummary]);
+  }, [companyName, language, getManagementSummary]);
+
+  // Print/export handler (bonus)
+  const handlePrint = () => {
+    window.print();
+  };
 
   if (isLoading) {
     return (
@@ -114,8 +140,7 @@ const ManagementSummary: React.FC = () => {
   if (error) {
     return (
       <Alert severity="error" sx={{ mb: 2 }}>
-        Error loading management summary for {selectedCompany}. Please try
-        again.
+        Error loading management summary for {companyName}. Please try again.
       </Alert>
     );
   }
@@ -123,216 +148,64 @@ const ManagementSummary: React.FC = () => {
   if (!summary) {
     return (
       <Alert severity="info" sx={{ mb: 2 }}>
-        No management summary available for {selectedCompany}.
+        No management summary available for {companyName}.
       </Alert>
     );
   }
 
   return (
-    <Box>
-      {/* Header */}
-      <Box mb={3}>
-        <Typography variant="h4" fontWeight="bold" gutterBottom>
-          Management Summary
-        </Typography>
-        <Typography variant="body2" color="text.secondary" gutterBottom>
-          {summary.company_name} • Generated{" "}
-          {summary.generated_at
-            ? new Date(summary.generated_at).toLocaleString()
-            : "-"}
-        </Typography>
+    <Fade in timeout={600}>
+      <Box>
+        {/* Header Section with language toggle and print/export */}
+        <SummaryHeader
+          companyName={companyName}
+          overallRisk={summary.overall_risk}
+          generatedAt={summary.generated_at}
+          method={summary.method}
+          language={language}
+          onLanguageChange={onLanguageChange}
+          languages={languages}
+          onPrint={handlePrint}
+        />
+
+        <Grid container spacing={3}>
+          {/* Executive Summary */}
+          <Grid item xs={12}>
+            <ExecutiveSummaryCard summary={summary.executive_summary} />
+          </Grid>
+
+          {/* Risk Breakdown */}
+          <Grid item xs={12}>
+            <RiskBreakdownGrid riskBreakdown={summary.risk_breakdown} />
+          </Grid>
+
+          {/* Financial Health & Key Risks */}
+          <Grid item xs={12} md={6}>
+            <FinancialHealthPanel financialHealth={summary.financial_health} />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <KeyRisksPanel keyRisks={summary.key_risks} />
+          </Grid>
+
+          {/* Key Findings & Recommendations */}
+          <Grid item xs={12} md={6}>
+            <KeyFindingsList keyFindings={summary.key_findings} />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <RecommendationsChecklist
+              recommendations={summary.recommendations}
+            />
+          </Grid>
+
+          {/* Compliance Status */}
+          <Grid item xs={12}>
+            <ComplianceStatusPanel
+              complianceStatus={summary.compliance_status}
+            />
+          </Grid>
+        </Grid>
       </Box>
-
-      <Grid container spacing={3}>
-        {/* Executive Summary */}
-        <Grid item xs={12}>
-          <Card>
-            <CardContent>
-              <Box display="flex" alignItems="center" mb={2}>
-                <FileText size={20} style={{ marginRight: 8 }} />
-                <Typography variant="h6">Executive Summary</Typography>
-              </Box>
-              <Typography variant="body1" sx={{ lineHeight: 1.6 }}>
-                {summary.executive_summary || "-"}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Key Risks */}
-        <Grid item xs={12} md={6}>
-          <Card>
-            <CardContent>
-              <Box display="flex" alignItems="center" mb={2}>
-                <AlertTriangle size={20} style={{ marginRight: 8 }} />
-                <Typography variant="h6">Key Risks</Typography>
-              </Box>
-              <Stack spacing={2}>
-                {summary.key_risks?.length ? (
-                  summary.key_risks.map((risk, index) => (
-                    <Box key={index}>
-                      <Box
-                        display="flex"
-                        justifyContent="space-between"
-                        alignItems="center"
-                        mb={1}
-                      >
-                        <Typography variant="subtitle2" fontWeight="medium">
-                          {risk.risk_type}
-                        </Typography>
-                        <SeverityChip severity={risk.severity} />
-                      </Box>
-                      <Typography variant="body2" color="text.secondary" mb={1}>
-                        {risk.description}
-                      </Typography>
-                      <List dense>
-                        {risk.recommendations?.map((rec, recIndex) => (
-                          <ListItem key={recIndex} sx={{ py: 0.5 }}>
-                            <ListItemIcon sx={{ minWidth: 20 }}>
-                              <Info size={12} color="#2196f3" />
-                            </ListItemIcon>
-                            <ListItemText
-                              primary={rec}
-                              primaryTypographyProps={{ variant: "caption" }}
-                            />
-                          </ListItem>
-                        ))}
-                      </List>
-                      {index < summary.key_risks.length - 1 && (
-                        <Divider sx={{ mt: 2 }} />
-                      )}
-                    </Box>
-                  ))
-                ) : (
-                  <Typography variant="body2" color="text.secondary">
-                    No key risks found.
-                  </Typography>
-                )}
-              </Stack>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Financial Health */}
-        <Grid item xs={12} md={6}>
-          <Card>
-            <CardContent>
-              <Box display="flex" alignItems="center" mb={2}>
-                <DollarSign size={20} style={{ marginRight: 8 }} />
-                <Typography variant="h6">Financial Health</Typography>
-              </Box>
-              <Box display="flex" alignItems="center" mb={2}>
-                <StatusIcon status={summary.financial_health?.status} />
-                <Typography variant="subtitle1" fontWeight="medium" ml={1}>
-                  {summary.financial_health?.status?.toUpperCase() || "-"}
-                </Typography>
-              </Box>
-              <TableContainer component={Paper} variant="outlined">
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Indicator</TableCell>
-                      <TableCell>Value</TableCell>
-                      <TableCell>Status</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {summary.financial_health?.indicators?.length ? (
-                      summary.financial_health.indicators.map(
-                        (indicator, index) => (
-                          <TableRow key={index}>
-                            <TableCell>
-                              <Typography variant="body2">
-                                {indicator.indicator}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              <Typography variant="body2" fontWeight="medium">
-                                {indicator.value}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              <Box display="flex" alignItems="center">
-                                <StatusIcon status={indicator.status} />
-                                <Typography variant="body2" ml={0.5}>
-                                  {indicator.status?.toUpperCase()}
-                                </Typography>
-                              </Box>
-                            </TableCell>
-                          </TableRow>
-                        )
-                      )
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={3} align="center">
-                          No indicators found.
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Compliance Status */}
-        <Grid item xs={12}>
-          <Card>
-            <CardContent>
-              <Box display="flex" alignItems="center" mb={2}>
-                <Shield size={20} style={{ marginRight: 8 }} />
-                <Typography variant="h6">Compliance Status</Typography>
-              </Box>
-              <Box display="flex" alignItems="center" mb={2}>
-                <StatusIcon status={summary.compliance_status?.overall} />
-                <Typography variant="subtitle1" fontWeight="medium" ml={1}>
-                  Overall:{" "}
-                  {summary.compliance_status?.overall
-                    ?.replace("_", " ")
-                    .toUpperCase() || "-"}
-                </Typography>
-              </Box>
-              <Grid container spacing={2}>
-                {summary.compliance_status?.areas?.length ? (
-                  summary.compliance_status.areas.map((area, index) => (
-                    <Grid item xs={12} md={6} key={index}>
-                      <Paper variant="outlined" sx={{ p: 2 }}>
-                        <Box
-                          display="flex"
-                          justifyContent="space-between"
-                          alignItems="center"
-                          mb={1}
-                        >
-                          <Typography variant="subtitle2" fontWeight="medium">
-                            {area.area}
-                          </Typography>
-                          <Box display="flex" alignItems="center">
-                            <StatusIcon status={area.status} />
-                            <Typography variant="caption" ml={0.5}>
-                              {area.status?.replace("_", " ").toUpperCase()}
-                            </Typography>
-                          </Box>
-                        </Box>
-                        <Typography variant="body2" color="text.secondary">
-                          {area.details}
-                        </Typography>
-                      </Paper>
-                    </Grid>
-                  ))
-                ) : (
-                  <Grid item xs={12}>
-                    <Typography variant="body2" color="text.secondary">
-                      No compliance areas found.
-                    </Typography>
-                  </Grid>
-                )}
-              </Grid>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-    </Box>
+    </Fade>
   );
 };
 

@@ -115,3 +115,15 @@ wheels/
 .installed.cfg
 *.egg
 MANIFEST
+
+# Additional files and folders
+venv/
+.ipynb_checkpoints/
+package-lock.json
+bhsi-frontend/package-lock.json
+bhsi-frontend/test-integration.html
+bhsi-backend/search_results.json
+# Ignore Jupyter notebooks if not needed
+*.ipynb
+# Ignore Markdown summaries if not needed
+*SUMMARY.md

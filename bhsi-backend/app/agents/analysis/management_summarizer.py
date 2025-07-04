@@ -9,6 +9,9 @@ import httpx
 from typing import Dict, Any, List
 from datetime import datetime
 from app.agents.search.streamlined_yahoo_finance_agent import StreamlinedYahooFinanceAgent
+import hashlib
+import json
+from app.agents.analytics.cache_manager import AnalyticsCacheManager
 
 logger = logging.getLogger(__name__)
 
@@ -67,59 +70,88 @@ class ManagementSummarizer:
                 ]
             }
         }
+        
+        # English templates for different risk scenarios
+        self.english_templates = {
+            "high_risk": {
+                "summary": (
+                    "Significant risks have been identified that require immediate "
+                    "attention from management."
+                ),
+                "recommendations": [
+                    "Immediately review compliance procedures",
+                    "Consult with the legal department",
+                    "Implement additional monitoring measures"
+                ]
+            },
+            "medium_risk": {
+                "summary": (
+                    "Some irregularities have been detected that require "
+                    "follow-up and supervision."
+                ),
+                "recommendations": [
+                    "Establish regular monitoring of the situation",
+                    "Review related internal policies",
+                    "Maintain communication with legal advisors"
+                ]
+            },
+            "low_risk": {
+                "summary": (
+                    "No significant risks have been identified in the "
+                    "current analysis."
+                ),
+                "recommendations": [
+                    "Continue routine monitoring",
+                    "Keep compliance policies up to date"
+                ]
+            }
+        }
+        
+        # Initialize cache manager (in-memory, 24h TTL)
+        self.cache_manager = AnalyticsCacheManager(default_ttl_hours=24)
     
     async def generate_summary(
         self, 
         company_name: str, 
         classification_results: List[Dict[str, Any]],
         include_evidence: bool = True,
-        language: str = "es"
+        language: str = "es",
+        force_refresh: bool = False
     ) -> Dict[str, Any]:
         """
-        Generate comprehensive management summary
-        
-        Args:
-            company_name: Name of the company
-            classification_results: List of classified documents/results
-            include_evidence: Whether to include evidence details
-            language: Language for the summary (es/en)
-            
-        Returns:
-            Dict containing the management summary
+        Generate comprehensive management summary using Gemini for all major output sections.
+        Fallback to templates only if Gemini fails.
         """
-        
-        # --- Integrate Yahoo Finance Agent for financial health ---
+        # --- Caching logic ---
+        input_hash = hashlib.sha256(json.dumps({
+            "company_name": company_name,
+            "classification_results": classification_results,
+            "include_evidence": include_evidence,
+            "language": language
+        }, sort_keys=True, default=str).encode()).hexdigest()
+        cache_key_args = {
+            "company_name": company_name,
+            "language": language,
+            "include_evidence": include_evidence,
+            "input_hash": input_hash
+        }
+        if not force_refresh:
+            cached = self.cache_manager.get("management_summary", **cache_key_args)
+            if cached:
+                logger.info(f"Returning cached management summary for {company_name} [{language}]")
+                return cached
+
         financial_health = await self._get_financial_health(company_name)
-        # ---
         try:
-            # Try cloud-based summary first
             logger.info(f"Attempting cloud summary for {company_name}")
             summary = await self._cloud_gemini_summary(
                 company_name, classification_results, include_evidence, language
             )
             summary["method"] = "cloud_gemini_analysis"
-            # --- Enrich summary with Gemini-generated findings and recommendations ---
-            try:
-                async with httpx.AsyncClient(timeout=30.0) as client:
-                    response = await client.post(
-                        f"{self.gemini_service_url}/generate_findings_and_recommendations",
-                        json={
-                            "classification_results": classification_results,
-                            "company_name": company_name
-                        }
-                    )
-                    if response.status_code == 200:
-                        findings_recs = response.json()
-                        summary["key_findings"] = findings_recs.get("key_findings", [])
-                        summary["recommendations"] = findings_recs.get("recommendations", [])
-                    else:
-                        logger.warning(f"Gemini findings/recs failed: {response.text}")
-                        summary["key_findings"] = []
-                        summary["recommendations"] = []
-            except Exception as e:
-                logger.warning(f"Failed to enrich summary with Gemini findings/recs: {e}")
-                summary["key_findings"] = []
-                summary["recommendations"] = []
+            self.cache_manager.set(
+                "management_summary", summary, **cache_key_args
+            )
+            logger.info("Gemini summary generated and cached.")
         except Exception as e:
             logger.warning(
                 f"Cloud summary failed for {company_name}: {e}, "
@@ -129,7 +161,9 @@ class ManagementSummarizer:
                 company_name, classification_results, include_evidence, language
             )
             summary["method"] = "template_analysis"
-        # --- Always include financial_health, key_risks, compliance_status ---
+            logger.info("Template summary generated.")
+
+        # Ensure all fields are present in the summary dict
         summary["financial_health"] = financial_health
         summary["key_risks"] = self._extract_key_risks(classification_results)
         summary["compliance_status"] = self._default_compliance_status()
@@ -142,41 +176,54 @@ class ManagementSummarizer:
         include_evidence: bool,
         language: str
     ) -> Dict[str, Any]:
-        """Generate summary using Cloud Gemini service"""
-        
-        # Prepare data for Gemini analysis
-        company_data = {
+        """Generate summary using Cloud Gemini service for all major output sections"""
+        # Build structured risk breakdown
+        risk_breakdown = self._build_risk_breakdown(classification_results, include_evidence)
+        # Compose system-level prompt
+        system_prompt = (
+            "You are a risk analyst generating executive summaries for companies based on automated risk classification data. "
+            "Given the risk breakdown (legal, financial, etc.), with level, reasoning, and evidence, generate:\n"
+            "1. A concise executive summary.\n"
+            "2. A list of key findings (bullet points).\n"
+            "3. A list of recommendations tailored to the company's risk profile.\n\n"
+            "Output JSON with keys:\n"
+            "- executive_summary\n"
+            "- key_findings\n"
+            "- recommendations\n\n"
+            f"Language: {language}\n"
+        )
+        payload = {
             "company_name": company_name,
-            "classification_results": classification_results,
-            "total_documents": len(classification_results),
-            "risk_distribution": self._calculate_risk_distribution(
-                classification_results
-            )
+            "language": language,
+            "risk_breakdown": risk_breakdown
         }
-        
-        # Call Gemini service for company analysis
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
-                f"{self.gemini_service_url}/analyze_company",
+                f"{self.gemini_service_url}/generate",
                 json={
-                    "company_name": company_name,
-                    "company_data": company_data,
-                    "analysis_type": "management_summary"
+                    "prompt": system_prompt + json.dumps(payload, ensure_ascii=False),
+                    "max_tokens": 1200,
+                    "temperature": 0.2
                 }
             )
-            
             if response.status_code != 200:
                 raise Exception(
                     f"Gemini service returned {response.status_code}: "
                     f"{response.text}"
                 )
-            
             gemini_result = response.json()
-            
-            # Transform Gemini result to our format
-            return self._transform_gemini_result(
-                gemini_result, classification_results, include_evidence
-            )
+            # Parse Gemini response for required fields
+            if not all(k in gemini_result for k in ["executive_summary", "key_findings", "recommendations"]):
+                raise Exception("Gemini response missing required fields")
+            return {
+                "company_name": company_name,
+                "overall_risk": self._analyze_risk_levels(classification_results)["overall_risk"],
+                "executive_summary": gemini_result["executive_summary"],
+                "risk_breakdown": risk_breakdown,
+                "key_findings": gemini_result["key_findings"],
+                "recommendations": gemini_result["recommendations"],
+                "generated_at": datetime.utcnow().isoformat()
+            }
     
     def _template_summary(
         self, 
@@ -185,35 +232,30 @@ class ManagementSummarizer:
         include_evidence: bool,
         language: str
     ) -> Dict[str, Any]:
-        """Generate summary using templates"""
-        
-        # Analyze risk distribution
+        """Generate summary using templates (fallback only)"""
         risk_analysis = self._analyze_risk_levels(classification_results)
         overall_risk = risk_analysis["overall_risk"]
-        
-        # Get template based on risk level
-        if overall_risk == "red":
-            template = self.spanish_templates["high_risk"]
-        elif overall_risk == "orange":
-            template = self.spanish_templates["medium_risk"] 
+        # Select template set based on language
+        if language == "es":
+            templates = self.spanish_templates
+        elif language == "en":
+            templates = self.english_templates
         else:
-            template = self.spanish_templates["low_risk"]
-        
-        # Build risk breakdown
-        risk_breakdown = {}
-        for category in ["legal", "financial", "regulatory", "operational"]:
-            risk_breakdown[category] = self._analyze_category_risk(
-                classification_results, category, include_evidence
-            )
-        
-        # Generate key findings
+            raise ValueError(f"Unsupported language: {language}")
+        if overall_risk == "red":
+            template = templates["high_risk"]
+        elif overall_risk == "orange":
+            template = templates["medium_risk"]
+        else:
+            template = templates["low_risk"]
+        risk_breakdown = self._build_risk_breakdown(classification_results, include_evidence)
         key_findings = self._extract_key_findings(classification_results)
-        
         return {
             "company_name": company_name,
             "overall_risk": overall_risk,
             "executive_summary": (
-                f"Análisis de riesgo para {company_name}: {template['summary']}"
+                (f"Análisis de riesgo para {company_name}: {template['summary']}" if language == "es"
+                 else f"Risk analysis for {company_name}: {template['summary']}")
             ),
             "risk_breakdown": risk_breakdown,
             "key_findings": key_findings,
@@ -377,40 +419,14 @@ class ManagementSummarizer:
         
         return findings[:5]  # Limit to top 5 findings
     
-    def _transform_gemini_result(
-        self, 
-        gemini_result: Dict[str, Any], 
-        classification_results: List[Dict[str, Any]],
-        include_evidence: bool
-    ) -> Dict[str, Any]:
-        """Transform Gemini result to our standard format"""
-        
-        risk_assessment = gemini_result.get("risk_assessment", {})
-        
-        # Map Gemini risk levels to our format
+    def _build_risk_breakdown(self, classification_results, include_evidence):
+        # Build risk breakdown for all categories
         risk_breakdown = {}
         for category in ["legal", "financial", "regulatory", "operational"]:
-            gemini_level = risk_assessment.get(category, "green")
-            risk_breakdown[category] = {
-                "level": gemini_level,
-                "reasoning": f"Análisis automático de {category} mediante IA",
-                "evidence": [],
-                "confidence": 0.92
-            }
-        
-        return {
-            "company_name": gemini_result.get("company_name", ""),
-            "overall_risk": risk_assessment.get("overall", "green"),
-            "executive_summary": gemini_result.get("analysis_summary", ""),
-            "risk_breakdown": risk_breakdown,
-            "key_findings": self._extract_key_findings(classification_results),
-            "recommendations": [
-                "Revisar el análisis detallado con el equipo legal",
-                "Implementar medidas de seguimiento continuo",
-                "Evaluar el impacto en la estrategia de negocio"
-            ],
-            "generated_at": datetime.utcnow().isoformat()
-        }
+            risk_breakdown[category] = self._analyze_category_risk(
+                classification_results, category, include_evidence
+            )
+        return risk_breakdown
     
     async def health_check(self) -> Dict[str, Any]:
         """Check health of management summarizer components"""

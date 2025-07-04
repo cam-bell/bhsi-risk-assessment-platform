@@ -116,6 +116,12 @@ class BOEDocumentProcessor:
             # Parse publication date
             pub_date = self._parse_pub_date(item.get("fecha_publicacion"))
             
+            # Determine risk_label (you may need to add logic to extract or classify it)
+            risk_label = item.get("risk_label")
+            if not risk_label:
+                # Fallback or classification logic here if needed
+                risk_label = "Unknown"
+            
             # Create event
             event = events.create_from_raw(
                 db,
@@ -125,7 +131,8 @@ class BOEDocumentProcessor:
                 text=text,
                 section=section,
                 pub_date=pub_date,
-                url=item.get("url_html", "")
+                url=item.get("url_html", ""),
+                alerted=risk_label in ["High-Legal", "High-Reg"]
             )
             
             return event
@@ -341,6 +348,12 @@ class EventNormalizer:
             except Exception:
                 pass
 
+        # Determine risk_label (you may need to add logic to extract or classify it)
+        risk_label = item.get("risk_label")
+        if not risk_label:
+            # Fallback or classification logic here if needed
+            risk_label = "Unknown"
+
         # Create event
         from app.crud.events import events
         event = events.create_from_raw(
@@ -351,7 +364,8 @@ class EventNormalizer:
             text=text,
             section=section,
             pub_date=parsed_date,
-            url=url
+            url=url,
+            alerted=risk_label in ["High-Legal", "High-Reg"]
         )
         return event
 

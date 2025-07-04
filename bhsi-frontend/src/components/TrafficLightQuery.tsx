@@ -47,6 +47,7 @@ import {
   useSearchCompanyMutation,
   SearchResponse,
 } from "../store/api/riskAssessmentApi";
+import { useGetManagementSummaryMutation } from "../store/api/analyticsApi";
 
 // Type for API response
 export interface TrafficLightResponse {
@@ -147,7 +148,13 @@ const RSS_FEEDS = [
   { value: "europapress", label: "Europa Press" },
 ];
 
-const TrafficLightQuery = () => {
+interface TrafficLightQueryProps {
+  onRiskResult?: (company: string, executiveSummary: string) => void;
+}
+
+const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
+  onRiskResult,
+}) => {
   const { user } = useAuth();
   const { addAssessedCompany } = useCompanies();
   const [query, setQuery] = useState("");
@@ -171,6 +178,7 @@ const TrafficLightQuery = () => {
 
   // RTK Query hook for API calls
   const [searchCompany, { isLoading }] = useSearchCompanyMutation();
+  const [getManagementSummary] = useGetManagementSummaryMutation();
 
   // Helper function to format date to YYYY-MM-DD
   const formatDateToYYYYMMDD = (date: Date): string => {
@@ -301,6 +309,20 @@ const TrafficLightQuery = () => {
             legal: trafficLightResult.blocks.legal,
           },
         });
+      }
+
+      // Fetch executive summary (only executive_summary field)
+      if (onRiskResult) {
+        try {
+          const summary = await getManagementSummary({
+            company_name: trafficLightResult.company,
+            classification_results: searchResponse.results,
+            language: "es",
+          }).unwrap();
+          onRiskResult(trafficLightResult.company, summary.executive_summary);
+        } catch (summaryErr) {
+          onRiskResult(trafficLightResult.company, "");
+        }
       }
     } catch (err: any) {
       console.error("Search error:", err);

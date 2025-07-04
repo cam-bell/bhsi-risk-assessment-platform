@@ -97,6 +97,7 @@ export interface CompanyComparisonResponse {
 export interface ManagementSummaryRequest {
   company_name: string;
   classification_results?: any[]; // Allow sending classified results
+  language?: string; // Add language toggle support
 }
 
 export interface ManagementSummaryResponse {

@@ -117,6 +117,7 @@ class BigQuerySchemaManager:
             bigquery.SchemaField("processing_time_ms", "FLOAT64", mode="NULLABLE"),
             bigquery.SchemaField("embedding_status", "STRING", mode="NULLABLE"),
             bigquery.SchemaField("embedding_model", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("alerted", "BOOLEAN", mode="NULLABLE"),
         ]
     
     def get_raw_docs_table_schema(self) -> List[bigquery.SchemaField]:

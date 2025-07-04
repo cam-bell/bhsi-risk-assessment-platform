@@ -86,6 +86,10 @@ class Settings(BaseSettings):
     def is_bigquery_enabled(self) -> bool:
         return self.USE_BIGQUERY
     
+    # New additions
+    GCP_PROJECT_ID: str = "solid-topic-443216-b2"  # From settings
+    BIGQUERY_DATASET_ID: str = "risk_monitoring"  # Your dataset
+    
     class Config:
         case_sensitive = True
         env_file = ".env"

@@ -331,9 +331,13 @@ async def get_company_analytics(identifier: str) -> CompanyAnalyticsResponse:
         
         # Alert summary
         alert_summary = {
-            "total_alerts": sum(1 for event in latest_events if event.get("alerted")),
-            "high_risk_events": len([e for e in latest_events if e.get("risk_label") == "HIGH"]),
-            "last_alert": max([e.get("pub_date") for e in latest_events if e.get("alerted")], default=None)
+            "total_alerts": sum(1 for e in latest_events if e.get("alerted")),
+            "high_risk_alerts": sum(
+                1 for e in latest_events if e.get("risk_label") == "High-Legal" and e.get("alerted")
+            ),
+            "last_alert": max(
+                (e.get("pub_date") for e in latest_events if e.get("alerted")), default=None
+            )
         }
         
         return CompanyAnalyticsResponse(
@@ -367,7 +371,7 @@ async def get_risk_trends():
             source,
             COUNT(*) as event_count,
             COUNT(DISTINCT vat) as unique_companies,
-            SUM(CASE WHEN alerted THEN 1 ELSE 0 END) as alerts_triggered
+            COUNTIF(alerted = TRUE) as alerts_triggered
         FROM `{project_id}.{dataset_id}.events`
         WHERE pub_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 90 DAY)
         GROUP BY DATE(pub_date), risk_label, source

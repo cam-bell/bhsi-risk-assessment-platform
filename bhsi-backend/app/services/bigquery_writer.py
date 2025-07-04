@@ -179,6 +179,7 @@ if __name__ == "__main__":
             self.embedding = "done"
             self.embedding_model = "test-embedding"
             self.risk_label = "High-Legal"
+            self.alerted = self.risk_label in ["High-Legal", "High-Reg"]
             self.rationale = "Test rationale."
             self.confidence = 0.95
             self.classifier_ts = datetime.utcnow()

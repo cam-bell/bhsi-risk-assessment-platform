@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, Date, Text, Float
+from sqlalchemy import Column, String, DateTime, Date, Text, Float, Boolean
 from sqlalchemy.sql import func
 from app.db.base import Base
 import enum
@@ -37,6 +37,9 @@ class Event(Base):
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Alert status
+    alerted = Column(Boolean, default=None)
     
     def __repr__(self):
         return f"<Event(event_id={self.event_id}, risk_label={self.risk_label}, title={self.title[:50]}...)>" 

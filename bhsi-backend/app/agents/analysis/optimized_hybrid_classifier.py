@@ -285,16 +285,24 @@ class OptimizedHybridClassifier:
     def get_performance_stats(self) -> Dict[str, Any]:
         """Get classification performance statistics"""
         total = self.stats["total_classifications"]
+        keyword_hits = self.stats["keyword_hits"]
+        llm_calls = self.stats["llm_calls"]
         if total == 0:
-            return {"message": "No classifications performed yet"}
-        
-        keyword_rate = (self.stats["keyword_hits"] / total) * 100
-        llm_rate = (self.stats["llm_calls"] / total) * 100
-        
+            return {
+                "total_classifications": 0,
+                "keyword_hits": 0,
+                "llm_calls": 0,
+                "keyword_efficiency": "0.0%",
+                "llm_usage": "0.0%",
+                "performance_gain": "0.0% faster than LLM-only",
+                "expected_speed": "90%+ handled by µ-second keyword gate"
+            }
+        keyword_rate = (keyword_hits / total) * 100
+        llm_rate = (llm_calls / total) * 100
         return {
             "total_classifications": total,
-            "keyword_hits": self.stats["keyword_hits"],
-            "llm_calls": self.stats["llm_calls"],
+            "keyword_hits": keyword_hits,
+            "llm_calls": llm_calls,
             "keyword_efficiency": f"{keyword_rate:.1f}%",
             "llm_usage": f"{llm_rate:.1f}%",
             "performance_gain": f"{100 - llm_rate:.1f}% faster than LLM-only",

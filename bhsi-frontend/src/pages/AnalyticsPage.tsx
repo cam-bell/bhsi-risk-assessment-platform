@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Card,
@@ -12,9 +12,9 @@ import {
   Alert,
   Tooltip,
   Avatar,
-  InputAdornment,
-  Autocomplete,
+  CircularProgress,
   TextField,
+  Container,
 } from "@mui/material";
 import {
   BarChart3,
@@ -22,26 +22,37 @@ import {
   TrendingUp,
   GitCompare,
   Building2,
-  Shield,
-  Activity,
-  Users,
-  Search,
 } from "lucide-react";
-import CompanyAnalyticsDashboard from "../components/CompanyAnalyticsDashboard";
 import ManagementSummary from "../components/ManagementSummary";
-import RiskTrendsChart from "../components/RiskTrendsChart";
-import CompanyComparison from "../components/CompanyComparison";
-import CompanySearchBar from "../components/CompanySearchBar";
+import { useLocation } from "react-router-dom";
 
-interface TabPanelProps {
+// Placeholder components for tabs
+const CompanyAnalyticsDashboard = ({
+  analyticsData,
+}: {
+  analyticsData: any;
+}) => (
+  <Box p={2}>
+    <Typography>Company Analytics (Coming soon)</Typography>
+  </Box>
+);
+const RiskTrendsChart = () => (
+  <Box p={2}>
+    <Typography>Risk Trends (Coming soon)</Typography>
+  </Box>
+);
+const CompanyComparison = () => (
+  <Box p={2}>
+    <Typography>Company Comparison (Coming soon)</Typography>
+  </Box>
+);
+
+function TabPanel(props: {
   children?: React.ReactNode;
   index: number;
   value: number;
-}
-
-function TabPanel(props: TabPanelProps) {
+}) {
   const { children, value, index, ...other } = props;
-
   return (
     <div
       role="tabpanel"
@@ -55,31 +66,43 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
+const LANGUAGES = [
+  { code: "es", label: "Español" },
+  { code: "en", label: "English" },
+];
+
 const AnalyticsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [selectedCompany, setSelectedCompany] = useState("");
   const [analyticsData, setAnalyticsData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [language, setLanguage] = useState("es");
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const companyFromUrl = params.get("company") || "";
 
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
-    setActiveTab(newValue);
-  };
+  // Fetch analytics data on mount if company param exists
+  useEffect(() => {
+    if (companyFromUrl) {
+      setSelectedCompany(companyFromUrl);
+      fetchAnalytics(companyFromUrl);
+    }
+    // eslint-disable-next-line
+  }, [companyFromUrl]);
 
-  const handleCompanyInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSelectedCompany(e.target.value);
-  };
-
-  const fetchAnalytics = async () => {
+  // Fetch analytics data (simulate /analysis?company=...)
+  const fetchAnalytics = async (company: string) => {
     setLoading(true);
     setError(null);
     setAnalyticsData(null);
     try {
-      const response = await fetch(
-        `/api/v1/companies/${encodeURIComponent(
-          selectedCompany
-        )}/analytics?include_trends=true&include_sectors=false`
-      );
+      // Replace with your real API endpoint
+      const response = await fetch(`/api/v1/analysis/management-summary`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ company_name: company, language }),
+      });
       if (!response.ok) throw new Error("Failed to fetch analytics");
       const data = await response.json();
       setAnalyticsData(data);
@@ -90,40 +113,25 @@ const AnalyticsPage: React.FC = () => {
     }
   };
 
-  const analyticsFeatures = [
-    {
-      title: "Company Analytics",
-      description:
-        "Comprehensive risk analysis and insights for individual companies",
-      icon: Building2,
-      color: "#2196f3",
-    },
-    {
-      title: "Management Summary",
-      description:
-        "Executive summaries with key risks, financial health, and compliance status",
-      icon: FileText,
-      color: "#4caf50",
-    },
-    {
-      title: "Risk Trends",
-      description:
-        "System-wide risk trends, sector insights, and risk factor analysis",
-      icon: TrendingUp,
-      color: "#ff9800",
-    },
-    {
-      title: "Company Comparison",
-      description:
-        "Compare risk profiles across multiple companies side by side",
-      icon: GitCompare,
-      color: "#9c27b0",
-    },
-  ];
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setActiveTab(newValue);
+  };
+
+  const handleCompanyInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSelectedCompany(e.target.value);
+  };
+
+  const handleAnalyze = () => {
+    if (selectedCompany.trim()) {
+      fetchAnalytics(selectedCompany.trim());
+    }
+  };
+
+  // Sticky language toggle + print/export for ManagementSummary
+  const [printAnchor, setPrintAnchor] = useState<HTMLDivElement | null>(null);
 
   return (
-    <Box>
-      {/* Header */}
+    <Container maxWidth="lg" sx={{ py: 4 }}>
       <Box mb={2}>
         <Typography variant="h3" fontWeight="bold" gutterBottom>
           Analytics Dashboard
@@ -131,17 +139,6 @@ const AnalyticsPage: React.FC = () => {
         <Typography variant="body1" color="text.secondary">
           Comprehensive risk analytics and insights for informed decision making
         </Typography>
-      </Box>
-      {/* Summary Banner */}
-      <Box mb={3}>
-        <Card sx={{ background: "#f5f7fa", boxShadow: 0 }}>
-          <CardContent>
-            <Typography variant="subtitle1" color="primary" fontWeight="medium">
-              Select a company and explore its analytics, management summary,
-              risk trends, and comparisons using the tabs below.
-            </Typography>
-          </CardContent>
-        </Card>
       </Box>
       <Box display="flex" gap={2} mb={2}>
         <TextField
@@ -152,31 +149,29 @@ const AnalyticsPage: React.FC = () => {
         />
         <Button
           variant="contained"
-          onClick={fetchAnalytics}
+          onClick={handleAnalyze}
           disabled={!selectedCompany.trim() || loading}
         >
-          {loading ? "Loading..." : "Load Analytics"}
+          {analyticsData ? "Refresh Analysis" : "Analyze Company"}
         </Button>
       </Box>
-      {analyticsData && (
-        <Card sx={{ mb: 3, background: "#e3f2fd" }}>
-          <CardContent sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <Avatar sx={{ bgcolor: "primary.main", width: 48, height: 48 }}>
-              <Building2 size={28} />
-            </Avatar>
-            <Box>
-              <Typography variant="h6" fontWeight="bold">
-                {analyticsData.company_name}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Analytics loaded. Explore tabs for more insights.
-              </Typography>
-            </Box>
-          </CardContent>
-        </Card>
+      {loading && (
+        <Box
+          display="flex"
+          justifyContent="center"
+          alignItems="center"
+          minHeight={200}
+        >
+          <CircularProgress />
+        </Box>
       )}
-      {/* Analytics Tabs */}
-      <Paper sx={{ width: "100%" }}>
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          {error}
+        </Alert>
+      )}
+      {/* Tabs Layout */}
+      <Paper sx={{ width: "100%", mt: 2 }}>
         <Tabs
           value={activeTab}
           onChange={handleTabChange}
@@ -237,32 +232,63 @@ const AnalyticsPage: React.FC = () => {
           </Tooltip>
         </Tabs>
         <TabPanel value={activeTab} index={0}>
-          <Box sx={{ minHeight: 400, p: 2 }}>
-            <CompanyAnalyticsDashboard
-              analyticsData={analyticsData}
-              loading={loading}
-              error={error}
-              companyName={selectedCompany}
-            />
-          </Box>
+          <CompanyAnalyticsDashboard analyticsData={analyticsData} />
         </TabPanel>
         <TabPanel value={activeTab} index={1}>
-          <Box sx={{ minHeight: 400, p: 2 }}>
-            <ManagementSummary />
+          {/* Sticky language toggle + print/export */}
+          <Box
+            sx={{
+              position: "sticky",
+              top: 0,
+              zIndex: 10,
+              bgcolor: "background.paper",
+              py: 2,
+              mb: 2,
+              borderBottom: 1,
+              borderColor: "divider",
+            }}
+            ref={setPrintAnchor}
+          >
+            <Box display="flex" alignItems="center" gap={2}>
+              <Tabs
+                value={language}
+                onChange={(_, val) => setLanguage(val)}
+                aria-label="language toggle"
+                sx={{ minHeight: 36 }}
+              >
+                {LANGUAGES.map((lang) => (
+                  <Tab
+                    key={lang.code}
+                    value={lang.code}
+                    label={lang.label}
+                    sx={{ minWidth: 100 }}
+                  />
+                ))}
+              </Tabs>
+              <Button
+                variant="outlined"
+                onClick={() => window.print()}
+                sx={{ ml: 2 }}
+              >
+                Print / Export
+              </Button>
+            </Box>
           </Box>
+          <ManagementSummary
+            companyName={selectedCompany}
+            language={language}
+            onLanguageChange={setLanguage}
+            languages={LANGUAGES}
+          />
         </TabPanel>
         <TabPanel value={activeTab} index={2}>
-          <Box sx={{ minHeight: 400, p: 2 }}>
-            <RiskTrendsChart />
-          </Box>
+          <RiskTrendsChart />
         </TabPanel>
         <TabPanel value={activeTab} index={3}>
-          <Box sx={{ minHeight: 400, p: 2 }}>
-            <CompanyComparison />
-          </Box>
+          <CompanyComparison />
         </TabPanel>
       </Paper>
-    </Box>
+    </Container>
   );
 };
 

@@ -23,7 +23,8 @@ class CRUDEvent:
         text: str,
         section: Optional[str] = None,
         pub_date: Optional[date] = None,
-        url: Optional[str] = None
+        url: Optional[str] = None,
+        alerted: Optional[bool] = None
     ) -> Any:
         """Create event from raw document data"""
         event_id = f"{source}:{raw_id}"
@@ -38,7 +39,8 @@ class CRUDEvent:
             source=source,
             section=section,
             pub_date=pub_date,
-            url=url
+            url=url,
+            alerted=alerted
         )
         db.add(db_obj)
         db.commit()

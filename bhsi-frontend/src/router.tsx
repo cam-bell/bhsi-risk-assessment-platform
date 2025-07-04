@@ -10,6 +10,7 @@ import BatchUploadPage from "./pages/BatchUploadPage";
 import AssessmentHistoryPage from "./pages/AssessmentHistoryPage";
 import SettingsPage from "./pages/SettingsPage";
 import HelpPage from "./pages/HelpPage";
+import CompanyAnalyticsDashboardWrapper from "./components/CompanyAnalyticsDashboardWrapper";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated } = useAuth();
@@ -90,6 +91,16 @@ export const RouterConfig = () => {
           <ProtectedRoute>
             <Layout currentPage="help">
               <HelpPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/companies/:companyName/analytics"
+        element={
+          <ProtectedRoute>
+            <Layout currentPage="analytics">
+              <CompanyAnalyticsDashboardWrapper />
             </Layout>
           </ProtectedRoute>
         }

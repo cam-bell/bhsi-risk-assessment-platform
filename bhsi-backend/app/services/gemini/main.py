@@ -8,6 +8,7 @@ from typing import Optional, Dict, Any
 import google.generativeai as genai
 from tenacity import retry, stop_after_attempt, wait_exponential
 import anyio
+import ast
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -259,20 +260,39 @@ Responde SOLO en formato JSON:
         logger.error(f"Traceback: {traceback.format_exc()}")
         raise
 
-def _extract_json_from_response(response: str) -> Optional[Dict[str, Any]]:
-    """Extract JSON from Gemini response."""
-    import json
+def _extract_json_from_response(response: str):
+    """Extract JSON from Gemini response, with leniency for common LLM mistakes."""
     import re
-    
     try:
         # Try to find JSON in the response
         json_match = re.search(r'\{.*\}', response, re.DOTALL)
         if json_match:
             json_str = json_match.group()
-            return json.loads(json_str)
-        
+            try:
+                return json.loads(json_str)
+            except Exception:
+                pass
         # Try parsing the whole response as JSON
-        return json.loads(response)
+        try:
+            return json.loads(response)
+        except Exception:
+            pass
+        # If it looks like JSON but isn't, try to fix common issues
+        if "key_findings" in response and "recommendations" in response:
+            try:
+                return json.loads(response)
+            except Exception:
+                # Try to fix quotes
+                fixed = response.replace(""", '"').replace(""", '"').replace("'", '"')
+                try:
+                    return json.loads(fixed)
+                except Exception:
+                    # Last resort: try ast.literal_eval
+                    try:
+                        return ast.literal_eval(response)
+                    except Exception:
+                        pass
+        return None
     except Exception as e:
         logger.warning(f"Failed to parse JSON from response: {e}")
         return None
@@ -479,14 +499,16 @@ Con base en los siguientes documentos clasificados, identifica:
 DOCUMENTOS:
 {docs_text}
 
-Responde en formato JSON:
+Tu salida DEBE estar en JSON estricto, con dos arrays de texto plano:
 {{
-  "key_findings": ["...", "..."],
-  "recommendations": ["...", "..."]
+  "key_findings": ["Resumen legal...", "Riesgo regulatorio..."],
+  "recommendations": ["Considerar una auditoría interna...", "Revisar estructura societaria..."]
 }}
+No incluyas texto fuera de este objeto JSON.
 """
 
     response = await generate_text(prompt)
+    logger.debug(f"Gemini raw response: {response}")
     return _extract_json_from_response(response) or {
         "key_findings": [],
         "recommendations": []

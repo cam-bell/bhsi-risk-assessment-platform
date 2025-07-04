@@ -3,10 +3,7 @@ fastapi>=0.111.0,<0.112.0
 uvicorn[standard]>=0.30.0,<0.31.0
 
 # Google Cloud BigQuery
-google-cloud-bigquery>=3.4.0,<4.0.0
-
-# HTTP client
-httpx>=0.28.0
+google-cloud-bigquery>=3.11.4
 
 # infra / helpers
 tenacity==8.2.3

@@ -1,8 +1,7 @@
 import pytest
-from typing import Dict, List
 from app.agents.analysis.optimized_hybrid_classifier import OptimizedHybridClassifier
+from app.agents.analysis.management_summarizer import ManagementSummarizer
 from app.agents.search.streamlined_orchestrator import StreamlinedSearchOrchestrator
-import asyncio
 
 
 @pytest.fixture
@@ -111,3 +110,66 @@ async def test_classification_speed(hybrid_classifier):
     
     stats = hybrid_classifier.get_performance_stats()
     assert stats["keyword_efficiency"] != "0.0%"  # Should have some keyword hits 
+
+
+@pytest.mark.asyncio
+async def test_management_summary_language_templates():
+    summarizer = ManagementSummarizer()
+    # Spanish (es) high risk
+    classification_results = [
+        {"risk_level": "High-Legal", "title": "Sanción grave", "summary": "Multa importante"}
+    ]
+    summary_es = await summarizer.generate_summary(
+        company_name="TestCorp",
+        classification_results=classification_results,
+        include_evidence=True,
+        language="es"
+    )
+    # Accept either template or cloud output: check company name and Spanish keywords
+    assert "TestCorp" in summary_es["executive_summary"]
+    assert any(word in summary_es["executive_summary"].lower() for word in ["riesgo", "empresa", "evaluación"])
+    assert summary_es["method"] in ("cloud_gemini_analysis", "template_analysis")
+
+    # English (en) high risk
+    summary_en = await summarizer.generate_summary(
+        company_name="TestCorp",
+        classification_results=classification_results,
+        include_evidence=True,
+        language="en"
+    )
+    # Only check company name and non-empty summary for English
+    assert "TestCorp" in summary_en["executive_summary"]
+    assert summary_en["executive_summary"].strip() != ""
+    assert summary_en["method"] in ("cloud_gemini_analysis", "template_analysis")
+
+    # Spanish (es) low risk
+    classification_results = [
+        {"risk_level": "No-Legal", "title": "Noticia positiva", "summary": "Sin incidencias"}
+    ]
+    summary_es_low = await summarizer.generate_summary(
+        company_name="TestCorp",
+        classification_results=classification_results,
+        include_evidence=True,
+        language="es"
+    )
+    assert "TestCorp" in summary_es_low["executive_summary"]
+    assert any(word in summary_es_low["executive_summary"].lower() for word in ["riesgo", "empresa", "evaluación"])
+
+    # English (en) low risk
+    summary_en_low = await summarizer.generate_summary(
+        company_name="TestCorp",
+        classification_results=classification_results,
+        include_evidence=True,
+        language="en"
+    )
+    assert "TestCorp" in summary_en_low["executive_summary"]
+    assert summary_en_low["executive_summary"].strip() != ""
+
+    # Unsupported language
+    with pytest.raises(ValueError):
+        await summarizer.generate_summary(
+            company_name="TestCorp",
+            classification_results=classification_results,
+            include_evidence=True,
+            language="fr"
+        ) 

@@ -1,33 +1,50 @@
-import { Box, Container, Typography, useMediaQuery, AppBar, Toolbar, Button } from '@mui/material';
-import { useTheme } from '@mui/material/styles';
-import { LogOut } from 'lucide-react';
-import { useAuth } from '../auth/useAuth';
-import TrafficLightQuery from '../components/TrafficLightQuery';
+import {
+  Box,
+  Container,
+  Typography,
+  useMediaQuery,
+  AppBar,
+  Toolbar,
+  Button,
+} from "@mui/material";
+import { useTheme } from "@mui/material/styles";
+import { LogOut } from "lucide-react";
+import { useAuth } from "../auth/useAuth";
+import TrafficLightQuery from "../components/TrafficLightQuery";
+import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import ExecutiveSummaryCard from "../components/ManagementSummary/ExecutiveSummaryCard";
 
 const LandingPage = () => {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const { user, logout } = useAuth();
-  
+  const navigate = useNavigate();
+  const [executiveSummary, setExecutiveSummary] = useState<string | null>(null);
+  const [companyName, setCompanyName] = useState<string>("");
+
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+    <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
       {/* Header/Nav */}
       <AppBar position="static" color="primary" elevation={0}>
         <Toolbar>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             BHSI Traffic Light
           </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Typography variant="body2" sx={{ mr: 2, display: { xs: 'none', sm: 'block' } }}>
-              {user?.name || 'User'}
+          <Box sx={{ display: "flex", alignItems: "center" }}>
+            <Typography
+              variant="body2"
+              sx={{ mr: 2, display: { xs: "none", sm: "block" } }}
+            >
+              {user?.name || "User"}
             </Typography>
-            <Button 
-              color="inherit" 
+            <Button
+              color="inherit"
               onClick={logout}
               startIcon={<LogOut size={18} />}
-              size={isMobile ? 'small' : 'medium'}
+              size={isMobile ? "small" : "medium"}
             >
-              {isMobile ? '' : 'Sign Out'}
+              {isMobile ? "" : "Sign Out"}
             </Button>
           </Box>
         </Toolbar>
@@ -36,21 +53,21 @@ const LandingPage = () => {
       {/* Hero Section */}
       <Box
         sx={{
-          bgcolor: 'primary.main',
-          color: 'white',
+          bgcolor: "primary.main",
+          color: "white",
           py: { xs: 6, md: 10 },
-          backgroundImage: 'linear-gradient(to bottom right, #003366, #00508F)',
+          backgroundImage: "linear-gradient(to bottom right, #003366, #00508F)",
         }}
       >
         <Container maxWidth="lg">
-          <Box sx={{ maxWidth: 800, mx: 'auto', textAlign: 'center' }}>
+          <Box sx={{ maxWidth: 800, mx: "auto", textAlign: "center" }}>
             <Typography
               variant="h2"
               component="h1"
               gutterBottom
               sx={{
                 fontWeight: 700,
-                fontSize: { xs: '2rem', sm: '2.5rem', md: '3rem' },
+                fontSize: { xs: "2rem", sm: "2.5rem", md: "3rem" },
               }}
             >
               BHSI Traffic Light Scoring System
@@ -60,11 +77,12 @@ const LandingPage = () => {
               sx={{
                 mb: 4,
                 opacity: 0.9,
-                fontSize: { xs: '1.1rem', sm: '1.25rem' },
+                fontSize: { xs: "1.1rem", sm: "1.25rem" },
                 fontWeight: 400,
               }}
             >
-              Supporting Spanish D&O policy decisions with data-driven risk assessment
+              Supporting Spanish D&O policy decisions with data-driven risk
+              assessment
             </Typography>
           </Box>
         </Container>
@@ -78,20 +96,40 @@ const LandingPage = () => {
             variant="h4"
             component="h2"
             gutterBottom
-            sx={{ mb: 3, textAlign: { xs: 'center', md: 'left' } }}
+            sx={{ mb: 3, textAlign: { xs: "center", md: "left" } }}
           >
             Company Risk Assessment
           </Typography>
-          <Typography
-            variant="body1"
-            paragraph
-            sx={{ mb: 4, maxWidth: 800 }}
-          >
-            Enter a company name or VAT number to receive an instant risk assessment based on our proprietary algorithm analyzing turnover, shareholding structure, bankruptcy history, and legal issues.
+          <Typography variant="body1" paragraph sx={{ mb: 4, maxWidth: 800 }}>
+            Enter a company name or VAT number to receive an instant risk
+            assessment based on our proprietary algorithm analyzing turnover,
+            shareholding structure, bankruptcy history, and legal issues.
           </Typography>
-          <TrafficLightQuery />
+          <TrafficLightQuery
+            onRiskResult={(company, executiveSummary) => {
+              setCompanyName(company);
+              setExecutiveSummary(executiveSummary);
+            }}
+          />
         </Box>
       </Container>
+
+      {/* After risk result */}
+      {executiveSummary && (
+        <Box mt={4}>
+          <ExecutiveSummaryCard summary={executiveSummary} />
+          <Button
+            variant="contained"
+            color="primary"
+            sx={{ mt: 2 }}
+            onClick={() =>
+              navigate(`/analytics?company=${encodeURIComponent(companyName)}`)
+            }
+          >
+            View Full Summary in Analytics
+          </Button>
+        </Box>
+      )}
 
       {/* Footer */}
       <Box
@@ -99,14 +137,15 @@ const LandingPage = () => {
         sx={{
           py: 3,
           px: 2,
-          mt: 'auto',
+          mt: "auto",
           backgroundColor: theme.palette.grey[100],
           borderTop: `1px solid ${theme.palette.grey[300]}`,
         }}
       >
         <Container maxWidth="lg">
           <Typography variant="body2" color="text.secondary" align="center">
-            © {new Date().getFullYear()} Berkshire Hathaway Specialty Insurance. All rights reserved.
+            © {new Date().getFullYear()} Berkshire Hathaway Specialty Insurance.
+            All rights reserved.
           </Typography>
         </Container>
       </Box>
