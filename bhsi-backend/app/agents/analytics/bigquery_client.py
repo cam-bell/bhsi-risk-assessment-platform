@@ -59,7 +59,7 @@ class BigQueryClient:
         days_back: int = 30
     ) -> Dict[str, Any]:
         """
-        Get comprehensive analytics for a company
+        Get comprehensive analytics for a company using actual BigQuery schema
         
         Args:
             company_name: Name of the company to analyze
@@ -69,34 +69,16 @@ class BigQueryClient:
             if not self.client:
                 return self._get_fallback_analytics(company_name)
                 
-            # Query for company events using exact schema
-            query = f"""
-            WITH company_events AS (
-                SELECT 
-                    e.*,
-                    c.name as company_name,
-                    c.sector,
-                    c.vat
-                FROM `{self.project_id}.{self.dataset_id}.events` e
-                LEFT JOIN `{self.project_id}.{self.dataset_id}.companies` c
-                    ON e.vat = c.vat
-                WHERE 
-                    LOWER(c.name) LIKE LOWER(@company_name)
-                    AND e.pub_date >= TIMESTAMP_SUB(
-                        CURRENT_TIMESTAMP(), 
-                        INTERVAL @days INTEGER DAY
-                    )
-            )
-            SELECT
-                ANY_VALUE(company_name) as company_name,
-                ANY_VALUE(vat) as vat,
-                ANY_VALUE(sector) as sector,
-                COUNT(*) as total_events,
-                COUNTIF(risk_label = 'HIGH') as high_risk_count,
-                COUNTIF(risk_label = 'MEDIUM') as medium_risk_count,
-                COUNTIF(risk_label = 'LOW') as low_risk_count
-            FROM company_events
-            GROUP BY vat
+            # First, find the company by name to get its ID
+            company_query = f"""
+            SELECT 
+                id,
+                name,
+                vat_number,
+                sector
+            FROM `{self.project_id}.{self.dataset_id}.companies`
+            WHERE LOWER(name) LIKE LOWER(@company_name)
+            LIMIT 1
             """
             
             job_config = bigquery.QueryJobConfig(
@@ -106,21 +88,23 @@ class BigQueryClient:
                         "STRING", 
                         f"%{company_name}%"
                     ),
-                    bigquery.ScalarQueryParameter("days", "INT64", days_back),
                 ]
             )
             
-            query_job = self.client.query(query, job_config=job_config)
-            results = list(query_job.result())
+            company_job = self.client.query(company_query, job_config=job_config)
+            company_results = list(company_job.result())
             
-            if not results:
-                logger.warning(f"No data found for company: {company_name}")
+            if not company_results:
+                logger.warning(f"No company found for: {company_name}")
                 return self._get_fallback_analytics(company_name)
                 
-            row = results[0]
+            company = company_results[0]
+            company_id = company.id
             
-            # Get latest events in separate query
-            latest_query = f"""
+            # Get events for this company using the actual schema
+            # Note: In the events table, we might need to join differently
+            # Let's assume events are linked by some company identifier
+            events_query = f"""
             SELECT 
                 event_id,
                 title,
@@ -129,49 +113,61 @@ class BigQueryClient:
                 section,
                 pub_date,
                 url,
-                embedding,
-                embedding_model,
                 risk_label,
                 rationale,
                 confidence,
-                classifier_ts
-            FROM `{self.project_id}.{self.dataset_id}.events` e
-            JOIN `{self.project_id}.{self.dataset_id}.companies` c
-                ON e.vat = c.vat
-            WHERE LOWER(c.name) LIKE LOWER(@company_name)
-            ORDER BY pub_date DESC, classifier_ts DESC
-            LIMIT 10
+                classifier_ts,
+                alerted
+            FROM `{self.project_id}.{self.dataset_id}.events`
+            WHERE pub_date >= TIMESTAMP_SUB(
+                CURRENT_TIMESTAMP(), 
+                INTERVAL @days INTEGER DAY
+            )
+            AND (
+                LOWER(title) LIKE LOWER(@company_name_search) OR
+                LOWER(text) LIKE LOWER(@company_name_search)
+            )
+            ORDER BY pub_date DESC
+            LIMIT 50
             """
             
-            latest_job = self.client.query(
-                latest_query, 
-                job_config=bigquery.QueryJobConfig(
-                    query_parameters=[
-                        bigquery.ScalarQueryParameter(
-                            "company_name", 
-                            "STRING", 
-                            f"%{company_name}%"
-                        ),
-                    ]
-                )
+            events_job_config = bigquery.QueryJobConfig(
+                query_parameters=[
+                    bigquery.ScalarQueryParameter("days", "INT64", days_back),
+                    bigquery.ScalarQueryParameter(
+                        "company_name_search", 
+                        "STRING", 
+                        f"%{company_name}%"
+                    ),
+                ]
             )
             
+            events_job = self.client.query(events_query, job_config=events_job_config)
+            events_results = list(events_job.result())
+            
+            # Count risk levels
+            high_risk_count = sum(1 for e in events_results if e.risk_label == 'HIGH')
+            medium_risk_count = sum(1 for e in events_results if e.risk_label == 'MEDIUM') 
+            low_risk_count = sum(1 for e in events_results if e.risk_label == 'LOW')
+            
+            # Format events
             latest_events = [{
                 "event_id": event.event_id,
                 "title": event.title,
-                "text": event.text,
+                "text": event.text[:500] if event.text else "",  # Truncate for response
                 "source": event.source,
                 "section": event.section,
                 "pub_date": event.pub_date.isoformat() if event.pub_date else None,
                 "url": event.url,
                 "risk_label": event.risk_label,
                 "rationale": event.rationale,
-                "confidence": event.confidence,
+                "confidence": float(event.confidence) if event.confidence else None,
                 "classifier_ts": (
                     event.classifier_ts.isoformat() 
                     if event.classifier_ts else None
-                )
-            } for event in latest_job.result()]
+                ),
+                "alerted": bool(event.alerted) if event.alerted is not None else False
+            } for event in events_results[:10]]  # Limit to top 10
             
             # Get assessment data if available
             assessment_query = f"""
@@ -182,9 +178,10 @@ class BigQueryClient:
                 legal,
                 corruption,
                 overall,
-                analysis_summary
-            FROM `{self.project_id}.{self.dataset_id}.assessment` a
-            WHERE company_id = @vat
+                analysis_summary,
+                created_at
+            FROM `{self.project_id}.{self.dataset_id}.assessment`
+            WHERE company_id = @company_id
             ORDER BY created_at DESC
             LIMIT 1
             """
@@ -193,7 +190,7 @@ class BigQueryClient:
                 assessment_query,
                 job_config=bigquery.QueryJobConfig(
                     query_parameters=[
-                        bigquery.ScalarQueryParameter("vat", "STRING", row.vat),
+                        bigquery.ScalarQueryParameter("company_id", "STRING", company_id),
                     ]
                 )
             )
@@ -202,16 +199,25 @@ class BigQueryClient:
             assessment = assessment_results[0] if assessment_results else None
             
             return {
-                "company_name": row.company_name,
-                "vat": row.vat,
-                "sector": row.sector,
-                "total_events": row.total_events,
+                "company_name": company.name,
+                "company_id": company_id,
+                "vat_number": company.vat_number,
+                "sector": company.sector,
+                "total_events": len(events_results),
                 "risk_distribution": {
-                    "HIGH": row.high_risk_count,
-                    "MEDIUM": row.medium_risk_count,
-                    "LOW": row.low_risk_count
+                    "HIGH": high_risk_count,
+                    "MEDIUM": medium_risk_count,
+                    "LOW": low_risk_count
                 },
                 "latest_events": latest_events,
+                "alert_summary": {
+                    "total_alerts": sum(1 for e in events_results if e.alerted),
+                    "high_risk_events": high_risk_count,
+                    "last_alert": max(
+                        (e.pub_date.isoformat() for e in events_results if e.alerted and e.pub_date),
+                        default=None
+                    )
+                },
                 "assessment": {
                     "turnover": assessment.turnover if assessment else None,
                     "shareholding": assessment.shareholding if assessment else None,
@@ -219,14 +225,18 @@ class BigQueryClient:
                     "legal": assessment.legal if assessment else None,
                     "corruption": assessment.corruption if assessment else None,
                     "overall": assessment.overall if assessment else None,
-                    "summary": (
-                        assessment.analysis_summary if assessment else None
+                    "summary": assessment.analysis_summary if assessment else None,
+                    "last_updated": (
+                        assessment.created_at.isoformat() 
+                        if assessment and assessment.created_at else None
                     )
                 } if assessment else None
             }
                     
         except Exception as e:
             logger.error(f"BigQuery analytics error for {company_name}: {e}")
+            import traceback
+            traceback.print_exc()
             return self._get_fallback_analytics(company_name)
     
     async def get_risk_trends(self, days_back: int = 90) -> Dict[str, Any]:

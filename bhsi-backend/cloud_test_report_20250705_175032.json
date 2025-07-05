@@ -1,0 +1,225 @@
+{
+  "timestamp": "2025-07-05 17:49:48.127467",
+  "tests": {
+    "gemini_health": {
+      "success": true,
+      "data": {
+        "status": "healthy",
+        "api_key_configured": true,
+        "model_available": true,
+        "model_name": "gemini-1.5-pro",
+        "test_response": "OK"
+      },
+      "response_time": 8.71865177154541,
+      "timestamp": "2025-07-05 17:49:56.847993"
+    },
+    "embedder_health": {
+      "success": true,
+      "data": {
+        "status": "healthy",
+        "api_key_configured": true,
+        "model_available": true,
+        "embedding_dimension": 768
+      },
+      "response_time": 8.070576906204224,
+      "timestamp": "2025-07-05 17:50:04.919187"
+    },
+    "vector_search_health": {
+      "success": true,
+      "data": {
+        "status": "healthy",
+        "embedder_service": true,
+        "vector_store": "ready",
+        "documents_count": 0
+      },
+      "response_time": 4.112786293029785,
+      "timestamp": "2025-07-05 17:50:09.032668"
+    },
+    "bigquery_health": {
+      "success": true,
+      "data": {
+        "status": "healthy",
+        "bigquery_connected": true,
+        "dataset": "solid-topic-443216-b2 DATASET_ID=bhsi_analytics.bhsi_analytics",
+        "table_counts": {
+          "table_0_error": "'dict' object has no attribute 'count'",
+          "table_1_error": "'dict' object has no attribute 'count'",
+          "table_2_error": "'dict' object has no attribute 'count'"
+        }
+      },
+      "response_time": 4.0872743129730225,
+      "timestamp": "2025-07-05 17:50:13.120456"
+    },
+    "gemini_scenario_1": {
+      "success": false,
+      "data": null,
+      "response_time": null,
+      "timestamp": "2025-07-05 17:50:14.552687"
+    },
+    "gemini_scenario_2": {
+      "success": false,
+      "data": null,
+      "response_time": null,
+      "timestamp": "2025-07-05 17:50:15.609192"
+    },
+    "gemini_scenario_3": {
+      "success": false,
+      "data": null,
+      "response_time": null,
+      "timestamp": "2025-07-05 17:50:16.928903"
+    },
+    "embedder_test_1": {
+      "success": true,
+      "data": {
+        "text_sample": "Banco Santander riesgo regulat...",
+        "embedding_dimension": 768,
+        "quality_check": true
+      },
+      "response_time": 1.4576070308685303,
+      "timestamp": "2025-07-05 17:50:18.390103"
+    },
+    "embedder_test_2": {
+      "success": true,
+      "data": {
+        "text_sample": "BBVA financial performance ana...",
+        "embedding_dimension": 768,
+        "quality_check": true
+      },
+      "response_time": 1.2685911655426025,
+      "timestamp": "2025-07-05 17:50:19.659877"
+    },
+    "embedder_test_3": {
+      "success": true,
+      "data": {
+        "text_sample": "Telef\u00f3nica telecommunications ...",
+        "embedding_dimension": 768,
+        "quality_check": true
+      },
+      "response_time": 1.6510670185089111,
+      "timestamp": "2025-07-05 17:50:21.311747"
+    },
+    "embedder_test_4": {
+      "success": true,
+      "data": {
+        "text_sample": "Repsol energy sector risk asse...",
+        "embedding_dimension": 768,
+        "quality_check": true
+      },
+      "response_time": 1.3322889804840088,
+      "timestamp": "2025-07-05 17:50:22.644599"
+    },
+    "bigquery_banco_santander": {
+      "success": true,
+      "data": {
+        "company": "Banco Santander",
+        "total_events": 42,
+        "structure_valid": true
+      },
+      "response_time": 1.2616076469421387,
+      "timestamp": "2025-07-05 17:50:23.907728"
+    },
+    "bigquery_bbva": {
+      "success": true,
+      "data": {
+        "company": "BBVA",
+        "total_events": 42,
+        "structure_valid": true
+      },
+      "response_time": 1.1888995170593262,
+      "timestamp": "2025-07-05 17:50:25.097335"
+    },
+    "bigquery_telef\u00f3nica": {
+      "success": true,
+      "data": {
+        "company": "Telef\u00f3nica",
+        "total_events": 42,
+        "structure_valid": true
+      },
+      "response_time": 0.9621522426605225,
+      "timestamp": "2025-07-05 17:50:26.060349"
+    },
+    "bigquery_risk_trends": {
+      "success": true,
+      "data": {
+        "endpoint": "/analytics/risk-trends",
+        "data_size": 203,
+        "has_data": true
+      },
+      "response_time": 1.0145375728607178,
+      "timestamp": "2025-07-05 17:50:27.076109"
+    },
+    "bigquery_alerts": {
+      "success": true,
+      "data": {
+        "endpoint": "/analytics/alerts",
+        "data_size": 216,
+        "has_data": true
+      },
+      "response_time": 0.8544216156005859,
+      "timestamp": "2025-07-05 17:50:27.931775"
+    },
+    "bigquery_sectors": {
+      "success": true,
+      "data": {
+        "endpoint": "/analytics/sectors",
+        "data_size": 239,
+        "has_data": true
+      },
+      "response_time": 0.8075311183929443,
+      "timestamp": "2025-07-05 17:50:28.740219"
+    },
+    "bigquery_events_stats": {
+      "success": true,
+      "data": {
+        "endpoint": "/stats/events",
+        "data_size": 241,
+        "has_data": true
+      },
+      "response_time": 0.8208417892456055,
+      "timestamp": "2025-07-05 17:50:29.561994"
+    },
+    "integration_workflow": {
+      "success": true,
+      "data": {
+        "steps": {
+          "embedding": "success",
+          "classification": "failed",
+          "analytics": "success"
+        },
+        "success_rate": "2/3",
+        "has_embedding": true,
+        "has_classification": false,
+        "has_analytics": true
+      },
+      "response_time": 3.0173213481903076,
+      "timestamp": "2025-07-05 17:50:32.581477"
+    }
+  },
+  "metrics": {
+    "response_times": {
+      "gemini_health": 8.71865177154541,
+      "embedder_health": 8.070576906204224,
+      "vector_search_health": 4.112786293029785,
+      "bigquery_health": 4.0872743129730225,
+      "embedder_test_1": 1.4576070308685303,
+      "embedder_test_2": 1.2685911655426025,
+      "embedder_test_3": 1.6510670185089111,
+      "embedder_test_4": 1.3322889804840088,
+      "bigquery_banco_santander": 1.2616076469421387,
+      "bigquery_bbva": 1.1888995170593262,
+      "bigquery_telef\u00f3nica": 0.9621522426605225,
+      "bigquery_risk_trends": 1.0145375728607178,
+      "bigquery_alerts": 0.8544216156005859,
+      "bigquery_sectors": 0.8075311183929443,
+      "bigquery_events_stats": 0.8208417892456055,
+      "integration_workflow": 3.0173213481903076
+    },
+    "accuracy": {},
+    "reliability": {}
+  },
+  "summary": {
+    "total_tests": 19,
+    "passed": 16,
+    "failed": 3
+  }
+}
