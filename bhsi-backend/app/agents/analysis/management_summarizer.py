@@ -186,11 +186,21 @@ class ManagementSummarizer:
             "1. A concise executive summary.\n"
             "2. A list of key findings (bullet points).\n"
             "3. A list of recommendations tailored to the company's risk profile.\n\n"
-            "Output JSON with keys:\n"
-            "- executive_summary\n"
-            "- key_findings\n"
-            "- recommendations\n\n"
+            "IMPORTANT: You MUST respond with ONLY a valid JSON object. No additional text before or after the JSON.\n\n"
+            "Required JSON structure:\n"
+            "{\n"
+            '  "executive_summary": "A concise summary of the risk assessment in the specified language",\n'
+            '  "key_findings": ["Finding 1", "Finding 2", "Finding 3"],\n'
+            '  "recommendations": ["Recommendation 1", "Recommendation 2", "Recommendation 3"]\n'
+            "}\n\n"
             f"Language: {language}\n"
+            "Example for Spanish:\n"
+            "{\n"
+            '  "executive_summary": "Análisis de riesgo ejecutivo para la empresa",\n'
+            '  "key_findings": ["Hallazgo 1", "Hallazgo 2"],\n'
+            '  "recommendations": ["Recomendación 1", "Recomendación 2"]\n'
+            "}\n\n"
+            "Respond ONLY with the JSON object, no other text."
         )
         payload = {
             "company_name": company_name,
@@ -211,19 +221,93 @@ class ManagementSummarizer:
                     f"Gemini service returned {response.status_code}: "
                     f"{response.text}"
                 )
-            gemini_result = response.json()
-            # Parse Gemini response for required fields
-            if not all(k in gemini_result for k in ["executive_summary", "key_findings", "recommendations"]):
-                raise Exception("Gemini response missing required fields")
-            return {
-                "company_name": company_name,
-                "overall_risk": self._analyze_risk_levels(classification_results)["overall_risk"],
-                "executive_summary": gemini_result["executive_summary"],
-                "risk_breakdown": risk_breakdown,
-                "key_findings": gemini_result["key_findings"],
-                "recommendations": gemini_result["recommendations"],
-                "generated_at": datetime.utcnow().isoformat()
-            }
+            gemini_response = response.json()
+            
+            # Extract the text from Gemini response
+            generated_text = gemini_response.get("text", "")
+            if not generated_text:
+                raise Exception("Gemini returned empty response")
+            
+            # Try to extract JSON from the generated text
+            try:
+                # Look for JSON in the response text
+                gemini_result = self._extract_json_from_text(generated_text)
+                if not gemini_result:
+                    logger.warning(f"Could not extract JSON from Gemini response for {company_name}")
+                    logger.debug(f"Raw Gemini response: {generated_text[:500]}...")
+                    raise Exception("Could not extract JSON from Gemini response")
+                
+                # Validate required fields
+                required_fields = ["executive_summary", "key_findings", "recommendations"]
+                missing_fields = [field for field in required_fields if field not in gemini_result]
+                if missing_fields:
+                    logger.warning(f"Gemini response for {company_name} missing fields: {missing_fields}")
+                    logger.debug(f"Available fields: {list(gemini_result.keys())}")
+                    raise Exception(f"Gemini response missing required fields: {missing_fields}")
+                
+                logger.info(f"Successfully parsed Gemini response for {company_name}")
+                return {
+                    "company_name": company_name,
+                    "overall_risk": self._analyze_risk_levels(classification_results)["overall_risk"],
+                    "executive_summary": gemini_result["executive_summary"],
+                    "risk_breakdown": risk_breakdown,
+                    "key_findings": gemini_result["key_findings"],
+                    "recommendations": gemini_result["recommendations"],
+                    "generated_at": datetime.utcnow().isoformat()
+                }
+            except Exception as e:
+                logger.warning(f"Failed to parse Gemini JSON response for {company_name}: {e}")
+                logger.debug(f"Raw Gemini response: {generated_text[:500]}...")
+                raise Exception(f"Gemini response parsing failed: {str(e)}")
+    
+    def _extract_json_from_text(self, text: str) -> Dict[str, Any]:
+        """Extract JSON object from text response"""
+        import re
+        
+        # Try to find JSON object in the text
+        # Look for content between { and }
+        json_pattern = r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}'
+        matches = re.findall(json_pattern, text, re.DOTALL)
+        
+        logger.debug(f"Found {len(matches)} potential JSON matches in Gemini response")
+        
+        for i, match in enumerate(matches):
+            try:
+                # Clean up the JSON string
+                cleaned_json = match.strip()
+                # Remove any markdown formatting
+                if cleaned_json.startswith('```json'):
+                    cleaned_json = cleaned_json[7:]
+                if cleaned_json.endswith('```'):
+                    cleaned_json = cleaned_json[:-3]
+                cleaned_json = cleaned_json.strip()
+                
+                logger.debug(f"Attempting to parse JSON match {i+1}: {cleaned_json[:100]}...")
+                result = json.loads(cleaned_json)
+                
+                # Validate that it has the expected structure
+                if isinstance(result, dict) and any(key in result for key in ["executive_summary", "key_findings", "recommendations"]):
+                    logger.debug(f"Successfully parsed valid JSON with keys: {list(result.keys())}")
+                    return result
+                else:
+                    logger.debug(f"JSON parsed but missing expected keys: {list(result.keys()) if isinstance(result, dict) else 'not a dict'}")
+                    
+            except json.JSONDecodeError as e:
+                logger.debug(f"JSON decode error for match {i+1}: {e}")
+                continue
+        
+        # If no JSON found, try to parse the entire text as JSON
+        try:
+            logger.debug("Attempting to parse entire text as JSON")
+            result = json.loads(text.strip())
+            if isinstance(result, dict) and any(key in result for key in ["executive_summary", "key_findings", "recommendations"]):
+                logger.debug(f"Successfully parsed entire text as JSON with keys: {list(result.keys())}")
+                return result
+        except json.JSONDecodeError as e:
+            logger.debug(f"Failed to parse entire text as JSON: {e}")
+        
+        logger.warning(f"No valid JSON found in response. Text preview: {text[:200]}...")
+        return None
     
     def _template_summary(
         self, 

@@ -180,6 +180,21 @@ class BigQuerySchemaManager:
             bigquery.SchemaField("updated_at", "TIMESTAMP", mode="REQUIRED"),
         ]
     
+    def get_users_table_schema(self) -> List[bigquery.SchemaField]:
+        """Schema for users table - user authentication and authorization"""
+        return [
+            bigquery.SchemaField("user_id", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("email", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("first_name", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("last_name", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("hashed_password", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("user_type", "STRING", mode="REQUIRED"),  # "admin" or "user"
+            bigquery.SchemaField("is_active", "BOOLEAN", mode="REQUIRED"),
+            bigquery.SchemaField("created_at", "TIMESTAMP", mode="REQUIRED"),
+            bigquery.SchemaField("updated_at", "TIMESTAMP", mode="REQUIRED"),
+            bigquery.SchemaField("last_login", "TIMESTAMP", mode="NULLABLE"),
+        ]
+    
     def create_tables_if_not_exist(self) -> Dict[str, bool]:
         """Create all tables if they don't exist"""
         tables = {
@@ -188,6 +203,7 @@ class BigQuerySchemaManager:
             "events": self.get_events_table_schema(),
             "raw_docs": self.get_raw_docs_table_schema(),
             "financial_metrics": self.get_financial_metrics_table_schema(),
+            "users": self.get_users_table_schema(),
         }
         
         results = {}
@@ -207,6 +223,16 @@ class BigQuerySchemaManager:
                 
                 # Create table if it doesn't exist
                 table = self.client.create_table(table, exists_ok=True)
+                
+                # For existing users table, try to disable streaming if possible
+                if table_name == "users":
+                    try:
+                        # Note: BigQuery doesn't allow disabling streaming on existing tables
+                        # We'll need to handle this in the update logic
+                        logger.info(f"ℹ️ Users table created - streaming buffer limitations apply")
+                    except Exception as e:
+                        logger.warning(f"Could not configure streaming for {table_name}: {e}")
+                
                 results[table_name] = True
                 logger.info(f"✅ Table {table_name} ready")
                 
@@ -228,5 +254,6 @@ class BigQuerySchemaManager:
             "events": self.get_events_table_schema(),
             "raw_docs": self.get_raw_docs_table_schema(),
             "financial_metrics": self.get_financial_metrics_table_schema(),
+            "users": self.get_users_table_schema(),
         }
         return schemas.get(table_name, []) 

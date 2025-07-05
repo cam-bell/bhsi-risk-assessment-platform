@@ -108,8 +108,35 @@ class AsyncBigQueryClient:
                 if errors:
                     raise Exception(f"Insert errors: {errors}")
             elif request.operation == "upsert":
-                # Use MERGE for upsert operations
-                self._execute_upsert(table_id, request.data)
+                # For users table, use only INSERT to avoid streaming buffer issues
+                if request.table_name == "users":
+                    # Use INSERT with ignore_unknown_values to handle duplicates gracefully
+                    job_config = bigquery.LoadJobConfig(
+                        ignore_unknown_values=True,
+                        create_disposition=bigquery.CreateDisposition.CREATE_NEVER,
+                        write_disposition=bigquery.WriteDisposition.WRITE_APPEND
+                    )
+                    
+                    # Convert data to JSON for load job
+                    import json
+                    json_data = [json.dumps(row) for row in request.data]
+                    
+                    # Create a temporary file-like object
+                    from io import StringIO
+                    data_source = StringIO('\n'.join(json_data))
+                    
+                    # Load data
+                    load_job = self.client.load_table_from_file(
+                        data_source,
+                        table_id,
+                        job_config=job_config,
+                        source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON
+                    )
+                    load_job.result()  # Wait for completion
+                    
+                else:
+                    # Use MERGE for other tables
+                    self._execute_upsert(table_id, request.data)
             else:
                 raise ValueError(f"Unsupported operation: {request.operation}")
                 
@@ -195,12 +222,8 @@ class AsyncBigQueryClient:
         """
         request_id = str(uuid.uuid4())
         
-        # Add timestamps if not present
-        for row in data:
-            if "created_at" not in row:
-                row["created_at"] = datetime.utcnow().isoformat()
-            if "updated_at" not in row:
-                row["updated_at"] = datetime.utcnow().isoformat()
+        # Don't add timestamps automatically - let the caller handle them
+        # since different tables have different schema requirements
         
         request = BigQueryWriteRequest(
             table_name=table_name,
@@ -297,20 +320,13 @@ class AsyncBigQueryClient:
         docs_rows = []
         for doc in raw_docs_data:
             doc_row = {
-                "doc_id": doc.get("doc_id", str(uuid.uuid4())),
+                "raw_id": doc.get("raw_id", str(uuid.uuid4())),
                 "source": doc["source"],
-                "source_name": doc.get("source_name"),
-                "raw_payload": json.dumps(doc["raw_payload"]),
-                "document_type": doc.get("document_type"),
-                "identificador": doc.get("identificador"),
-                "title": doc.get("title"),
-                "url": doc.get("url"),
-                "publication_date": doc.get("publication_date"),
-                "section": doc.get("section"),
-                "author": doc.get("author"),
-                "processing_status": doc.get("processing_status", "pending"),
-                "processing_attempts": doc.get("processing_attempts", 0),
-                "error_message": doc.get("error_message"),
+                "payload": doc["payload"],  # Keep as bytes - BigQuery will handle base64 encoding
+                "meta": doc.get("meta", "{}"),
+                "fetched_at": doc.get("fetched_at"),
+                "retries": doc.get("retries", 0),
+                "status": doc.get("status"),
             }
             docs_rows.append(doc_row)
         

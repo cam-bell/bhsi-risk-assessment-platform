@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 import aiohttp
 from app.agents.search.base_agent import BaseSearchAgent
 from app.core.config import settings
+import ssl
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +93,14 @@ class StreamlinedNewsAPIAgent(BaseSearchAgent):
             
             timeout = aiohttp.ClientTimeout(total=10)
             
-            async with aiohttp.ClientSession(timeout=timeout) as session:
+            # Create SSL context that doesn't verify certificates (for testing only)
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            
+            connector = aiohttp.TCPConnector(ssl=ssl_context)
+            
+            async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
                 async with session.get(
                     f"{self.base_url}/everything",
                     params=params,

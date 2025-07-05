@@ -7,20 +7,16 @@ Search API Endpoints - Unified search across BOE and news sources
     This file is kept for reference and backward compatibility only.
 """
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pydantic import BaseModel
-from typing import Optional
-import datetime
+from typing import Optional, List, Dict, Any
 import time
-from sqlalchemy.orm import Session
+import datetime
 
-from app.agents.search.orchestrator_factory import get_search_orchestrator
+from app.agents.search.streamlined_orchestrator import get_search_orchestrator
 from app.agents.analysis.optimized_hybrid_classifier import OptimizedHybridClassifier
-from app.services.database_integration import db_integration
-from app.api import deps
 
 router = APIRouter()
-
 
 # Request/Response Models
 class SearchRequest(BaseModel):
@@ -36,8 +32,7 @@ class SearchRequest(BaseModel):
 
 @router.post("/search")
 async def search(
-    request: SearchRequest,
-    db: Session = Depends(deps.get_db)
+    request: SearchRequest
 ):
     """
     MULTI-SOURCE SEARCH ENDPOINT
@@ -95,9 +90,13 @@ async def search(
         
         # STEP 2: DATABASE INTEGRATION - Save raw results
         db_start_time = time.time()
-        db_stats = db_integration.save_search_results(
-            db, search_results, request.company_name, request.company_name
-        )
+        # Since we're using BigQuery only, skip database integration for now
+        db_stats = {
+            "raw_docs_saved": 0,
+            "events_created": 0,
+            "total_processed": 0,
+            "errors": []
+        }
         db_time = time.time() - db_start_time
         
         # STEP 3: CLASSIFICATION
@@ -371,17 +370,22 @@ async def search_health():
 
 
 @router.get("/search/database-stats")
-async def get_database_stats(db: Session = Depends(deps.get_db)):
+async def get_database_stats():
     """
     Get database statistics for search results
     """
     try:
-        stats = db_integration.get_database_stats(db)
-        
+        # Since we're using BigQuery only, return a placeholder response
         return {
             "status": "success",
             "message": "Database statistics retrieved successfully",
-            "statistics": stats
+            "statistics": {
+                "database_type": "BigQuery",
+                "total_companies": "N/A - BigQuery",
+                "total_assessments": "N/A - BigQuery",
+                "total_raw_docs": "N/A - BigQuery",
+                "total_events": "N/A - BigQuery"
+            }
         }
         
     except Exception as e:

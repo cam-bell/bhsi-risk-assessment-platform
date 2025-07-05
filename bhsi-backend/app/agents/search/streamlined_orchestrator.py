@@ -20,6 +20,11 @@ from app.agents.search.streamlined_yahoo_finance_agent import StreamlinedYahooFi
 logger = logging.getLogger(__name__)
 
 
+def get_search_orchestrator() -> "StreamlinedSearchOrchestrator":
+    """Factory function to get the streamlined search orchestrator"""
+    return StreamlinedSearchOrchestrator()
+
+
 class StreamlinedSearchOrchestrator:
     """Ultra-fast search orchestrator - data fetching only, classification happens later"""
     

@@ -9,6 +9,7 @@ from datetime import datetime
 import aiohttp
 import feedparser
 from app.agents.search.base_agent import BaseSearchAgent
+import ssl
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +101,14 @@ class StreamlinedElMundoAgent(BaseSearchAgent):
             
             timeout = aiohttp.ClientTimeout(total=10)
             
-            async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
+            # Create SSL context that doesn't verify certificates (for testing only)
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            
+            connector = aiohttp.TCPConnector(ssl=ssl_context)
+            
+            async with aiohttp.ClientSession(timeout=timeout, headers=headers, connector=connector) as session:
                 for feed in self.feeds:
                     try:
                         logger.debug(f"Fetching El Mundo feed: {feed['category']}")

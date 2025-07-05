@@ -34,7 +34,12 @@ axiosInstance.interceptors.response.use(
       // Clear auth token and redirect to login
       localStorage.removeItem("authToken");
       localStorage.removeItem("user");
-      window.location.href = "/login";
+      localStorage.removeItem("savedResults");
+
+      // Only redirect if not already on login page
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
     }
 
     // Handle 403 - Forbidden

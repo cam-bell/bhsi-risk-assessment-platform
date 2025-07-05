@@ -1,7 +1,10 @@
 from fastapi import APIRouter
-from app.api.v1.endpoints import companies, streamlined_search, analysis, search
+from app.api.v1.endpoints import companies, streamlined_search, analysis, search, auth
 
 api_router = APIRouter()
+
+# Authentication endpoints
+api_router.include_router(auth.router, prefix="/auth", tags=["authentication"])
 
 # Search endpoints - Main functionality (streamlined search)
 # Updated to use streamlined search for better performance

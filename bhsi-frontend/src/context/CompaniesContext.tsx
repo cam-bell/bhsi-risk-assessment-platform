@@ -66,20 +66,22 @@ export const CompaniesProvider: React.FC<{ children: React.ReactNode }> = ({
       };
 
       setAssessedCompanies((prev) => {
-        // Check if company already exists (by VAT or name)
+        // Check if the exact same company was assessed within the last hour
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
         const existingIndex = prev.findIndex(
           (company) =>
-            company.vat === newCompany.vat ||
-            company.name.toLowerCase() === newCompany.name.toLowerCase()
+            company.vat === newCompany.vat &&
+            company.name.toLowerCase() === newCompany.name.toLowerCase() &&
+            new Date(company.assessedAt) > oneHourAgo
         );
 
         let updatedCompanies;
         if (existingIndex >= 0) {
-          // Update existing company
+          // Update existing company (only if it's the same company assessed within the last hour)
           updatedCompanies = [...prev];
           updatedCompanies[existingIndex] = newCompany;
         } else {
-          // Add new company at the beginning
+          // Always add new company at the beginning
           updatedCompanies = [newCompany, ...prev];
         }
 

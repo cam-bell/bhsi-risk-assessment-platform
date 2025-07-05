@@ -99,7 +99,15 @@ class StreamlinedElPaisAgent(BaseSearchAgent):
             
             timeout = aiohttp.ClientTimeout(total=10)
             
-            async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
+            # Create SSL context that doesn't verify certificates (for testing only)
+            import ssl
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            
+            connector = aiohttp.TCPConnector(ssl=ssl_context)
+            
+            async with aiohttp.ClientSession(timeout=timeout, headers=headers, connector=connector) as session:
                 for feed in self.feeds:
                     try:
                         logger.debug(f"Fetching El País feed: {feed['category']}")

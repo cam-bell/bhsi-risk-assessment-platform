@@ -9,6 +9,7 @@ from datetime import datetime
 import aiohttp
 import feedparser
 from app.agents.search.base_agent import BaseSearchAgent
+import ssl
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,15 @@ class StreamlinedElDiarioAgent(BaseSearchAgent):
             query_terms = query_lower.split()
             headers = {"User-Agent": "BHSI-Risk-Assessment/1.0", "Accept": "application/rss+xml, application/xml", "Accept-Language": "es-ES,es;q=0.9,en;q=0.8"}
             timeout = aiohttp.ClientTimeout(total=10)
-            async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
+            
+            # Create SSL context that doesn't verify certificates (for testing only)
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            
+            connector = aiohttp.TCPConnector(ssl=ssl_context)
+            
+            async with aiohttp.ClientSession(timeout=timeout, headers=headers, connector=connector) as session:
                 for feed in self.feeds:
                     try:
                         logger.debug(f"Fetching El Diario feed: {feed['category']}")

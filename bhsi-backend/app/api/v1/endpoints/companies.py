@@ -1,6 +1,5 @@
 from typing import List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from sqlalchemy.orm import Session
 from app.api import deps
 from app.models.company import Company
 from app.schemas.company import CompanyCreate, CompanyResponse, CompanyAnalysis
@@ -11,8 +10,9 @@ from app.agents.analysis.optimized_hybrid_classifier import (
     OptimizedHybridClassifier
 )
 from app.agents.analytics.analytics_service import AnalyticsService
-from app.crud.company import company as company_crud
-from app.crud.assessment import assessment as assessment_crud
+from app.crud.bigquery_company import bigquery_company
+from app.crud.bigquery_assessment import bigquery_assessment
+from app.services.search_cache_service import search_cache_service
 import logging
 from app.core.config import settings
 import uuid
@@ -22,10 +22,8 @@ import datetime
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-logger.info(f"company_crud type: {type(company_crud)}")
-logger.info(f"company_crud dir: {dir(company_crud)}")
-
-
+logger.info(f"bigquery_company type: {type(bigquery_company)}")
+logger.info(f"bigquery_company dir: {dir(bigquery_company)}")
 
 router = APIRouter()
 
@@ -33,17 +31,17 @@ router = APIRouter()
 @router.post("/analyze", response_model=CompanyAnalysis)
 async def analyze_company(
     company: CompanyCreate,
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(deps.get_db)
+    background_tasks: BackgroundTasks
 ) -> Dict[str, Any]:
     """
-    UNIFIED COMPANY ANALYSIS ENDPOINT - Comprehensive Risk Assessment
+    UNIFIED COMPANY ANALYSIS ENDPOINT - Comprehensive Risk Assessment with Caching
     
     This endpoint combines the best of both worlds:
-    1. Comprehensive data collection (BOE + NewsAPI + RSS feeds)
-    2. Optimized hybrid classification (90%+ keyword efficiency)
-    3. Business intelligence and analytics integration
-    4. Database persistence and assessment tracking
+    1. Smart caching: Check BigQuery for existing results before searching
+    2. Comprehensive data collection (BOE + NewsAPI + RSS feeds)
+    3. Optimized hybrid classification (90%+ keyword efficiency)
+    4. Business intelligence and analytics integration
+    5. BigQuery persistence and assessment tracking
     
     **Data Sources:**
     - BOE (Spanish official gazette)
@@ -53,16 +51,18 @@ async def analyze_company(
     **Business Features:**
     - Complete risk assessment with business categories
     - Analytics integration for enhanced insights
-    - Database persistence for historical tracking
+    - BigQuery persistence for historical tracking
     - Performance monitoring and optimization
+    - Smart caching for improved performance
     """
+    overall_start_time = time.time()
+    
     # Initialize streamlined components
-    search_orchestrator = StreamlinedSearchOrchestrator()
     classifier = OptimizedHybridClassifier()
     analytics_service = AnalyticsService()
     
     try:
-        # STEP 1: COMPREHENSIVE DATA COLLECTION
+        # STEP 1: SMART CACHING - Check BigQuery for existing results
         # Configure which agents to use based on request parameters
         active_agents = []
         if company.include_boe:
@@ -82,14 +82,19 @@ async def analyze_company(
                 detail="At least one source (BOE, news, or RSS) must be enabled"
             )
         
-        # Perform comprehensive search across all enabled sources
-        search_results = await search_orchestrator.search_all(
-            query=company.name,
+        # Get search results with caching
+        search_data = await search_cache_service.get_search_results(
+            company_name=company.name,
             start_date=company.start_date,
             end_date=company.end_date,
             days_back=company.days_back,
-            active_agents=active_agents
+            active_agents=active_agents,
+            cache_age_hours=24,  # Default cache age
+            force_refresh=False  # Allow caching for company analysis
         )
+        
+        search_results = search_data['results']
+        search_method = search_data['search_method']
         
         # STEP 2: COMPREHENSIVE CLASSIFICATION
         # Classify all results using optimized hybrid classifier
@@ -99,18 +104,24 @@ async def analyze_company(
         # Process BOE results
         boe_results = search_results.get("boe", {}).get("results", [])
         for result in boe_results:
-            classification = await classifier.classify_document(
-                text=result.get("texto_completo", ""),
-                title=result.get("titulo", ""),
-                source="BOE",
-                section=result.get("seccion_codigo", "")
-            )
+            # Skip classification if already classified (cached results)
+            if result.get("method") == "cached":
+                result["risk_level"] = result.get("risk_level", "Unknown")
+                result["confidence"] = result.get("confidence", 0.5)
+                result["method"] = "cached"
+            else:
+                classification = await classifier.classify_document(
+                    text=result.get("texto_completo", result.get("text", "")),
+                    title=result.get("titulo", ""),
+                    source="BOE",
+                    section=result.get("seccion_codigo", "")
+                )
+                
+                result["risk_level"] = classification["label"]
+                result["confidence"] = classification["confidence"]
+                result["method"] = classification["method"]
             
-            result["risk_level"] = classification["label"]
-            result["confidence"] = classification["confidence"]
-            result["method"] = classification["method"]
-            
-            if classification["label"] == "High-Legal":
+            if result["risk_level"] == "High-Legal":
                 high_risk_count += 1
             
             classified_results.append(result)
@@ -118,18 +129,24 @@ async def analyze_company(
         # Process NewsAPI results
         news_results = search_results.get("newsapi", {}).get("articles", [])
         for article in news_results:
-            classification = await classifier.classify_document(
-                text=article.get("content", article.get("description", "")),
-                title=article.get("title", ""),
-                source="News",
-                section=article.get("source", "")
-            )
+            # Skip classification if already classified (cached results)
+            if article.get("method") == "cached":
+                article["risk_level"] = article.get("risk_level", "Unknown")
+                article["confidence"] = article.get("confidence", 0.5)
+                article["method"] = "cached"
+            else:
+                classification = await classifier.classify_document(
+                    text=article.get("content", article.get("description", "")),
+                    title=article.get("title", ""),
+                    source="News",
+                    section=article.get("source", "")
+                )
+                
+                article["risk_level"] = classification["label"]
+                article["confidence"] = classification["confidence"]
+                article["method"] = classification["method"]
             
-            article["risk_level"] = classification["label"]
-            article["confidence"] = classification["confidence"]
-            article["method"] = classification["method"]
-            
-            if classification["label"] == "High-Legal":
+            if article["risk_level"] == "High-Legal":
                 high_risk_count += 1
             
             classified_results.append(article)
@@ -142,17 +159,23 @@ async def analyze_company(
         for agent_name in rss_agents:
             if agent_name in search_results and search_results[agent_name].get("articles"):
                 for article in search_results[agent_name]["articles"]:
-                    classification = await classifier.classify_document(
-                        text=article.get("content", article.get("description", "")),
-                        title=article.get("title", ""),
-                        source=f"RSS-{agent_name.upper()}"
-                    )
+                    # Skip classification if already classified (cached results)
+                    if article.get("method") == "cached":
+                        article["risk_level"] = article.get("risk_level", "Unknown")
+                        article["confidence"] = article.get("confidence", 0.5)
+                        article["method"] = "cached"
+                    else:
+                        classification = await classifier.classify_document(
+                            text=article.get("content", article.get("description", "")),
+                            title=article.get("title", ""),
+                            source=f"RSS-{agent_name.upper()}"
+                        )
+                        
+                        article["risk_level"] = classification["label"]
+                        article["confidence"] = classification["confidence"]
+                        article["method"] = classification["method"]
                     
-                    article["risk_level"] = classification["label"]
-                    article["confidence"] = classification["confidence"]
-                    article["method"] = classification["method"]
-                    
-                    if classification["label"] == "High-Legal":
+                    if article["risk_level"] == "High-Legal":
                         high_risk_count += 1
                     
                     classified_results.append(article)
@@ -193,79 +216,94 @@ async def analyze_company(
                              "corrupción" in str(r).lower() 
                              for r in classified_results)
         
+        # STEP 4: BIGQUERY PERSISTENCE
+        db_start_time = time.time()
+        
+        # Save company metadata to BigQuery
+        company_metadata = {
+            "vat": company.vat,
+            "name": company.name,
+            "description": company.description,
+            "sector": company.sector,
+            "client_tier": company.client_tier
+        }
+        
+        # Check if company exists and update/create
+        existing_company = await bigquery_company.get_by_name(company.name)
+        if existing_company:
+            await bigquery_company.update_company(existing_company["vat"], company_metadata)
+        else:
+            await bigquery_company.create_company(company_metadata)
+        
+        # Save comprehensive assessment to BigQuery
+        assessment_dict = {
+            "company_id": company.vat,
+            "user_id": "system",  # Default user for automated assessments
+            "turnover": overall_risk,
+            "shareholding": overall_risk,
+            "bankruptcy": "red" if bankruptcy_risk else "green",
+            "legal": overall_risk,
+            "corruption": "red" if corruption_risk else "green",
+            "overall": overall_risk,
+            "google_results": str(search_results.get("google", {})),
+            "bing_results": str(search_results.get("bing", {})),
+            "gov_results": str(search_results.get("boe", {})),
+            "news_results": str(search_results.get("newsapi", {})),
+            "rss_results": str(rss_results),
+            "analysis_summary": str({
+                "total_results": total_results,
+                "high_risk_count": high_risk_count,
+                "classified_results": classified_results,
+                "search_method": search_method
+            }),
+        }
+        
+        await bigquery_assessment.create_assessment(assessment_dict)
+        
+        db_time = time.time() - db_start_time
+        total_time = time.time() - overall_start_time
+        
         # Format comprehensive analysis response
         analysis = {
             "company_name": company.name,
             "vat": company.vat,
             "risk_assessment": {
-                "overall": overall_risk,
-                "legal": "red" if high_risk_count > 0 else "green",
-                "turnover": "green",  # Default for streamlined system
-                "shareholding": "green",  # Default for streamlined system 
-                "bankruptcy": "red" if bankruptcy_risk else "green",
-                "corruption": "red" if corruption_risk else "green"
-            },
-            "analysis_summary": {
+                "overall_risk": overall_risk,
+                "bankruptcy_risk": bankruptcy_risk,
+                "corruption_risk": corruption_risk,
                 "total_results": total_results,
-                "high_risk_results": high_risk_count,
-                "boe_results": len(boe_results),
-                "news_results": len(news_results),
-                "rss_results": len(rss_results),
-                "keyword_efficiency": performance_stats["keyword_efficiency"],
-                "llm_usage": performance_stats["llm_usage"],
-                "sources_searched": active_agents
+                "high_risk_count": high_risk_count,
+                "classified_results": classified_results
             },
-            "classified_results": classified_results[:10],  # Return top 10
-            "performance": performance_stats,
-            "enhanced_analytics": enhanced_analytics
+            "performance_stats": performance_stats,
+            "enhanced_analytics": enhanced_analytics,
+            "processing_time": {
+                "total_time": total_time,
+                "db_time": db_time
+            },
+            "cache_info": {
+                "search_method": search_method,
+                "cache_age_hours": search_data.get("cache_info", {}).get("age_hours", 0),
+                "total_events": search_data.get("cache_info", {}).get("total_events", 0),
+                "sources": search_data.get("cache_info", {}).get("sources", [])
+            },
+            "database": "BigQuery"
         }
-        
-        # STEP 4: DATABASE PERSISTENCE
-        # Save company metadata to Company table
-        company_metadata = {
-            "name": company.name,
-            "vat": company.vat,
-        }
-        db_company = company_crud.get_by_name(db, name=company.name)
-        if db_company:
-            company_crud.update(db, db_obj=db_company, obj_in=company_metadata)
-        else:
-            db_company = company_crud.create(db, obj_in=company_metadata)
-
-        # Save comprehensive assessment to BigQuery/SQLite
-        assessment_dict = {
-            "id": str(uuid.uuid4()),
-            "company_id": getattr(db_company, "id", str(uuid.uuid4())),
-            "user_id": "system",
-            "turnover": analysis["risk_assessment"]["turnover"],
-            "shareholding": analysis["risk_assessment"]["shareholding"],
-            "bankruptcy": analysis["risk_assessment"]["bankruptcy"],
-            "legal": analysis["risk_assessment"]["legal"],
-            "corruption": analysis["risk_assessment"]["corruption"],
-            "overall": analysis["risk_assessment"]["overall"],
-            "google_results": "[]",
-            "bing_results": "[]",
-            "gov_results": str(boe_results),
-            "news_results": str(news_results),
-            "rss_results": str(rss_results),  # Include RSS results
-            "analysis_summary": str(analysis["analysis_summary"]),
-        }
-        assessment_crud.create(db, obj_in=assessment_dict)
         
         return analysis
-    
+        
     except Exception as e:
+        logger.error(f"Company analysis failed for {company.name}: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Error analyzing company: {str(e)}"
+            detail=f"Analysis failed: {str(e)}"
         )
 
 
 @router.post("/batch-analyze", response_model=List[CompanyAnalysis])
 async def batch_analyze_companies(
     companies: List[CompanyCreate],
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(deps.get_db)
+    background_tasks: BackgroundTasks
 ) -> List[Dict[str, Any]]:
     """
     Analyze multiple companies in batch using streamlined system
@@ -273,7 +311,7 @@ async def batch_analyze_companies(
     results = []
     for company in companies:
         try:
-            analysis = await analyze_company(company, background_tasks, db)
+            analysis = await analyze_company(company, background_tasks)
             results.append(analysis)
         except Exception as e:
             results.append({
@@ -286,48 +324,45 @@ async def batch_analyze_companies(
 
 @router.get("/{company_id}/analysis", response_model=CompanyAnalysis)
 async def get_company_analysis(
-    company_id: int,
-    db: Session = Depends(deps.get_db)
+    company_id: int
 ) -> Dict[str, Any]:
     """
     Get analysis results for a specific company
     """
-    company = company_crud.get(db, id=company_id)
+    company = await bigquery_company.get_by_id(company_id)
     if not company:
         raise HTTPException(
             status_code=404,
-            detail="Company not found"
+            detail=f"Company with ID {company_id} not found"
         )
     
+    # Get latest assessment for this company
+    assessments = await bigquery_assessment.get_by_company(company["vat"])
+    if not assessments:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No assessments found for company {company_id}"
+        )
+    
+    # Return the most recent assessment
+    latest_assessment = assessments[0]  # Already sorted by created_at DESC
+    
     return {
-        "risk_scores": {
-            "turnover": company.turnover,
-            "shareholding": company.shareholding,
-            "bankruptcy": company.bankruptcy,
-            "legal": company.legal,
-            "corruption": company.corruption,
-            "overall": company.overall
-        },
-        "processed_results": {
-            "google_results": company.google_results,
-            "bing_results": company.bing_results,
-            "gov_results": company.gov_results,
-            "news_results": company.news_results,
-            "analysis_summary": company.analysis_summary
-        }
+        "company": company,
+        "assessment": latest_assessment,
+        "database": "BigQuery"
     }
 
 
 @router.get("/", response_model=List[CompanyResponse])
 async def list_companies(
     skip: int = 0,
-    limit: int = 100,
-    db: Session = Depends(deps.get_db)
-) -> List[Company]:
+    limit: int = 100
+) -> List[Dict[str, Any]]:
     """
     List all companies with their risk profiles
     """
-    companies = company_crud.get_multi(db, skip=skip, limit=limit)
+    companies = await bigquery_company.list_companies(skip=skip, limit=limit)
     return companies
 
 
@@ -368,11 +403,76 @@ async def get_risk_trends() -> Dict[str, Any]:
     try:
         analytics_service = AnalyticsService()
         system_analytics = await analytics_service.get_system_analytics()
-        return system_analytics.get("system_analytics", {}).get("trends", {})
+        trends_data = system_analytics.get("system_analytics", {}).get("trends", {})
+        
+        # Always return a dictionary with a 'trends' key
+        if isinstance(trends_data, dict) and "trends" in trends_data:
+            trends = trends_data["trends"]
+        elif isinstance(trends_data, list):
+            trends = trends_data
+        else:
+            trends = []
+        return {"trends": trends}
     except Exception as e:
         raise HTTPException(
             status_code=500,
             detail=f"Error getting risk trends: {str(e)}"
+        )
+
+
+@router.get("/analytics/alerts")
+async def get_system_alerts() -> Dict[str, Any]:
+    """
+    Get system-wide alerts and alert statistics
+    """
+    try:
+        analytics_service = AnalyticsService()
+        system_analytics = await analytics_service.get_system_analytics()
+        
+        # Extract alerts data from system analytics
+        alerts_data = system_analytics.get("system_analytics", {}).get("alerts", {})
+        
+        # Return structured alerts data
+        return {
+            "total_alerts": alerts_data.get("total_alerts", 0),
+            "high_risk_alerts": alerts_data.get("high_risk_alerts", 0),
+            "last_alert": alerts_data.get("last_alert"),
+            "alert_trends": alerts_data.get("alert_trends", []),
+            "alert_distribution": alerts_data.get("alert_distribution", {})
+        }
+    except Exception as e:
+        # Return fallback data if analytics service fails
+        return {
+            "total_alerts": 0,
+            "high_risk_alerts": 0,
+            "last_alert": None,
+            "alert_trends": [],
+            "alert_distribution": {}
+        }
+
+
+@router.get("/analytics/sectors")
+async def get_sector_analytics() -> Dict[str, Any]:
+    """
+    Get sector-based analytics and risk distribution
+    """
+    try:
+        analytics_service = AnalyticsService()
+        system_analytics = await analytics_service.get_system_analytics()
+        
+        # Extract sectors data from system analytics
+        sectors_data = system_analytics.get("system_analytics", {}).get("sectors", [])
+        
+        # Return structured sectors data as a dictionary
+        return {
+            "sectors": sectors_data if isinstance(sectors_data, list) else [],
+            "total_sectors": len(sectors_data) if isinstance(sectors_data, list) else 0,
+            "period": "last_90_days"
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error getting sector analytics: {str(e)}"
         )
 
 
@@ -474,263 +574,120 @@ async def get_system_status():
 @router.post("/unified-analysis")
 async def unified_company_analysis(
     company: CompanyCreate,
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(deps.get_db)
+    background_tasks: BackgroundTasks
 ) -> Dict[str, Any]:
     """
-    🚀 UNIFIED COMPANY ANALYSIS ENDPOINT - The Ultimate Analysis
-    
-    This endpoint combines ALL capabilities:
-    1. Comprehensive data collection (BOE + NewsAPI + ALL RSS feeds)
-    2. Optimized hybrid classification (90%+ keyword efficiency)
-    3. Business intelligence and analytics integration
-    4. Database persistence and assessment tracking
-    5. Enhanced analytics with BigQuery integration
-    6. Performance monitoring and optimization
-    
-    **Features:**
-    - Complete data source coverage (10+ sources)
-    - Business risk assessment with 6 categories
-    - Enhanced analytics for companies with VAT
-    - Historical tracking and trend analysis
-    - Performance optimization and monitoring
-    
-    **Response includes:**
-    - Comprehensive risk assessment
-    - All classified results from all sources
-    - Enhanced analytics (if VAT provided)
-    - Performance metrics and optimization stats
-    - Database persistence confirmation
+    Unified company analysis with BigQuery persistence
     """
-    
-    # Initialize all components
-    search_orchestrator = StreamlinedSearchOrchestrator()
-    classifier = OptimizedHybridClassifier()
-    analytics_service = AnalyticsService()
-    
     overall_start_time = time.time()
     
     try:
-        # STEP 1: COMPREHENSIVE DATA COLLECTION
-        # Always use ALL available sources for maximum coverage
-        active_agents = ["boe", "newsapi"]
-        if company.include_rss:
-            active_agents.extend([
-                "elpais", "expansion", "elmundo", "abc", "lavanguardia", 
-                "elconfidencial", "eldiario", "europapress"
-            ])
+        # Initialize components
+        search_orchestrator = StreamlinedSearchOrchestrator()
+        classifier = OptimizedHybridClassifier()
         
+        # Perform search
         search_start_time = time.time()
         search_results = await search_orchestrator.search_all(
             query=company.name,
-            start_date=company.start_date,
-            end_date=company.end_date,
-            days_back=company.days_back,
-            active_agents=active_agents
+            days_back=company.days_back or 7,
+            active_agents=["boe", "newsapi"]  # Simplified for speed
         )
         search_time = time.time() - search_start_time
         
-        # STEP 2: COMPREHENSIVE CLASSIFICATION
+        # Classify results
         classification_start_time = time.time()
         classified_results = []
-        high_risk_count = 0
-        source_counts = {}
-        
-        # Process all sources systematically
-        for source_name, source_data in search_results.items():
-            if not source_data:
-                continue
-                
-            source_results = []
-            if source_name == "boe":
-                source_results = source_data.get("results", [])
-            else:
-                source_results = source_data.get("articles", [])
-            
-            source_counts[source_name] = len(source_results)
-            
-            for item in source_results:
-                try:
-                    # Determine text content based on source
-                    if source_name == "boe":
-                        text = item.get("texto_completo", "")
-                        title = item.get("titulo", "")
-                        section = item.get("seccion_codigo", "")
-                    else:
-                        text = item.get("content", item.get("description", ""))
-                        title = item.get("title", "")
-                        section = item.get("source", "")
-                    
-                    # Classify document
+        for source, results in search_results.items():
+            if source == "boe" and results.get("results"):
+                for result in results["results"]:
                     classification = await classifier.classify_document(
-                        text=text,
-                        title=title,
-                        source=source_name.upper(),
-                        section=section
+                        text=result.get("text", ""),
+                        title=result.get("titulo", ""),
+                        source="BOE"
                     )
-                    
-                    # Add classification to item
-                    item["risk_level"] = classification["label"]
-                    item["confidence"] = classification["confidence"]
-                    item["method"] = classification["method"]
-                    
-                    if classification["label"] == "High-Legal":
-                        high_risk_count += 1
-                    
-                    classified_results.append(item)
-                    
-                except Exception as e:
-                    logger.warning(f"Classification failed for {source_name}: {e}")
-                    # Add item with fallback classification
-                    item["risk_level"] = "Unknown"
-                    item["confidence"] = 0.3
-                    item["method"] = "error_fallback"
-                    classified_results.append(item)
+                    result["risk_level"] = classification["label"]
+                    classified_results.append(result)
+            
+            elif source == "newsapi" and results.get("articles"):
+                for article in results["articles"]:
+                    classification = await classifier.classify_document(
+                        text=article.get("content", ""),
+                        title=article.get("title", ""),
+                        source="News"
+                    )
+                    article["risk_level"] = classification["label"]
+                    classified_results.append(article)
         
         classification_time = time.time() - classification_start_time
         
-        # STEP 3: BUSINESS INTELLIGENCE & ANALYTICS
-        analytics_start_time = time.time()
+        # Determine risk level
+        high_risk_count = sum(1 for r in classified_results if r.get("risk_level") == "High-Legal")
+        overall_risk = "red" if high_risk_count > 0 else "green"
         
-        # Get enhanced analytics if VAT is provided
-        enhanced_analytics = None
-        if company.vat:
-            try:
-                enhanced_analytics = await analytics_service.get_comprehensive_analytics(
-                    company_name=company.name,
-                    include_trends=True,
-                    include_sectors=True
-                )
-            except Exception as e:
-                logger.warning(f"Enhanced analytics failed: {e}")
-        
-        analytics_time = time.time() - analytics_start_time
-        
-        # STEP 4: COMPREHENSIVE RISK ASSESSMENT
-        total_results = len(classified_results)
-        
-        # Determine overall risk
-        if total_results == 0:
-            overall_risk = "green"
-        elif high_risk_count > 0:
-            overall_risk = "red"
-        elif any(r.get("risk_level") == "Medium-Legal" 
-                for r in classified_results):
-            overall_risk = "orange"
-        else:
-            overall_risk = "green"
-        
-        # Calculate specific risk categories
-        bankruptcy_risk = any("concurso" in str(r).lower() 
-                             for r in classified_results)
-        corruption_risk = any("blanqueo" in str(r).lower() or 
-                             "corrupción" in str(r).lower() 
-                             for r in classified_results)
-        
-        # STEP 5: DATABASE PERSISTENCE
+        # Save to BigQuery
         db_start_time = time.time()
         
-        # Save company metadata
         company_metadata = {
-            "name": company.name,
             "vat": company.vat,
+            "name": company.name,
+            "description": company.description,
+            "sector": company.sector,
+            "client_tier": company.client_tier
         }
-        db_company = company_crud.get_by_name(db, name=company.name)
-        if db_company:
-            company_crud.update(db, db_obj=db_company, obj_in=company_metadata)
-        else:
-            db_company = company_crud.create(db, obj_in=company_metadata)
         
-        # Save comprehensive assessment
+        existing_company = await bigquery_company.get_by_name(company.name)
+        if existing_company:
+            await bigquery_company.update_company(existing_company["vat"], company_metadata)
+        else:
+            await bigquery_company.create_company(company_metadata)
+        
         assessment_dict = {
-            "id": str(uuid.uuid4()),
-            "company_id": getattr(db_company, "id", str(uuid.uuid4())),
+            "company_id": company.vat,
             "user_id": "system",
-            "turnover": "green",  # Default
-            "shareholding": "green",  # Default
-            "bankruptcy": "red" if bankruptcy_risk else "green",
-            "legal": "red" if high_risk_count > 0 else "green",
-            "corruption": "red" if corruption_risk else "green",
+            "turnover": overall_risk,
+            "shareholding": overall_risk,
+            "bankruptcy": "green",
+            "legal": overall_risk,
+            "corruption": "green",
             "overall": overall_risk,
-            "google_results": "[]",
-            "bing_results": "[]",
+            "google_results": "{}",
+            "bing_results": "{}",
             "gov_results": str(search_results.get("boe", {})),
             "news_results": str(search_results.get("newsapi", {})),
-            "rss_results": str({k: v for k, v in search_results.items() 
-                              if k not in ["boe", "newsapi"]}),
+            "rss_results": "{}",
             "analysis_summary": str({
-                "total_results": total_results,
-                "high_risk_results": high_risk_count,
-                "source_counts": source_counts,
-                "rss_sources": [k for k in search_results.keys() 
-                              if k not in ["boe", "newsapi"]]
+                "total_results": len(classified_results),
+                "high_risk_count": high_risk_count,
+                "classified_results": classified_results
             }),
         }
-        assessment_crud.create(db, obj_in=assessment_dict)
+        
+        await bigquery_assessment.create_assessment(assessment_dict)
         
         db_time = time.time() - db_start_time
         
-        # STEP 6: COMPREHENSIVE RESPONSE ASSEMBLY
-        total_time = time.time() - overall_start_time
-        performance_stats = classifier.get_performance_stats()
-        
-        response = {
-            "company_name": company.name,
-            "vat": company.vat,
-            "search_date": datetime.datetime.now().isoformat(),
-            "date_range": {
-                "start": company.start_date,
-                "end": company.end_date,
-                "days_back": company.days_back
-            },
-            "risk_assessment": {
-                "overall": overall_risk,
-                "legal": "red" if high_risk_count > 0 else "green",
-                "turnover": "green",
-                "shareholding": "green",
-                "bankruptcy": "red" if bankruptcy_risk else "green",
-                "corruption": "red" if corruption_risk else "green"
-            },
-            "analysis_summary": {
-                "total_results": total_results,
-                "high_risk_results": high_risk_count,
-                "source_counts": source_counts,
-                "keyword_efficiency": performance_stats["keyword_efficiency"],
-                "llm_usage": performance_stats["llm_usage"],
-                "sources_searched": active_agents
-            },
-            "classified_results": classified_results[:20],  # Top 20 results
-            "enhanced_analytics": enhanced_analytics,
-            "performance": {
-                **performance_stats,
-                "total_time_seconds": f"{total_time:.2f}",
-                "search_time_seconds": f"{search_time:.2f}",
-                "classification_time_seconds": f"{classification_time:.2f}",
-                "analytics_time_seconds": f"{analytics_time:.2f}",
-                "database_time_seconds": f"{db_time:.2f}",
-                "optimization": "Unified analysis with comprehensive coverage"
-            },
-            "database_stats": {
-                "company_saved": True,
-                "assessment_saved": True,
-                "company_id": getattr(db_company, "id", "unknown")
-            }
-        }
-        
-        return response
-        
-    except Exception as e:
-        total_time = time.time() - overall_start_time
-        logger.error(f"Unified analysis failed for {company.name}: {e}")
         return {
             "company_name": company.name,
             "vat": company.vat,
-            "risk_assessment": {},
-            "analysis_summary": {},
-            "classified_results": [],
-            "error": f"Unified analysis failed: {str(e)}",
-            "performance": {
-                "total_time_seconds": f"{total_time:.2f}",
-                "error": "Analysis failed before completion"
-            }
-        } 
+            "risk_assessment": {
+                "overall_risk": overall_risk,
+                "total_results": len(classified_results),
+                "high_risk_count": high_risk_count,
+                "classified_results": classified_results
+            },
+            "processing_time": {
+                "search_time": search_time,
+                "classification_time": classification_time,
+                "db_time": db_time,
+                "total_time": time.time() - overall_start_time
+            },
+            "database": "BigQuery"
+        }
+        
+    except Exception as e:
+        logger.error(f"Unified analysis failed for {company.name}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unified analysis failed: {str(e)}"
+        ) 

@@ -79,17 +79,25 @@ class Settings(BaseSettings):
     BIGQUERY_RAW_DOCS_TABLE: str = "raw_docs"
 
     # Database selection logic
-    USE_BIGQUERY: bool = (
-        os.getenv("USE_BIGQUERY", "0").lower() in ("1", "true", "yes")
-    )
+    USE_BIGQUERY: bool = True  # Always use BigQuery as primary database
+    USE_SQLITE_FALLBACK: bool = False  # Disable SQLite fallback
 
     def is_bigquery_enabled(self) -> bool:
         return self.USE_BIGQUERY
+    
+    def is_sqlite_fallback_enabled(self) -> bool:
+        return self.USE_SQLITE_FALLBACK and not self.USE_BIGQUERY
     
     # New additions
     GCP_PROJECT_ID: str = "solid-topic-443216-b2"  # From settings
     BIGQUERY_DATASET_ID: str = "risk_monitoring"  # Your dataset
     
+    # JWT Settings
+    JWT_SECRET_KEY: str = "your-secret-key-change-in-production"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
     class Config:
         case_sensitive = True
         env_file = ".env"

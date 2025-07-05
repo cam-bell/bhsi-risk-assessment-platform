@@ -12,6 +12,7 @@ import {
   Container,
   Avatar,
   Fade,
+  CircularProgress,
 } from "@mui/material";
 import { Shield } from "lucide-react";
 import { useAuth } from "./useAuth";
@@ -24,14 +25,13 @@ const loginSchema = z.object({
 
 const LoginPage = () => {
   const navigate = useNavigate();
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, isLoading, error } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<{ email?: string; password?: string }>(
     {}
   );
-  const [loginError, setLoginError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Redirect if already authenticated
   if (isAuthenticated) {
@@ -41,21 +41,18 @@ const LoginPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoginError("");
+    setErrors({});
 
     try {
       // Validate form inputs
       loginSchema.parse({ email, password });
-      setErrors({});
 
       // Attempt login
-      setIsLoading(true);
+      setIsSubmitting(true);
       const success = await login(email, password);
 
       if (success) {
         navigate("/", { replace: true });
-      } else {
-        setLoginError("Invalid email or password");
       }
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -67,11 +64,9 @@ const LoginPage = () => {
           }
         });
         setErrors(formattedErrors);
-      } else {
-        setLoginError("An unexpected error occurred");
       }
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -131,9 +126,9 @@ const LoginPage = () => {
                 </Typography>
               </Box>
 
-              {loginError && (
+              {error && (
                 <Alert severity="error" sx={{ mb: 3 }}>
-                  {loginError}
+                  {error}
                 </Alert>
               )}
 
@@ -149,6 +144,7 @@ const LoginPage = () => {
                   helperText={errors.email}
                   required
                   autoFocus
+                  disabled={isSubmitting || isLoading}
                 />
                 <TextField
                   label="Password"
@@ -160,6 +156,7 @@ const LoginPage = () => {
                   error={!!errors.password}
                   helperText={errors.password}
                   required
+                  disabled={isSubmitting || isLoading}
                 />
                 <Button
                   type="submit"
@@ -168,9 +165,16 @@ const LoginPage = () => {
                   fullWidth
                   size="large"
                   sx={{ mt: 3, mb: 2 }}
-                  disabled={isLoading}
+                  disabled={isSubmitting || isLoading}
                 >
-                  {isLoading ? "Signing in..." : "Sign in"}
+                  {isSubmitting ? (
+                    <Box sx={{ display: "flex", alignItems: "center" }}>
+                      <CircularProgress size={20} sx={{ mr: 1 }} />
+                      Signing in...
+                    </Box>
+                  ) : (
+                    "Sign in"
+                  )}
                 </Button>
               </form>
 
@@ -180,7 +184,7 @@ const LoginPage = () => {
                 textAlign="center"
                 sx={{ mt: 2 }}
               >
-                Demo: Use any email with a password of at least 6 characters
+                Use your BHSI credentials to access the system
               </Typography>
             </CardContent>
           </Card>

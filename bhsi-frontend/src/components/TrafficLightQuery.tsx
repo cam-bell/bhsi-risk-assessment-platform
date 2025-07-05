@@ -269,19 +269,24 @@ const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
         company_name: query.trim(),
         include_boe: boeEnabled,
         include_news: newsEnabled,
-        include_rss: false,
-        rss_feeds: [],
+        include_rss: false, // RSS is disabled for performance
         ...(dateRangeType === "preset"
           ? { days_back: daysBack }
           : { start_date: startDate, end_date: endDate }),
       };
 
+      console.log("🔍 Sending search request:", searchRequest);
+
       // Call the backend API
       const searchResponse = await searchCompany(searchRequest).unwrap();
+
+      console.log("✅ Search response received:", searchResponse);
 
       // Convert to traffic light format
       const trafficLightResult =
         convertSearchResultsToTrafficLight(searchResponse);
+
+      console.log("🎯 Traffic light result:", trafficLightResult);
 
       // Add metadata
       const resultWithMetadata: TrafficLightResponse = {
@@ -314,18 +319,29 @@ const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
       // Fetch executive summary (only executive_summary field)
       if (onRiskResult) {
         try {
+          console.log(
+            "📊 Fetching management summary for:",
+            trafficLightResult.company
+          );
           const summary = await getManagementSummary({
             company_name: trafficLightResult.company,
             classification_results: searchResponse.results,
             language: "es",
           }).unwrap();
+          console.log("✅ Management summary received:", summary);
           onRiskResult(trafficLightResult.company, summary.executive_summary);
         } catch (summaryErr) {
+          console.error("❌ Management summary error:", summaryErr);
           onRiskResult(trafficLightResult.company, "");
         }
       }
     } catch (err: any) {
-      console.error("Search error:", err);
+      console.error("❌ Search error:", err);
+      console.error("❌ Error details:", {
+        status: err?.status,
+        data: err?.data,
+        message: err?.message,
+      });
       setError(
         err?.data?.detail || err?.message || "An unexpected error occurred"
       );

@@ -30,6 +30,7 @@ import {
   LogOut,
   User,
   BarChart3,
+  Users,
 } from "lucide-react";
 import { useAuth } from "../auth/useAuth";
 import { NotificationCenter } from "./NotificationSystem";
@@ -53,6 +54,15 @@ const navigationItems = [
   },
   { id: "settings", label: "Settings", icon: Settings, path: "/settings" },
   { id: "help", label: "Help & Support", icon: HelpCircle, path: "/help" },
+];
+
+const adminNavigationItems = [
+  {
+    id: "user-management",
+    label: "User Management",
+    icon: Users,
+    path: "/user-management",
+  },
 ];
 
 const Layout = ({ children, currentPage = "search" }: LayoutProps) => {
@@ -110,8 +120,19 @@ const Layout = ({ children, currentPage = "search" }: LayoutProps) => {
     if (location.pathname === "/history") return "history";
     if (location.pathname === "/settings") return "settings";
     if (location.pathname === "/help") return "help";
+    if (location.pathname === "/profile") return "profile";
+    if (location.pathname === "/user-management") return "user-management";
     return currentPage;
   };
+
+  // Check if user is admin
+  const isAdmin = user?.user_type === "admin";
+
+  // Combine navigation items
+  const allNavigationItems = [
+    ...navigationItems,
+    ...(isAdmin ? adminNavigationItems : []),
+  ];
 
   const drawerWidth = 280;
 
@@ -129,38 +150,48 @@ const Layout = ({ children, currentPage = "search" }: LayoutProps) => {
 
       {/* Navigation */}
       <List sx={{ flex: 1, px: 2, py: 1 }}>
-        {navigationItems.map((item) => {
+        {allNavigationItems.map((item, index) => {
           const Icon = item.icon;
           const isActive = getCurrentPage() === item.id;
+          const isAdminItem = adminNavigationItems.some(
+            (adminItem) => adminItem.id === item.id
+          );
+
           return (
-            <ListItem
-              key={item.id}
-              onClick={() => handleNavigation(item.path)}
-              sx={{
-                borderRadius: 2,
-                mb: 0.5,
-                bgcolor: isActive ? "primary.light" : "transparent",
-                color: isActive ? "white" : "inherit",
-                "&:hover": {
-                  bgcolor: isActive ? "primary.light" : "grey.100",
-                },
-                cursor: "pointer",
-                transition: "all 0.2s ease-in-out",
-              }}
-            >
-              <ListItemIcon
-                sx={{ color: isActive ? "white" : "inherit", minWidth: 40 }}
-              >
-                <Icon size={20} />
-              </ListItemIcon>
-              <ListItemText
-                primary={item.label}
-                primaryTypographyProps={{
-                  fontSize: "0.9rem",
-                  fontWeight: isActive ? 600 : 400,
+            <React.Fragment key={item.id}>
+              {isAdminItem &&
+                index > 0 &&
+                !allNavigationItems[index - 1].id.includes("admin") && (
+                  <Divider sx={{ my: 1 }} />
+                )}
+              <ListItem
+                onClick={() => handleNavigation(item.path)}
+                sx={{
+                  borderRadius: 2,
+                  mb: 0.5,
+                  bgcolor: isActive ? "primary.light" : "transparent",
+                  color: isActive ? "white" : "inherit",
+                  "&:hover": {
+                    bgcolor: isActive ? "primary.light" : "grey.100",
+                  },
+                  cursor: "pointer",
+                  transition: "all 0.2s ease-in-out",
                 }}
-              />
-            </ListItem>
+              >
+                <ListItemIcon
+                  sx={{ color: isActive ? "white" : "inherit", minWidth: 40 }}
+                >
+                  <Icon size={20} />
+                </ListItemIcon>
+                <ListItemText
+                  primary={item.label}
+                  primaryTypographyProps={{
+                    fontSize: "0.9rem",
+                    fontWeight: isActive ? 600 : 400,
+                  }}
+                />
+              </ListItem>
+            </React.Fragment>
           );
         })}
       </List>
@@ -171,7 +202,7 @@ const Layout = ({ children, currentPage = "search" }: LayoutProps) => {
           <Avatar
             sx={{ width: 32, height: 32, mr: 2, bgcolor: "primary.main" }}
           >
-            {user?.name?.charAt(0).toUpperCase() || "U"}
+            {user?.first_name?.charAt(0).toUpperCase() || "U"}
           </Avatar>
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography variant="body2" fontWeight={500} noWrap>
@@ -225,7 +256,7 @@ const Layout = ({ children, currentPage = "search" }: LayoutProps) => {
             sx={{ ml: 1 }}
           >
             <Avatar sx={{ width: 32, height: 32, bgcolor: "primary.main" }}>
-              {user?.name?.charAt(0).toUpperCase() || "U"}
+              {user?.first_name?.charAt(0).toUpperCase() || "U"}
             </Avatar>
           </IconButton>
 
