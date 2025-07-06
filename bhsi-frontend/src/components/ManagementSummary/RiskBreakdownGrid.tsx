@@ -20,6 +20,8 @@ import {
   Shield,
   Gavel,
   Info,
+  Users,
+  Leaf,
 } from "lucide-react";
 
 const categoryIconMap: Record<string, React.ReactNode> = {
@@ -27,6 +29,8 @@ const categoryIconMap: Record<string, React.ReactNode> = {
   financial: <DollarSign size={18} color="#1976d2" />,
   regulatory: <Shield size={18} color="#0288d1" />,
   operational: <Scale size={18} color="#43a047" />,
+  dismissals: <Users size={18} color="#ff9800" />,
+  environmental: <Leaf size={18} color="#4caf50" />,
 };
 
 const riskColorMap: Record<string, "success" | "warning" | "error"> = {

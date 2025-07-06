@@ -8,14 +8,14 @@ import asyncio
 import json
 import logging
 import uuid
-from datetime import datetime, date
+from datetime import datetime
 from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor
 import threading
+from collections import defaultdict, deque
 
 from google.cloud import bigquery
-from google.cloud.exceptions import NotFound
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -28,6 +28,28 @@ class BigQueryWriteRequest:
     data: List[Dict[str, Any]]
     operation: str = "insert"  # insert, update, upsert
     priority: int = 1  # 1=high, 2=medium, 3=low
+    request_id: Optional[str] = None
+    created_at: Optional[datetime] = None
+    retry_count: int = 0
+    max_retries: int = 3
+
+    def __post_init__(self):
+        if self.request_id is None:
+            self.request_id = str(uuid.uuid4())
+        if self.created_at is None:
+            self.created_at = datetime.utcnow()
+
+
+@dataclass
+class BigQueryFailure:
+    """Represents a BigQuery write failure"""
+    request_id: str
+    table_name: str
+    error: str
+    timestamp: datetime
+    retry_count: int
+    data_count: int
+    operation: str
 
 
 class AsyncBigQueryClient:
@@ -43,6 +65,15 @@ class AsyncBigQueryClient:
         self.queue_lock = threading.Lock()
         self.executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="BigQuery")
         self.running = True
+        
+        # Failure tracking
+        self.failures: deque = deque(maxlen=1000)  # Keep last 1000 failures
+        self.failure_lock = threading.Lock()
+        self.failure_stats = defaultdict(int)
+        
+        # Success tracking
+        self.success_stats = defaultdict(int)
+        self.success_lock = threading.Lock()
         
         # Start background processor
         self._start_background_processor()
@@ -64,7 +95,7 @@ class AsyncBigQueryClient:
         logger.info("🚀 BigQuery background processor started")
     
     async def _process_write_queue(self):
-        """Process pending write requests"""
+        """Process pending write requests with enhanced error handling"""
         with self.queue_lock:
             if not self.write_queue:
                 return
@@ -85,18 +116,79 @@ class AsyncBigQueryClient:
                     self.write_queue = [req for req in self.write_queue if req not in requests]
     
     async def _process_batch(self, requests: List[BigQueryWriteRequest]):
-        """Process a batch of write requests"""
+        """Process a batch of write requests with retry logic"""
         for request in requests:
             try:
                 loop = asyncio.get_event_loop()
                 await loop.run_in_executor(
                     self.executor,
-                    self._execute_write_request,
+                    self._execute_write_request_with_retry,
                     request
                 )
                 logger.debug(f"✅ Processed BigQuery write: {request.table_name}")
+                
+                # Track success
+                with self.success_lock:
+                    self.success_stats[request.table_name] += 1
+                    
             except Exception as e:
                 logger.error(f"❌ BigQuery write failed for {request.table_name}: {e}")
+                self._record_failure(request, str(e))
+    
+    def _execute_write_request_with_retry(self, request: BigQueryWriteRequest):
+        """Execute a write request with retry logic"""
+        table_id = f"{self.project_id}.{self.dataset_id}.{request.table_name}"
+        
+        for attempt in range(request.max_retries):
+            try:
+                if request.operation == "insert":
+                    errors = self.client.insert_rows_json(table_id, request.data)
+                    if errors:
+                        raise Exception(f"Insert errors: {errors}")
+                elif request.operation == "upsert":
+                    # Use MERGE for upsert operations
+                    self._execute_upsert(table_id, request.data)
+                else:
+                    raise ValueError(f"Unsupported operation: {request.operation}")
+                
+                # Success - return early
+                return
+                
+            except Exception as e:
+                request.retry_count += 1
+                logger.warning(
+                    f"BigQuery write attempt {attempt + 1}/{request.max_retries} "
+                    f"failed for {request.table_name}: {e}"
+                )
+                
+                if attempt < request.max_retries - 1:
+                    # Exponential backoff
+                    import time
+                    time.sleep(2 ** attempt)
+                else:
+                    # Final attempt failed
+                    raise e
+    
+    def _record_failure(self, request: BigQueryWriteRequest, error: str):
+        """Record a BigQuery write failure"""
+        failure = BigQueryFailure(
+            request_id=request.request_id,
+            table_name=request.table_name,
+            error=error,
+            timestamp=datetime.utcnow(),
+            retry_count=request.retry_count,
+            data_count=len(request.data),
+            operation=request.operation
+        )
+        
+        with self.failure_lock:
+            self.failures.append(failure)
+            self.failure_stats[request.table_name] += 1
+            
+        logger.error(
+            f"📊 BigQuery failure recorded: {request.table_name} "
+            f"({len(request.data)} rows, {request.retry_count} retries)"
+        )
     
     def _execute_write_request(self, request: BigQueryWriteRequest):
         """Execute a write request in a thread"""
@@ -165,7 +257,7 @@ class AsyncBigQueryClient:
                 raise Exception(f"Temp table insert errors: {errors}")
             
             # Build MERGE statement
-            merge_sql = self._build_merge_sql(table_id, temp_table_id, data[0].keys())
+            merge_sql = self._build_merge_sql(table_id, temp_table_id, list(data[0].keys()))
             
             # Execute MERGE
             query_job = self.client.query(merge_sql)
@@ -406,6 +498,50 @@ class AsyncBigQueryClient:
                 queue_stats["tables"][table] += len(request.data)
         
         return queue_stats
+    
+    async def get_failure_status(self) -> Dict[str, Any]:
+        """Get detailed failure status and statistics"""
+        with self.failure_lock:
+            recent_failures = list(self.failures)[-10:]  # Last 10 failures
+            
+            failure_summary = {
+                "total_failures": len(self.failures),
+                "failure_stats": dict(self.failure_stats),
+                "recent_failures": [
+                    {
+                        "request_id": f.request_id,
+                        "table_name": f.table_name,
+                        "error": f.error,
+                        "timestamp": f.timestamp.isoformat(),
+                        "retry_count": f.retry_count,
+                        "data_count": f.data_count,
+                        "operation": f.operation
+                    }
+                    for f in recent_failures
+                ]
+            }
+        
+        with self.success_lock:
+            failure_summary["success_stats"] = dict(self.success_stats)
+        
+        return failure_summary
+    
+    async def get_health_status(self) -> Dict[str, Any]:
+        """Get comprehensive health status including failures"""
+        queue_status = await self.get_queue_status()
+        failure_status = await self.get_failure_status()
+        
+        # Calculate failure rate
+        total_operations = sum(failure_status["success_stats"].values()) + failure_status["total_failures"]
+        failure_rate = (failure_status["total_failures"] / total_operations * 100) if total_operations > 0 else 0
+        
+        return {
+            "status": "healthy" if failure_rate < 5 else "degraded" if failure_rate < 20 else "unhealthy",
+            "failure_rate_percent": round(failure_rate, 2),
+            "queue": queue_status,
+            "failures": failure_status,
+            "timestamp": datetime.utcnow().isoformat()
+        }
     
     async def flush_queue(self) -> Dict[str, Any]:
         """Force flush the write queue"""

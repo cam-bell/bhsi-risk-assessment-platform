@@ -1,0 +1,128 @@
+# Development Artifacts - Test Files (Safe to Delete)
+test_advanced_strategies.py
+test_layer_optimization.py
+test_classification_metrics.py
+test_classification_metrics_enhanced.py
+test_classification_metrics_direct.py
+test_comprehensive_cloud.py
+test_end_to_end.py
+test_management_summarizer_fix.py
+test_cloud_services.py
+test_bigquery_client_enhanced.py
+test_bigquery_failure_handling.py
+test_bigquery_pipeline.py
+test_bigquery_correct_schema.py
+test_bigquery_schema.py
+test_bigquery_connection.py
+test_bigquery_fix.py
+test_backend.py
+test_analytics_endpoint.py
+test_events_bigquery.py
+test_embedding_bigquery_pipeline.py
+test_simple_embedding_update.py
+test_streamlined_search_api.py
+test_fix.py
+test_api_categories.py
+test_new_categories.py
+debug_bigquery.py
+
+# Generated Reports (Development Output)
+*_report_*.json
+advanced_strategy_report_*.json
+layer_optimization_report_*.json
+classification_metrics_report_*.json
+enhanced_classification_metrics_report_*.json
+direct_classification_metrics_report_*.json
+cloud_test_report_*.json
+
+# Large Data Files
+search_results.json
+
+# System Files
+.DS_Store
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.pytest_cache/
+
+# Development Utility Scripts
+update_categories.py
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# IDE Files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Temporary Files
+*.tmp
+*.temp
+
+# Database Files
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment Variables
+.env
+.env.local
+.env.production
+
+# Coverage Reports
+htmlcov/
+.coverage
+coverage.xml
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# PEP 582
+__pypackages__/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/ 

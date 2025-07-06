@@ -11,6 +11,7 @@ import httpx
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from datetime import datetime
+import hashlib
 
 # Add the app directory to the path for imports
 current_dir = Path(__file__).parent
@@ -65,6 +66,8 @@ class CloudRiskClassifier:
             "DGSFP": "Insurance Regulator - Insurance violations",
             "SEPBLAC": "Anti-Money Laundering - AML violations"
         }
+        
+        self.classification_cache = {}  # Simple in-memory cache: key -> result
     
     async def classify_event(self, event) -> Dict[str, Any]:
         """Main classification orchestrator with cloud fallback"""
@@ -334,6 +337,58 @@ class CloudRiskClassifier:
         finally:
             db.close()
 
+    def get_cache_key(self, doc: Dict[str, Any]) -> str:
+        key_str = f"{doc.get('text','')}|{doc.get('title','')}|{doc.get('source','')}|{doc.get('section','')}"
+        return hashlib.sha256(key_str.encode()).hexdigest()
+
+    async def classify_documents_batch(self, docs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Batch classify documents with cache and Gemini batch endpoint, exposing cache_key and last_verified_at."""
+        results = [None] * len(docs)
+        to_query = []
+        to_query_indices = []
+        now_iso = datetime.utcnow().isoformat()
+        for i, doc in enumerate(docs):
+            key = self.get_cache_key(doc)
+            cached = self.classification_cache.get(key)
+            if cached:
+                # Always include cache_key and last_verified_at
+                result = dict(cached)
+                result["cache_key"] = key
+                result["last_verified_at"] = cached.get("last_verified_at", now_iso)
+                results[i] = result
+            else:
+                to_query.append(doc)
+                to_query_indices.append(i)
+        # Query Gemini for uncached docs
+        if to_query:
+            try:
+                async with httpx.AsyncClient(timeout=60.0) as client:
+                    response = await client.post(
+                        f"{self.gemini_service_url}/classify_batch",
+                        json={"documents": to_query}
+                    )
+                    if response.status_code == 200:
+                        batch_results = response.json()
+                        for idx, res in zip(to_query_indices, batch_results):
+                            key = self.get_cache_key(to_query[idx - to_query_indices[0]])
+                            res["cache_key"] = key
+                            res["last_verified_at"] = now_iso
+                            results[idx] = res
+                            # Cache the result (with last_verified_at)
+                            self.classification_cache[key] = dict(res)
+                    else:
+                        raise Exception(f"Gemini batch service error: {response.status_code} {response.text}")
+            except Exception as e:
+                # On error, fallback to single classify for each uncached doc
+                for idx, doc in zip(to_query_indices, to_query):
+                    single = await self._gemini_classification(doc.get('text',''), doc.get('title',''), doc.get('source',''), doc.get('section',''))
+                    key = self.get_cache_key(doc)
+                    single["cache_key"] = key
+                    single["last_verified_at"] = now_iso
+                    results[idx] = single
+                    self.classification_cache[key] = dict(single)
+        return results
+
 
 # CLI interface
 if __name__ == "__main__":
@@ -423,4 +478,7 @@ class CloudClassifier:
                 "reason": f"Classification error: {str(e)}",
                 "confidence": 0.3,
                 "method": "error"
-            } 
+            }
+
+    async def classify_documents_batch(self, docs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        return await self.classifier.classify_documents_batch(docs) 

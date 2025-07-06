@@ -48,6 +48,8 @@ import {
   TrendingDown,
   TrendingUp as TrendingUpIcon,
 } from "lucide-react";
+import ManagementSummary from "../components/ManagementSummary";
+import { useLocation } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
 import axios from "axios";
 

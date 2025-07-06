@@ -32,7 +32,7 @@ async def main():
     
     try:
         # Search parameters
-        company_name = "Banco Santander"
+        company_name = "BBVA"
         days_back = 30
         search_date = datetime.now() - timedelta(days=days_back)
         

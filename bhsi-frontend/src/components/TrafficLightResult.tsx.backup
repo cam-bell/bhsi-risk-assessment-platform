@@ -1,0 +1,1061 @@
+import { useState, useEffect } from "react";
+import {
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  Chip,
+  Grid,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Grow,
+  useMediaQuery,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Link,
+  LinearProgress,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Tooltip,
+  CircularProgress,
+  Alert,
+  Skeleton,
+  Fade,
+  Slide,
+  useTheme,
+  alpha,
+} from "@mui/material";
+import { useTheme as useMuiTheme } from "@mui/material/styles";
+import {
+  ChevronDown,
+  Database,
+  Building,
+  FileText,
+  Scale,
+  ExternalLink,
+  Eye,
+  Search,
+  BarChart3,
+  DollarSign,
+  Shield,
+} from "lucide-react";
+import DonutLargeIcon from "@mui/icons-material/DonutLarge";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import RiskAnalysisDetails, {
+  convertSearchResultsToRiskAnalysis,
+} from "./RiskAnalysisDetails";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
+import ErrorIcon from "@mui/icons-material/Error";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import { useGetManagementSummaryMutation } from "../store/api/analyticsApi";
+import StarsIcon from "@mui/icons-material/Stars";
+import { TrafficLightResponse } from "./TrafficLightQuery";
+
+interface TrafficLightResultProps {
+  result: TrafficLightResponse;
+}
+
+// Map color strings to MUI color values
+const colorMap: Record<string, "success" | "warning" | "error"> = {
+  green: "success",
+  orange: "warning",
+  red: "error",
+} as const;
+
+// Map risk levels to colors
+const riskLevelColorMap = {
+  "Low-Other": "success",
+  "Low-Regulatory": "success",
+  "Low-Legal": "success",
+  "Low-Financial": "success",
+  "Low-Operational": "success",
+  "Medium-Economic": "warning",
+  "Medium-Tax": "warning",
+  "Medium-Legal": "warning",
+  "Medium-Financial": "warning",
+  "Medium-Regulatory": "warning",
+  "Medium-Operational": "warning",
+  "High-Legal": "error",
+  "High-Financial": "error",
+  "High-Regulatory": "error",
+  "High-Operational": "error",
+  Unknown: "default",
+} as const;
+
+// Map parameters to readable display names
+const parameterMap = {
+  turnover: "Financial Turnover",
+  shareholding: "Shareholding Structure",
+  bankruptcy: "Bankruptcy History",
+  legal: "Legal Issues",
+  regulatory: "Regulatory Compliance",
+  dismissals: "Employee Dismissals",
+  environmental: "Environmental Issues",
+  operational: "Operational Changes",
+} as const;
+
+// Map parameters to their data sources
+const dataSourcesMap = {
+  turnover: {
+    primary: "SABI Bureau van Dijk Database",
+    secondary: ["Companies House", "Annual Reports", "Financial Statements"],
+    icon: <Database size={16} />,
+    description:
+      "Financial performance data sourced from official company filings and commercial databases",
+    lastUpdated: "2024-01-15",
+  },
+  shareholding: {
+    primary: "Companies House Registry",
+    secondary: [
+      "PSC Register",
+      "Shareholding Disclosures",
+      "Regulatory Filings",
+    ],
+    icon: <Building size={16} />,
+    description:
+      "Ownership structure verified through official company registrations and regulatory submissions",
+    lastUpdated: "2024-01-12",
+  },
+  bankruptcy: {
+    primary: "Insolvency Service Records",
+    secondary: [
+      "Court Records",
+      "Gazette Notices",
+      "Credit Reference Agencies",
+    ],
+    icon: <Scale size={16} />,
+    description:
+      "Insolvency history tracked through official court records and regulatory announcements",
+    lastUpdated: "2024-01-10",
+  },
+  legal: {
+    primary: "UK Court Service",
+    secondary: ["Legal Databases", "Regulatory Actions", "Public Records"],
+    icon: <FileText size={16} />,
+    description:
+      "Legal proceedings monitored through court systems and regulatory enforcement databases",
+    lastUpdated: "2024-01-08",
+  },
+} as const;
+
+// Add animation for risk badge
+const riskBadgeAnimation = {
+  animation: "scaleIn 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
+  "@keyframes scaleIn": {
+    from: { transform: "scale(0.8)", opacity: 0 },
+    to: { transform: "scale(1)", opacity: 1 },
+  },
+};
+
+// Define type for search result items
+interface SearchResultItem {
+  risk_level: string;
+  date: string;
+  title: string;
+  summary?: string | null;
+  source: string;
+  confidence: number;
+  url: string;
+  [key: string]: any;
+}
+
+// Wrapper component to fix Alert linter error
+const ErrorAlert = ({ error }: { error: unknown }) => {
+  const errorMessage =
+    typeof error === "string"
+      ? error
+      : error instanceof Error
+      ? error.message
+      : "An unexpected error occurred";
+
+  return (
+    <Alert severity="error" sx={{ mt: 2 }}>
+      {errorMessage}
+    </Alert>
+  );
+};
+
+// Skeleton loader for management summary
+const ManagementSummarySkeleton = () => (
+  <Box sx={{ mt: 4 }}>
+    <Skeleton
+      variant="rectangular"
+      height={200}
+      sx={{ borderRadius: 2, mb: 2 }}
+    />
+    <Skeleton
+      variant="rectangular"
+      height={150}
+      sx={{ borderRadius: 2, mb: 2 }}
+    />
+    <Skeleton
+      variant="rectangular"
+      height={300}
+      sx={{ borderRadius: 2, mb: 2 }}
+    />
+    <Skeleton variant="rectangular" height={200} sx={{ borderRadius: 2 }} />
+  </Box>
+);
+
+const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
+  const theme = useMuiTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const [visible, setVisible] = useState(false);
+  const [showDetailedResults, setShowDetailedResults] = useState(false);
+  const [showRiskAnalysis, setShowRiskAnalysis] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
+  const [
+    getManagementSummary,
+    { data: summary, isLoading: summaryLoading, error: summaryError },
+  ] = useGetManagementSummaryMutation();
+  const [showSummary, setShowSummary] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+
+  // Trigger animation after component mounts
+  useEffect(() => {
+    const timer = setTimeout(() => setVisible(true), 100);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Get search results from the result
+  const searchResults = result.searchResults?.results || [];
+  const hasSearchResults = searchResults.length > 0;
+  const searchMeta =
+    result.searchResults &&
+    typeof result.searchResults === "object" &&
+    "metadata" in result.searchResults
+      ? (result.searchResults as any).metadata
+      : {};
+  const searchDate =
+    result.searchResults?.search_date || new Date().toISOString();
+  const sourcesUsed = Array.isArray(searchMeta.sources_searched)
+    ? searchMeta.sources_searched.join(", ")
+    : "N/A";
+
+  // Convert search results to risk analysis format
+  const riskAnalysisData = result.searchResults
+    ? convertSearchResultsToRiskAnalysis(result.searchResults)
+    : null;
+
+  // Handle retry for management summary
+  const handleRetrySummary = async () => {
+    setRetryCount((prev) => prev + 1);
+    try {
+      await getManagementSummary({
+        company_name: result.company,
+        classification_results: searchResults as SearchResultItem[],
+      });
+      setShowSummary(true);
+    } catch (error) {
+      console.error("Retry failed:", error);
+    }
+  };
+
+  // Accessibility: Handle keyboard navigation
+  const handleKeyPress = (event: React.KeyboardEvent, action: () => void) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      action();
+    }
+  };
+
+  if (!hasSearchResults) {
+    return (
+      <Fade in={visible} timeout={800}>
+        <Card
+          sx={{
+            mt: 4,
+            p: 4,
+            textAlign: "center",
+            boxShadow: 6,
+            borderRadius: 3,
+            background: alpha(theme.palette.background.paper, 0.8),
+          }}
+          role="alert"
+          aria-live="polite"
+        >
+          <Typography variant="h6" color="text.secondary" gutterBottom>
+            No results found for this company.
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Try another search or check your spelling.
+          </Typography>
+        </Card>
+      </Fade>
+    );
+  }
+
+  return (
+    <>
+      <Grow in={visible} timeout={800}>
+        <Card
+          sx={{
+            mt: 2,
+            p: isMobile ? 1 : 3,
+            boxShadow: 6,
+            borderRadius: 3,
+            background: alpha(theme.palette.background.paper, 0.95),
+          }}
+          role="region"
+          aria-label="Risk assessment results"
+        >
+          {/* Summary Banner */}
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              background: alpha(theme.palette.grey[100], 0.8),
+              borderRadius: 2,
+              px: isMobile ? 2 : 4,
+              py: 2,
+              mb: 3,
+              flexDirection: isMobile ? "column" : "row",
+              gap: isMobile ? 1 : 0,
+            }}
+            role="banner"
+            aria-label="Search summary"
+          >
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <CheckCircleIcon
+                color="success"
+                sx={{ fontSize: 32, mr: 1 }}
+                aria-hidden="true"
+              />
+              <Typography
+                variant={isMobile ? "h6" : "h5"}
+                fontWeight={700}
+                component="h2"
+              >
+                {result.company}
+              </Typography>
+            </Box>
+            <Box sx={{ textAlign: isMobile ? "center" : "right" }}>
+              <Typography variant="body2" color="text.secondary">
+                <strong>Date:</strong>{" "}
+                {new Date(searchDate).toLocaleDateString()}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                <strong>Sources:</strong> {sourcesUsed}
+              </Typography>
+            </Box>
+          </Box>
+
+          <CardContent sx={{ p: 0 }}>
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                mb: 4,
+                gap: 2,
+              }}
+              role="main"
+              aria-label="Risk assessment overview"
+            >
+              <Typography variant="h5" component="h3" gutterBottom>
+                Risk Assessment Result
+              </Typography>
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  mt: 2,
+                }}
+              >
+                <Typography variant="body1" gutterBottom>
+                  <strong>Company:</strong> {result.company}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  <strong>VAT:</strong> {result.vat}
+                </Typography>
+                <Chip
+                  label={result.overall.toUpperCase()}
+                  color={colorMap[result.overall as keyof typeof colorMap]}
+                  icon={
+                    result.overall === "green" ? (
+                      <CheckCircleIcon />
+                    ) : result.overall === "orange" ? (
+                      <WarningAmberIcon />
+                    ) : (
+                      <ErrorIcon />
+                    )
+                  }
+                  sx={{
+                    mt: 3,
+                    fontSize: isMobile ? "1.1rem" : "1.5rem",
+                    fontWeight: "bold",
+                    py: isMobile ? 2 : 3,
+                    px: isMobile ? 1 : 4,
+                    minWidth: isMobile ? "120px" : "200px",
+                    minHeight: isMobile ? "48px" : "64px",
+                    boxShadow: 3,
+                    letterSpacing: 2,
+                    ...riskBadgeAnimation,
+                  }}
+                  role="status"
+                  aria-label={`Overall risk level: ${result.overall}`}
+                />
+                <Typography
+                  variant="body1"
+                  sx={{
+                    mt: 2,
+                    textAlign: "center",
+                    maxWidth: 500,
+                    color: theme.palette.success.main,
+                  }}
+                  role="status"
+                  aria-live="polite"
+                >
+                  {result.overall === "green" &&
+                    "Low risk profile. Recommended for renewal."}
+                  {result.overall === "orange" &&
+                    "Medium risk profile. Review recommended."}
+                  {result.overall === "red" &&
+                    "High risk profile. Caution advised."}
+                </Typography>
+
+                {/* Action Buttons */}
+                {hasSearchResults && (
+                  <Box
+                    sx={{
+                      mt: 3,
+                      display: "flex",
+                      gap: 2,
+                      flexWrap: "wrap",
+                      justifyContent: "center",
+                    }}
+                    role="group"
+                    aria-label="Action buttons"
+                  >
+                    <Button
+                      variant="outlined"
+                      startIcon={<Eye />}
+                      onClick={() => setShowDetailedResults(true)}
+                      onKeyPress={(e) =>
+                        handleKeyPress(e, () => setShowDetailedResults(true))
+                      }
+                      size="small"
+                      aria-label="View detailed search results"
+                    >
+                      View Search Results
+                    </Button>
+                    <Button
+                      variant="contained"
+                      startIcon={<BarChart3 />}
+                      onClick={() => setShowRiskAnalysis(true)}
+                      onKeyPress={(e) =>
+                        handleKeyPress(e, () => setShowRiskAnalysis(true))
+                      }
+                      size="small"
+                      aria-label="View detailed risk analysis"
+                    >
+                      Detailed Risk Analysis
+                    </Button>
+                  </Box>
+                )}
+              </Box>
+            </Box>
+
+            <Typography
+              variant="h6"
+              component="h4"
+              gutterBottom
+              sx={{ mb: 2, mt: 4 }}
+            >
+              Detailed Parameters
+            </Typography>
+
+            {/* Parameter Table */}
+            <TableContainer
+              component={Paper}
+              sx={{ mt: 4, mb: 2, boxShadow: 2, borderRadius: 2 }}
+              role="table"
+              aria-label="Detailed risk parameters"
+            >
+              <Table size={isMobile ? "small" : "medium"}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell scope="col">Parameter</TableCell>
+                    <TableCell scope="col">Risk Level</TableCell>
+                    <TableCell scope="col">Data Source</TableCell>
+                    <TableCell scope="col">Last Updated</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {Object.keys(result.blocks).map((param) => {
+                    const risk =
+                      result.blocks[param as keyof typeof result.blocks];
+                    const isGreen = risk === "green";
+                    const riskIcon =
+                      risk === "green" ? (
+                        <CheckCircleIcon fontSize="small" color="success" />
+                      ) : risk === "orange" ? (
+                        <WarningAmberIcon fontSize="small" color="warning" />
+                      ) : (
+                        <ErrorIcon fontSize="small" color="error" />
+                      );
+                    return (
+                      <TableRow
+                        key={param}
+                        sx={{
+                          borderLeft: `6px solid ${
+                            isGreen
+                              ? theme.palette.success.main
+                              : risk === "orange"
+                              ? theme.palette.warning.main
+                              : theme.palette.error.main
+                          }`,
+                          backgroundColor: isGreen
+                            ? alpha(theme.palette.success.main, 0.05)
+                            : risk === "orange"
+                            ? alpha(theme.palette.warning.main, 0.05)
+                            : alpha(theme.palette.error.main, 0.05),
+                          transition: "all 0.3s ease",
+                          cursor: "pointer",
+                          "&:hover": {
+                            backgroundColor: alpha(
+                              theme.palette.primary.main,
+                              0.05
+                            ),
+                            transform: "translateX(4px)",
+                          },
+                          "&:focus-within": {
+                            outline: `2px solid ${theme.palette.primary.main}`,
+                            outlineOffset: "-2px",
+                          },
+                        }}
+                        tabIndex={0}
+                        onKeyPress={(e) =>
+                          handleKeyPress(e, () => {
+                            // Handle parameter details view
+                            console.log("View details for:", param);
+                          })
+                        }
+                        role="button"
+                        aria-label={`${
+                          parameterMap[param as keyof typeof parameterMap]
+                        }: ${risk} risk level`}
+                      >
+                        <TableCell>
+                          <Box display="flex" alignItems="center" gap={1}>
+                            {
+                              dataSourcesMap[
+                                param as keyof typeof dataSourcesMap
+                              ]?.icon
+                            }
+                            <b>
+                              {parameterMap[param as keyof typeof parameterMap]}
+                            </b>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={risk.toUpperCase()}
+                            color={colorMap[risk]}
+                            icon={riskIcon}
+                            sx={{ fontWeight: "bold" }}
+                            aria-label={`Risk level: ${risk}`}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Tooltip
+                            title={
+                              dataSourcesMap[
+                                param as keyof typeof dataSourcesMap
+                              ]?.description || ""
+                            }
+                          >
+                            <span>
+                              {dataSourcesMap[
+                                param as keyof typeof dataSourcesMap
+                              ]?.primary || "—"}
+                            </span>
+                          </Tooltip>
+                        </TableCell>
+                        <TableCell>
+                          {dataSourcesMap[param as keyof typeof dataSourcesMap]
+                            ?.lastUpdated || "—"}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+
+            {/* Add a summary bar above the table */}
+            {hasSearchResults && (
+              <Box
+                sx={{
+                  mt: 4,
+                  mb: 2,
+                  display: "flex",
+                  gap: 3,
+                  justifyContent: "center",
+                  flexWrap: "wrap",
+                }}
+                role="status"
+                aria-label="Search results summary"
+              >
+                <Chip
+                  label={`Total: ${searchResults.length}`}
+                  color="primary"
+                  aria-label={`Total results: ${searchResults.length}`}
+                />
+                <Chip
+                  label={`High: ${
+                    (searchResults as SearchResultItem[]).filter(
+                      (r: SearchResultItem) => r.risk_level.startsWith("High")
+                    ).length
+                  }`}
+                  color="error"
+                  icon={<ErrorIcon fontSize="small" />}
+                  aria-label={`High risk results: ${
+                    (searchResults as SearchResultItem[]).filter(
+                      (r: SearchResultItem) => r.risk_level.startsWith("High")
+                    ).length
+                  }`}
+                />
+                <Chip
+                  label={`Medium: ${
+                    (searchResults as SearchResultItem[]).filter(
+                      (r: SearchResultItem) => r.risk_level.startsWith("Medium")
+                    ).length
+                  }`}
+                  color="warning"
+                  icon={<WarningAmberIcon fontSize="small" />}
+                  aria-label={`Medium risk results: ${
+                    (searchResults as SearchResultItem[]).filter(
+                      (r: SearchResultItem) => r.risk_level.startsWith("Medium")
+                    ).length
+                  }`}
+                />
+                <Chip
+                  label={`Low: ${
+                    (searchResults as SearchResultItem[]).filter(
+                      (r: SearchResultItem) => r.risk_level.startsWith("Low")
+                    ).length
+                  }`}
+                  color="success"
+                  icon={<CheckCircleIcon fontSize="small" />}
+                  aria-label={`Low risk results: ${
+                    (searchResults as SearchResultItem[]).filter(
+                      (r: SearchResultItem) => r.risk_level.startsWith("Low")
+                    ).length
+                  }`}
+                />
+              </Box>
+            )}
+
+            {/* Search Results Summary Section */}
+            {hasSearchResults && (
+              <Box sx={{ mt: 4 }}>
+                <Typography
+                  variant="h6"
+                  component="h4"
+                  gutterBottom
+                  sx={{ mb: 2 }}
+                >
+                  Search Results Summary
+                </Typography>
+
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Paper sx={{ p: 2, textAlign: "center" }}>
+                      <Typography variant="h4" color="primary">
+                        {searchResults.length}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Total Documents
+                      </Typography>
+                    </Paper>
+                  </Grid>
+
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Paper sx={{ p: 2, textAlign: "center" }}>
+                      <Typography variant="h4" color="error">
+                        {
+                          (searchResults as SearchResultItem[]).filter(
+                            (r: SearchResultItem) =>
+                              r.risk_level.startsWith("High")
+                          ).length
+                        }
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        High Risk
+                      </Typography>
+                    </Paper>
+                  </Grid>
+
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Paper sx={{ p: 2, textAlign: "center" }}>
+                      <Typography variant="h4" color="warning.main">
+                        {
+                          (searchResults as SearchResultItem[]).filter(
+                            (r: SearchResultItem) =>
+                              r.risk_level.startsWith("Medium")
+                          ).length
+                        }
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Medium Risk
+                      </Typography>
+                    </Paper>
+                  </Grid>
+
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Paper sx={{ p: 2, textAlign: "center" }}>
+                      <Typography variant="h4" color="success.main">
+                        {
+                          (searchResults as SearchResultItem[]).filter(
+                            (r: SearchResultItem) =>
+                              r.risk_level.startsWith("Low")
+                          ).length
+                        }
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Low Risk
+                      </Typography>
+                    </Paper>
+                  </Grid>
+                </Grid>
+              </Box>
+            )}
+
+            {/* View Details Button */}
+            <Box sx={{ textAlign: "center", mt: 2 }}>
+              <Button
+                variant="outlined"
+                startIcon={<BarChart3 />}
+                onClick={() => setShowDetails((prev) => !prev)}
+                onKeyPress={(e) =>
+                  handleKeyPress(e, () => setShowDetails((prev) => !prev))
+                }
+                sx={{ fontWeight: 600 }}
+                aria-label={
+                  showDetails ? "Hide raw results" : "View raw results"
+                }
+                aria-expanded={showDetails}
+              >
+                {showDetails ? "Hide Raw Results" : "View Raw Results"}
+              </Button>
+            </Box>
+
+            <Slide direction="up" in={showDetails} mountOnEnter unmountOnExit>
+              <Accordion expanded sx={{ mt: 2 }}>
+                <AccordionSummary expandIcon={<ChevronDown />}>
+                  <Typography variant="subtitle2">
+                    Raw Search Results
+                  </Typography>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <pre
+                    style={{
+                      fontSize: isMobile ? 10 : 13,
+                      whiteSpace: "pre-wrap",
+                      wordBreak: "break-all",
+                      background: alpha(theme.palette.grey[100], 0.5),
+                      padding: 12,
+                      borderRadius: 6,
+                      maxHeight: 400,
+                      overflow: "auto",
+                    }}
+                    role="textbox"
+                    aria-label="Raw search results data"
+                  >
+                    {JSON.stringify(searchResults, null, 2)}
+                  </pre>
+                </AccordionDetails>
+              </Accordion>
+            </Slide>
+
+            {/* Add Management Summary button below the main result display, only if there are search results */}
+            {hasSearchResults && (
+              <Box sx={{ textAlign: "center", mt: 3 }}>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={async () => {
+                    try {
+                      await getManagementSummary({
+                        company_name: result.company,
+                        classification_results:
+                          searchResults as SearchResultItem[],
+                      });
+                      setShowSummary(true);
+                    } catch (error) {
+                      console.error(
+                        "Failed to load management summary:",
+                        error
+                      );
+                    }
+                  }}
+                  disabled={summaryLoading || !searchResults.length}
+                  aria-label="Generate management summary"
+                  aria-describedby={
+                    summaryLoading ? "loading-description" : undefined
+                  }
+                >
+                  {summaryLoading
+                    ? "Generating Summary..."
+                    : "Get Management Summary"}
+                </Button>
+
+                {summaryLoading && (
+                  <Box sx={{ mt: 2 }}>
+                    <CircularProgress size={24} />
+                    <Typography
+                      id="loading-description"
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ mt: 1 }}
+                    >
+                      Analyzing {searchResults.length} results...
+                    </Typography>
+                  </Box>
+                )}
+
+                {summaryError && (
+                  <Box sx={{ mt: 2 }}>
+                    <ErrorAlert error={summaryError} />
+                    <Button
+                      variant="outlined"
+                      onClick={handleRetrySummary}
+                      disabled={retryCount >= 3}
+                      sx={{ mt: 1 }}
+                      aria-label={`Retry loading summary (attempt ${
+                        retryCount + 1
+                      } of 3)`}
+                    >
+                      {retryCount >= 3 ? "Max retries reached" : "Retry"}
+                    </Button>
+                  </Box>
+                )}
+
+                {/* Management Summary display */}
+                {showSummary && summary ? (
+                  <Fade in={showSummary} timeout={600}>
+                    <Box sx={{ mt: 4, textAlign: "left" }}>
+                      <Typography variant="h6" gutterBottom>
+                        Management Summary
+                      </Typography>
+                      <Typography variant="body1">
+                        Summary content will be displayed here.
+                      </Typography>
+                    </Box>
+                  </Fade>
+                ) : summaryLoading ? (
+                  <ManagementSummarySkeleton />
+                ) : null}
+              </Box>
+            )}
+          </CardContent>
+        </Card>
+      </Grow>
+
+      {/* Detailed Results Dialog */}
+      <Dialog
+        open={showDetailedResults}
+        onClose={() => setShowDetailedResults(false)}
+        maxWidth="lg"
+        fullWidth
+        TransitionComponent={Slide}
+        transitionDuration={400}
+        aria-labelledby="detailed-results-title"
+      >
+        <DialogTitle id="detailed-results-title">
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Search size={20} />
+            Detailed Search Results for {result.company}
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {hasSearchResults ? (
+            <Box sx={{ mt: 2 }}>
+              <TableContainer component={Paper} elevation={0}>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: "bold" }}>Source</TableCell>
+                      <TableCell sx={{ fontWeight: "bold" }}>Date</TableCell>
+                      <TableCell sx={{ fontWeight: "bold" }}>Title</TableCell>
+                      <TableCell sx={{ fontWeight: "bold" }}>
+                        Risk Level
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: "bold" }}>
+                        Confidence
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: "bold" }}>Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {(searchResults as SearchResultItem[]).map(
+                      (item: SearchResultItem, index: number) => (
+                        <TableRow key={index} hover>
+                          <TableCell>
+                            <Chip
+                              label={item.source}
+                              color={
+                                item.source === "BOE" ? "primary" : "secondary"
+                              }
+                              size="small"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2">
+                              {new Date(item.date).toLocaleDateString()}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2" sx={{ maxWidth: 300 }}>
+                              {item.title}
+                            </Typography>
+                            {item.summary && (
+                              <Accordion sx={{ boxShadow: "none", mt: 1 }}>
+                                <AccordionSummary expandIcon={<ChevronDown />}>
+                                  <Typography
+                                    variant="caption"
+                                    color="text.secondary"
+                                  >
+                                    Show snippet
+                                  </Typography>
+                                </AccordionSummary>
+                                <AccordionDetails>
+                                  <Typography
+                                    variant="caption"
+                                    color="text.secondary"
+                                  >
+                                    {item.summary}
+                                  </Typography>
+                                </AccordionDetails>
+                              </Accordion>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={item.risk_level}
+                              color={
+                                riskLevelColorMap[
+                                  item.risk_level as keyof typeof riskLevelColorMap
+                                ] || "default"
+                              }
+                              size="small"
+                              icon={
+                                item.risk_level.startsWith("High") ? (
+                                  <ErrorIcon fontSize="small" />
+                                ) : item.risk_level.startsWith("Medium") ? (
+                                  <WarningAmberIcon fontSize="small" />
+                                ) : item.risk_level.startsWith("Low") ? (
+                                  <CheckCircleIcon fontSize="small" />
+                                ) : (
+                                  <InfoOutlinedIcon fontSize="small" />
+                                )
+                              }
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                              }}
+                            >
+                              <LinearProgress
+                                variant="determinate"
+                                value={item.confidence * 100}
+                                sx={{ width: 60, height: 6, borderRadius: 3 }}
+                              />
+                              <Typography variant="caption">
+                                {Math.round(item.confidence * 100)}%
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              component={Link}
+                              href={item.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              startIcon={<ExternalLink size={16} />}
+                              size="small"
+                              variant="outlined"
+                              aria-label={`View source article: ${item.title}`}
+                            >
+                              View
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
+          ) : (
+            <Typography variant="body1" sx={{ textAlign: "center", py: 4 }}>
+              No search results available
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowDetailedResults(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Risk Analysis Dialog */}
+      <Dialog
+        open={showRiskAnalysis}
+        onClose={() => setShowRiskAnalysis(false)}
+        maxWidth="xl"
+        fullWidth
+        TransitionComponent={Slide}
+        transitionDuration={400}
+        aria-labelledby="risk-analysis-title"
+      >
+        <DialogTitle id="risk-analysis-title">
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <BarChart3 size={20} />
+            Detailed Risk Analysis for {result.company}
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {riskAnalysisData ? (
+            <RiskAnalysisDetails
+              company={riskAnalysisData.company}
+              overallRisk={riskAnalysisData.overallRisk}
+              riskFactors={riskAnalysisData.riskFactors}
+              confidence={riskAnalysisData.confidence}
+              searchResults={result.searchResults}
+            />
+          ) : (
+            <Typography variant="body1" sx={{ textAlign: "center", py: 4 }}>
+              No risk analysis data available
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowRiskAnalysis(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+    </>
+  );
+};
+
+export default TrafficLightResult;

@@ -4,7 +4,7 @@ import traceback
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 import google.generativeai as genai
 from tenacity import retry, stop_after_attempt, wait_exponential
 import anyio
@@ -78,6 +78,17 @@ class CompanyAnalysisResponse(BaseModel):
     confidence: float
     methodology: str
     analysis_method: str
+
+class BatchClassificationRequest(BaseModel):
+    documents: List[Dict[str, Any]]  # Each: {text, title, section, source}
+
+class BatchClassificationResult(BaseModel):
+    category: str
+    label: str
+    confidence: float
+    reason: str
+    method: str
+    # Optionally, echo back doc index or id if provided
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
 async def classify_risk(text: str, title: str, source: str, section: str = None) -> Dict[str, Any]:
@@ -512,4 +523,93 @@ No incluyas texto fuera de este objeto JSON.
     return _extract_json_from_response(response) or {
         "key_findings": [],
         "recommendations": []
-    } 
+    }
+
+@app.post("/classify_batch", response_model=List[BatchClassificationResult])
+async def classify_batch(request: BatchClassificationRequest):
+    """Batch classify documents for D&O risk with modular categories and traffic light labels."""
+    if not client or not api_key or not model:
+        raise HTTPException(
+            status_code=503,
+            detail="Service temporarily unavailable - Gemini not configured"
+        )
+    docs = request.documents
+    if not docs or not isinstance(docs, list):
+        raise HTTPException(status_code=400, detail="No documents provided")
+
+    # Build prompt for batch classification
+    prompt = _build_batch_classification_prompt(docs)
+
+    def _classify_sync():
+        response = model.generate_content(prompt)
+        return response.text
+    try:
+        response_text = await anyio.to_thread.run_sync(_classify_sync)
+        # Try to extract a list of JSON objects from the response
+        results = _extract_json_list_from_response(response_text)
+        if not results or not isinstance(results, list):
+            logger.warning(f"Invalid Gemini batch response: {response_text[:200]}...")
+            raise HTTPException(status_code=500, detail="Failed to parse Gemini batch response")
+        # Validate and coerce results
+        validated = []
+        for res in results:
+            try:
+                validated.append(BatchClassificationResult(**res))
+            except Exception as e:
+                logger.warning(f"Invalid result in batch: {res} | {e}")
+        return validated
+    except Exception as e:
+        logger.error(f"Batch classification failed: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+def _build_batch_classification_prompt(docs: List[Dict[str, Any]]) -> str:
+    """Builds a prompt for Gemini to classify a batch of documents with modular risk categories."""
+    doc_lines = []
+    for i, doc in enumerate(docs):
+        doc_lines.append(f"Documento {i+1}:\nTÍTULO: {doc.get('title', '')}\nTEXTO: {doc.get('text', '')}\nSECCIÓN: {doc.get('section', '')}\nFUENTE: {doc.get('source', '')}\n")
+    joined_docs = '\n'.join(doc_lines)
+    prompt = f"""
+Analiza cada uno de los siguientes documentos para riesgos D&O. Para cada documento, responde SOLO en formato JSON con los siguientes campos:
+- category: Una de ['legal', 'financial', 'regulatory', 'shareholding', 'dismissals', 'environmental', 'operational']
+- label: 'red', 'amber', o 'green' (tráfico)
+- confidence: número entre 0.0 y 1.0
+- reason: explicación breve
+- method: 'cloud_gemini_analysis'
+
+Ejemplo de salida para cada documento:
+{{"category": "shareholding", "label": "red", "confidence": 0.91, "reason": "Board members exited following activist investor pressure", "method": "cloud_gemini_analysis"}}
+
+Documentos:
+{joined_docs}
+
+Responde con una lista JSON, un objeto por documento, en el mismo orden.
+"""
+    return prompt
+
+def _extract_json_list_from_response(response: str):
+    """Extract a list of JSON objects from Gemini's response, robust to minor formatting errors."""
+    import re, json, ast
+    try:
+        # Try to find a JSON array in the response
+        match = re.search(r'\[.*\]', response, re.DOTALL)
+        if match:
+            json_str = match.group()
+            try:
+                return json.loads(json_str)
+            except Exception:
+                pass
+        # Try parsing as a single object (if Gemini returns one)
+        try:
+            return json.loads(response)
+        except Exception:
+            pass
+        # Try ast.literal_eval as last resort
+        try:
+            return ast.literal_eval(response)
+        except Exception:
+            pass
+        return None
+    except Exception as e:
+        logger.warning(f"Failed to parse JSON list from response: {e}")
+        return None 

@@ -59,6 +59,10 @@ export interface TrafficLightResponse {
     shareholding: "green" | "orange" | "red";
     bankruptcy: "green" | "orange" | "red";
     legal: "green" | "orange" | "red";
+    regulatory: "green" | "orange" | "red";
+    dismissals: "green" | "orange" | "red";
+    environmental: "green" | "orange" | "red";
+    operational: "green" | "orange" | "red";
   };
   dataSource?: "BOE" | "NewsAPI" | "both";
   dateRange?: {
@@ -107,6 +111,12 @@ const convertSearchResultsToTrafficLight = (
   const financialResults = results.filter((r) =>
     r.risk_level.includes("Financial")
   );
+  const regulatoryResults = results.filter((r) =>
+    r.risk_level.includes("Regulatory")
+  );
+  const operationalResults = results.filter((r) =>
+    r.risk_level.includes("Operational")
+  );
 
   const getCategoryRisk = (
     categoryResults: any[]
@@ -132,6 +142,10 @@ const convertSearchResultsToTrafficLight = (
       shareholding: "green", // Not directly available from search
       bankruptcy: getCategoryRisk(financialResults),
       legal: getCategoryRisk(legalResults),
+      regulatory: getCategoryRisk(regulatoryResults),
+      dismissals: getCategoryRisk(operationalResults),
+      environmental: getCategoryRisk(operationalResults),
+      operational: getCategoryRisk(operationalResults),
     },
     searchResults: searchResponse,
   };
@@ -160,7 +174,7 @@ const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
   const [query, setQuery] = useState("");
   const [boeEnabled, setBoeEnabled] = useState(true);
   const [newsEnabled, setNewsEnabled] = useState(true);
-  const [rssEnabled, setRssEnabled] = useState(false);
+  const [rssEnabled, setRssEnabled] = useState(true);
   const [dateRangeType, setDateRangeType] = useState<"preset" | "custom">(
     "preset"
   );
@@ -269,7 +283,8 @@ const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
         company_name: query.trim(),
         include_boe: boeEnabled,
         include_news: newsEnabled,
-        include_rss: false, // RSS is disabled for performance
+        include_rss: rssEnabled,
+        rss_feeds: rssEnabled ? selectedRssFeeds : [],
         ...(dateRangeType === "preset"
           ? { days_back: daysBack }
           : { start_date: startDate, end_date: endDate }),
@@ -536,17 +551,20 @@ const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
                         International news sources and business publications
                       </Typography>
                     </Card>
-                    {/* RSS Feeds - Disabled for Demo */}
+                    {/* RSS Feeds */}
                     <Card
                       variant="outlined"
                       sx={{
                         p: 2,
-                        cursor: "not-allowed",
-                        border: "1px solid #e0e0e0",
-                        backgroundColor: "#f5f5f5",
-                        opacity: 0.6,
+                        cursor: rssEnabled ? "pointer" : "pointer",
+                        border: rssEnabled
+                          ? "2px solid #1976d2"
+                          : "1px solid #e0e0e0",
+                        backgroundColor: rssEnabled ? "#f3f8ff" : "transparent",
                         transition: "all 0.2s",
+                        opacity: 1,
                       }}
+                      onClick={() => setRssEnabled((prev) => !prev)}
                     >
                       <Box
                         sx={{
@@ -556,16 +574,22 @@ const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
                           mb: 1,
                         }}
                       >
-                        <Globe size={20} color="#9e9e9e" />
+                        <Globe
+                          size={20}
+                          color={rssEnabled ? "#1976d2" : "#9e9e9e"}
+                        />
                         <Typography
                           variant="subtitle2"
-                          sx={{ fontWeight: 600, color: "#9e9e9e" }}
+                          sx={{
+                            fontWeight: 600,
+                            color: rssEnabled ? "#1976d2" : undefined,
+                          }}
                         >
-                          RSS Feeds (Demo Disabled)
+                          RSS Feeds
                         </Typography>
                       </Box>
                       <Typography variant="caption" color="text.secondary">
-                        Spanish news sources - disabled for demo performance
+                        Spanish news sources (El País, Expansión, etc.)
                       </Typography>
                     </Card>
                   </Box>
@@ -653,36 +677,45 @@ const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
                     Date Range
                   </Typography>
 
-                  <ToggleButtonGroup
-                    value={dateRangeType}
-                    exclusive
-                    onChange={handleDateRangeTypeChange}
-                    size="small"
-                    sx={{ mb: 2 }}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      gap: 2,
+                      alignItems: "center",
+                      flexWrap: "wrap",
+                      mb: 2,
+                    }}
                   >
-                    <ToggleButton value="preset">Quick Select</ToggleButton>
-                    <ToggleButton value="custom">Custom Range</ToggleButton>
-                  </ToggleButtonGroup>
-
-                  {dateRangeType === "preset" ? (
-                    <FormControl sx={{ minWidth: 200 }}>
-                      <InputLabel>Time Period</InputLabel>
-                      <Select
-                        value={daysBack}
-                        label="Time Period"
-                        onChange={handleDaysBackChange}
-                        disabled={isLoading}
-                      >
-                        <MenuItem value={7}>Last 7 days</MenuItem>
-                        <MenuItem value={14}>Last 2 weeks</MenuItem>
-                        <MenuItem value={30}>Last 30 days</MenuItem>
-                        <MenuItem value={60}>Last 2 months</MenuItem>
-                        <MenuItem value={90}>Last 3 months</MenuItem>
-                        <MenuItem value={180}>Last 6 months</MenuItem>
-                        <MenuItem value={365}>Last year</MenuItem>
-                      </Select>
-                    </FormControl>
-                  ) : (
+                    <ToggleButtonGroup
+                      value={dateRangeType}
+                      exclusive
+                      onChange={handleDateRangeTypeChange}
+                      size="small"
+                    >
+                      <ToggleButton value="preset">Quick Select</ToggleButton>
+                      <ToggleButton value="custom">Custom Range</ToggleButton>
+                    </ToggleButtonGroup>
+                    {dateRangeType === "preset" && (
+                      <FormControl sx={{ minWidth: 180 }}>
+                        <InputLabel>Time Period</InputLabel>
+                        <Select
+                          value={daysBack}
+                          label="Time Period"
+                          onChange={handleDaysBackChange}
+                          disabled={isLoading}
+                        >
+                          <MenuItem value={7}>Last 7 days</MenuItem>
+                          <MenuItem value={14}>Last 2 weeks</MenuItem>
+                          <MenuItem value={30}>Last 30 days</MenuItem>
+                          <MenuItem value={60}>Last 2 months</MenuItem>
+                          <MenuItem value={90}>Last 3 months</MenuItem>
+                          <MenuItem value={180}>Last 6 months</MenuItem>
+                          <MenuItem value={365}>Last year</MenuItem>
+                        </Select>
+                      </FormControl>
+                    )}
+                  </Box>
+                  {dateRangeType === "custom" && (
                     <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
                       <TextField
                         label="Start Date"

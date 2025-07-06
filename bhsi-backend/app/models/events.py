@@ -7,7 +7,17 @@ import enum
 class RiskLabel(str, enum.Enum):
     """D&O Insurance Risk Labels"""
     HIGH_LEGAL = "High-Legal"
-    MEDIUM_REG = "Medium-Reg"
+    HIGH_FINANCIAL = "High-Financial"
+    HIGH_REGULATORY = "High-Regulatory"
+    HIGH_OPERATIONAL = "High-Operational"
+    MEDIUM_LEGAL = "Medium-Legal"
+    MEDIUM_FINANCIAL = "Medium-Financial"
+    MEDIUM_REGULATORY = "Medium-Regulatory"
+    MEDIUM_OPERATIONAL = "Medium-Operational"
+    LOW_LEGAL = "Low-Legal"
+    LOW_FINANCIAL = "Low-Financial"
+    LOW_REGULATORY = "Low-Regulatory"
+    LOW_OPERATIONAL = "Low-Operational"
     LOW_OTHER = "Low-Other"
     UNKNOWN = "Unknown"
 
@@ -29,10 +39,14 @@ class Event(Base):
     embedding_model = Column(String, default=None)           # Model used for embedding
     
     # Risk classification
-    risk_label = Column(String, default=None, index=True)    # High-Legal/Medium-Reg/Low-Other/Unknown
-    rationale = Column(Text, default=None)                   # Classification reasoning
-    confidence = Column(Float, default=None)                 # Classification confidence (0.0-1.0)
-    classifier_ts = Column(DateTime(timezone=True), default=None)  # When classified
+    risk_label = Column(String, default=None, index=True)    
+    # High-Legal/Medium-Reg/Low-Other/Unknown
+    rationale = Column(Text, default=None)                   
+    # Classification reasoning
+    confidence = Column(Float, default=None)                 
+    # Classification confidence (0.0-1.0)
+    classifier_ts = Column(DateTime(timezone=True), 
+                          default=None)  # When classified
     
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -5,9 +5,11 @@ from tests.utils.utils import get_test_company_data, get_test_classification_dat
 
 def test_search_endpoint(client: TestClient):
     """Test the main search endpoint with minimal data"""
+    data = get_test_company_data()
+    data["id"] = "test-company-id-123"
     response = client.post(
         "/api/v1/search",
-        json=get_test_company_data()
+        json=data
     )
     assert response.status_code == 200
     data = response.json()

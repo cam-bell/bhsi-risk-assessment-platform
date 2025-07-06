@@ -127,3 +127,9 @@ bhsi-backend/search_results.json
 *.ipynb
 # Ignore Markdown summaries if not needed
 *SUMMARY.md
+
+node_modules/
+node_modules/**
+venv/
+venv/**
+node_modules/.package-lock.json

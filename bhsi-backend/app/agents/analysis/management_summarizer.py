@@ -8,10 +8,13 @@ import logging
 import httpx
 from typing import Dict, Any, List
 from datetime import datetime
-from app.agents.search.streamlined_yahoo_finance_agent import StreamlinedYahooFinanceAgent
+from app.agents.search.streamlined_yahoo_finance_agent import (
+    StreamlinedYahooFinanceAgent,
+)
 import hashlib
 import json
 from app.agents.analytics.cache_manager import AnalyticsCacheManager
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +48,7 @@ class ManagementSummarizer:
                 "recommendations": [
                     "Revisar inmediatamente los procedimientos de cumplimiento",
                     "Consultar con el departamento legal",
-                    "Implementar medidas de monitoreo adicionales"
+                    "Implementar medidas de monitoreo adicionales",
                 ]
             },
             "medium_risk": {
@@ -138,14 +141,38 @@ class ManagementSummarizer:
         if not force_refresh:
             cached = self.cache_manager.get("management_summary", **cache_key_args)
             if cached:
-                logger.info(f"Returning cached management summary for {company_name} [{language}]")
+                logger.info(
+                    f"Returning cached management summary for {company_name} "
+                    f"[{language}]"
+                )
                 return cached
 
+        # Log the classification results for debugging
+        logger.info(
+            f"Classification results for {company_name}: "
+            f"{len(classification_results)} items"
+        )
+        if len(classification_results) == 0:
+            logger.warning(
+                f"No classification results for {company_name}. "
+                f"Defaulting to template summary."
+            )
+        else:
+            # Optionally, log a sample of the results
+            logger.debug(
+                f"Sample classification result: "
+                f"{classification_results[0] if classification_results else 'N/A'}"
+            )
+
         financial_health = await self._get_financial_health(company_name)
+        fallback_reason = None
         try:
             logger.info(f"Attempting cloud summary for {company_name}")
             summary = await self._cloud_gemini_summary(
-                company_name, classification_results, include_evidence, language
+                company_name,
+                classification_results,
+                include_evidence,
+                language
             )
             summary["method"] = "cloud_gemini_analysis"
             self.cache_manager.set(
@@ -157,8 +184,14 @@ class ManagementSummarizer:
                 f"Cloud summary failed for {company_name}: {e}, "
                 "falling back to template"
             )
+            fallback_reason = (
+                f"Gemini service failed: {str(e)}"
+            )
             summary = self._template_summary(
-                company_name, classification_results, include_evidence, language
+                company_name,
+                classification_results,
+                include_evidence,
+                language
             )
             summary["method"] = "template_analysis"
             logger.info("Template summary generated.")
@@ -167,6 +200,12 @@ class ManagementSummarizer:
         summary["financial_health"] = financial_health
         summary["key_risks"] = self._extract_key_risks(classification_results)
         summary["compliance_status"] = self._default_compliance_status()
+        if fallback_reason:
+            summary["fallback_reason"] = fallback_reason
+        if len(classification_results) == 0:
+            prev_reason = summary.get("fallback_reason", "")
+            extra_reason = " | No classification results."
+            summary["fallback_reason"] = prev_reason + extra_reason
         return summary
     
     async def _cloud_gemini_summary(
@@ -177,30 +216,25 @@ class ManagementSummarizer:
         language: str
     ) -> Dict[str, Any]:
         """Generate summary using Cloud Gemini service for all major output sections"""
-        # Build structured risk breakdown
+        # Build structured risk breakdown using modular fields
         risk_breakdown = self._build_risk_breakdown(classification_results, include_evidence)
+        overall_risk = self._compute_overall_risk_from_breakdown(risk_breakdown)
         # Compose system-level prompt
         system_prompt = (
-            "You are a risk analyst generating executive summaries for companies based on automated risk classification data. "
-            "Given the risk breakdown (legal, financial, etc.), with level, reasoning, and evidence, generate:\n"
-            "1. A concise executive summary.\n"
-            "2. A list of key findings (bullet points).\n"
-            "3. A list of recommendations tailored to the company's risk profile.\n\n"
-            "IMPORTANT: You MUST respond with ONLY a valid JSON object. No additional text before or after the JSON.\n\n"
-            "Required JSON structure:\n"
-            "{\n"
-            '  "executive_summary": "A concise summary of the risk assessment in the specified language",\n'
-            '  "key_findings": ["Finding 1", "Finding 2", "Finding 3"],\n'
-            '  "recommendations": ["Recommendation 1", "Recommendation 2", "Recommendation 3"]\n'
-            "}\n\n"
-            f"Language: {language}\n"
-            "Example for Spanish:\n"
-            "{\n"
-            '  "executive_summary": "Análisis de riesgo ejecutivo para la empresa",\n'
-            '  "key_findings": ["Hallazgo 1", "Hallazgo 2"],\n'
-            '  "recommendations": ["Recomendación 1", "Recomendación 2"]\n'
-            "}\n\n"
-            "Respond ONLY with the JSON object, no other text."
+            f"Actúa como un analista de riesgos D&O para la empresa {company_name}. "
+            f"Analiza los siguientes documentos clasificados y genera: "
+            f"1. Un resumen ejecutivo claro y conciso sobre el riesgo global de la empresa. "
+            f"2. Una lista de hallazgos clave (key_findings) sobre riesgos legales, "
+            f"financieros, regulatorios u operativos. "
+            f"3. Una lista de recomendaciones para la dirección o aseguradores. "
+            f"Incluye evidencia si se solicita. "
+            f"Responde SOLO en JSON estricto con los campos: executive_summary, "
+            f"key_findings, recommendations. "
+            f"Idioma: {language}. "
+            f"\n\nDOCUMENTOS:\n" + "\n".join(
+                f"- {doc.get('title', '')}: {doc.get('summary', '')}"
+                for doc in classification_results[:10]
+            )
         )
         payload = {
             "company_name": company_name,
@@ -221,93 +255,90 @@ class ManagementSummarizer:
                     f"Gemini service returned {response.status_code}: "
                     f"{response.text}"
                 )
-            gemini_response = response.json()
+            gemini_result = response.json()
+            # If the response is wrapped in a 'text' field, extract and parse the JSON
+            if 'text' in gemini_result:
+                text_content = gemini_result['text']
+                text_content = re.sub(r'^```json\n?|^```|```$', '', text_content.strip(), flags=re.MULTILINE)
+                text_content = re.sub(r'^json\s*', '', text_content.strip(), flags=re.IGNORECASE)
+                try:
+                    gemini_result = json.loads(text_content)
+                except Exception as parse_exc:
+                    logger.error(
+                        "Failed to parse Gemini 'text' field as JSON. Content was: %s",
+                        text_content
+                    )
+                    # Try to fix common JSON issues before giving up
+                    try:
+                        # Fix specific issues seen in the logs
+                        # Fix missing colons after field names
+                        text_content = re.sub(r'(\w+)\s+"([^"]+)"\s*([^,}\]]+)', r'\1: "\2", \3', text_content)
+                        # Fix missing colons in nested objects
+                        text_content = re.sub(r'(\w+)\s*{', r'\1: {', text_content)
+                        # Remove trailing commas
+                        text_content = re.sub(r',\s*}', '}', text_content)
+                        text_content = re.sub(r',\s*]', ']', text_content)
+                        # Fix common Gemini formatting issues
+                        text_content = re.sub(r'}\s*,\s*"([^"]+)"\s*{', r'}, "\1": {', text_content)
+                        
+                        gemini_result = json.loads(text_content)
+                        logger.info("Successfully fixed and parsed malformed JSON from Gemini")
+                    except Exception as fix_exc:
+                        logger.error(
+                            "Failed to fix malformed JSON from Gemini: %s",
+                            fix_exc
+                        )
+                        # As a last resort, try to extract just the required fields manually
+                        try:
+                            logger.info("Attempting manual field extraction as fallback")
+                            manual_result = {
+                                "executive_summary": "Análisis de riesgo generado automáticamente debido a errores de formato.",
+                                "key_findings": ["Se requiere revisión manual del análisis"],
+                                "recommendations": ["Consultar con el equipo técnico para análisis detallado"]
+                            }
+                            gemini_result = manual_result
+                            logger.info("Using manual fallback fields")
+                        except Exception as manual_exc:
+                            logger.error("All JSON parsing attempts failed")
+                            raise Exception(f"Failed to parse Gemini 'text' field as JSON: {parse_exc}")
+            required_fields = ["executive_summary", "key_findings", "recommendations"]
+            if not all(k in gemini_result for k in required_fields):
+                logger.error(
+                    "Gemini response missing required fields. "
+                    "Response was: %s",
+                    gemini_result
+                )
+                raise Exception("Gemini response missing required fields")
             
-            # Extract the text from Gemini response
-            generated_text = gemini_response.get("text", "")
-            if not generated_text:
-                raise Exception("Gemini returned empty response")
-            
-            # Try to extract JSON from the generated text
+            # Log the structure for debugging
+            logger.debug(f"Gemini response structure: {list(gemini_result.keys())}")
+            if "key_findings" in gemini_result:
+                logger.debug(f"Key findings type: {type(gemini_result['key_findings'])}, length: {len(gemini_result['key_findings']) if isinstance(gemini_result['key_findings'], list) else 'not a list'}")
+            if "recommendations" in gemini_result:
+                logger.debug(f"Recommendations type: {type(gemini_result['recommendations'])}, length: {len(gemini_result['recommendations']) if isinstance(gemini_result['recommendations'], list) else 'not a list'}")
+            # Extract and process key findings and recommendations with better error handling
             try:
-                # Look for JSON in the response text
-                gemini_result = self._extract_json_from_text(generated_text)
-                if not gemini_result:
-                    logger.warning(f"Could not extract JSON from Gemini response for {company_name}")
-                    logger.debug(f"Raw Gemini response: {generated_text[:500]}...")
-                    raise Exception("Could not extract JSON from Gemini response")
-                
-                # Validate required fields
-                required_fields = ["executive_summary", "key_findings", "recommendations"]
-                missing_fields = [field for field in required_fields if field not in gemini_result]
-                if missing_fields:
-                    logger.warning(f"Gemini response for {company_name} missing fields: {missing_fields}")
-                    logger.debug(f"Available fields: {list(gemini_result.keys())}")
-                    raise Exception(f"Gemini response missing required fields: {missing_fields}")
-                
-                logger.info(f"Successfully parsed Gemini response for {company_name}")
-                return {
-                    "company_name": company_name,
-                    "overall_risk": self._analyze_risk_levels(classification_results)["overall_risk"],
-                    "executive_summary": gemini_result["executive_summary"],
-                    "risk_breakdown": risk_breakdown,
-                    "key_findings": gemini_result["key_findings"],
-                    "recommendations": gemini_result["recommendations"],
-                    "generated_at": datetime.utcnow().isoformat()
-                }
+                key_findings = self._ensure_list_of_strings(gemini_result["key_findings"], key="description")
+                logger.debug(f"Processed {len(key_findings)} key findings")
             except Exception as e:
-                logger.warning(f"Failed to parse Gemini JSON response for {company_name}: {e}")
-                logger.debug(f"Raw Gemini response: {generated_text[:500]}...")
-                raise Exception(f"Gemini response parsing failed: {str(e)}")
-    
-    def _extract_json_from_text(self, text: str) -> Dict[str, Any]:
-        """Extract JSON object from text response"""
-        import re
-        
-        # Try to find JSON object in the text
-        # Look for content between { and }
-        json_pattern = r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}'
-        matches = re.findall(json_pattern, text, re.DOTALL)
-        
-        logger.debug(f"Found {len(matches)} potential JSON matches in Gemini response")
-        
-        for i, match in enumerate(matches):
+                logger.warning(f"Error processing key_findings: {e}")
+                key_findings = ["Error processing key findings"]
+            
             try:
-                # Clean up the JSON string
-                cleaned_json = match.strip()
-                # Remove any markdown formatting
-                if cleaned_json.startswith('```json'):
-                    cleaned_json = cleaned_json[7:]
-                if cleaned_json.endswith('```'):
-                    cleaned_json = cleaned_json[:-3]
-                cleaned_json = cleaned_json.strip()
-                
-                logger.debug(f"Attempting to parse JSON match {i+1}: {cleaned_json[:100]}...")
-                result = json.loads(cleaned_json)
-                
-                # Validate that it has the expected structure
-                if isinstance(result, dict) and any(key in result for key in ["executive_summary", "key_findings", "recommendations"]):
-                    logger.debug(f"Successfully parsed valid JSON with keys: {list(result.keys())}")
-                    return result
-                else:
-                    logger.debug(f"JSON parsed but missing expected keys: {list(result.keys()) if isinstance(result, dict) else 'not a dict'}")
-                    
-            except json.JSONDecodeError as e:
-                logger.debug(f"JSON decode error for match {i+1}: {e}")
-                continue
-        
-        # If no JSON found, try to parse the entire text as JSON
-        try:
-            logger.debug("Attempting to parse entire text as JSON")
-            result = json.loads(text.strip())
-            if isinstance(result, dict) and any(key in result for key in ["executive_summary", "key_findings", "recommendations"]):
-                logger.debug(f"Successfully parsed entire text as JSON with keys: {list(result.keys())}")
-                return result
-        except json.JSONDecodeError as e:
-            logger.debug(f"Failed to parse entire text as JSON: {e}")
-        
-        logger.warning(f"No valid JSON found in response. Text preview: {text[:200]}...")
-        return None
+                recommendations = self._ensure_list_of_strings(gemini_result["recommendations"], key="recommendation")
+                logger.debug(f"Processed {len(recommendations)} recommendations")
+            except Exception as e:
+                logger.warning(f"Error processing recommendations: {e}")
+                recommendations = ["Error processing recommendations"]
+            return {
+                "company_name": company_name,
+                "overall_risk": overall_risk,
+                "executive_summary": gemini_result["executive_summary"],
+                "risk_breakdown": risk_breakdown,
+                "key_findings": key_findings,
+                "recommendations": recommendations,
+                "generated_at": datetime.utcnow().isoformat()
+            }
     
     def _template_summary(
         self, 
@@ -317,9 +348,9 @@ class ManagementSummarizer:
         language: str
     ) -> Dict[str, Any]:
         """Generate summary using templates (fallback only)"""
-        risk_analysis = self._analyze_risk_levels(classification_results)
-        overall_risk = risk_analysis["overall_risk"]
-        # Select template set based on language
+        # Use modular risk breakdown and overall risk for template as well
+        risk_breakdown = self._build_risk_breakdown(classification_results, include_evidence)
+        overall_risk = self._compute_overall_risk_from_breakdown(risk_breakdown)
         if language == "es":
             templates = self.spanish_templates
         elif language == "en":
@@ -328,11 +359,10 @@ class ManagementSummarizer:
             raise ValueError(f"Unsupported language: {language}")
         if overall_risk == "red":
             template = templates["high_risk"]
-        elif overall_risk == "orange":
+        elif overall_risk in ("amber", "orange", "yellow"):
             template = templates["medium_risk"]
         else:
             template = templates["low_risk"]
-        risk_breakdown = self._build_risk_breakdown(classification_results, include_evidence)
         key_findings = self._extract_key_findings(classification_results)
         return {
             "company_name": company_name,
@@ -405,13 +435,19 @@ class ManagementSummarizer:
                 "sanción", "sentencia", "procedimiento", "tribunal", "delito"
             ],
             "financial": [
-                "concurso", "insolvencia", "pérdidas", "facturación"
+                "concurso", "insolvencia", "pérdidas", "facturación", "deuda"
             ],
             "regulatory": [
-                "cnmv", "banco de españa", "cnmc", "aepd"
+                "cnmv", "banco de españa", "cnmc", "aepd", "dgsfp", "sepblac"
             ],
             "operational": [
-                "cese", "nombramiento", "fusión", "adquisición"
+                "cese", "nombramiento", "fusión", "adquisición", "despido"
+            ],
+            "dismissals": [
+                "despido", "regulación de empleo", "reducción de plantilla", "ere"
+            ],
+            "environmental": [
+                "contaminación", "multa ambiental", "sanción ecológica", "vertido"
             ]
         }
         
@@ -504,13 +540,52 @@ class ManagementSummarizer:
         return findings[:5]  # Limit to top 5 findings
     
     def _build_risk_breakdown(self, classification_results, include_evidence):
-        # Build risk breakdown for all categories
+        # Build risk breakdown for all categories using modular Gemini fields
+        # Collect all unique categories from results
+        categories = set()
+        for result in classification_results:
+            if "category" in result:
+                categories.add(result["category"])
+        # Fallback to default categories if none found
+        if not categories:
+            categories = {"legal", "financial", "regulatory", "shareholding", "dismissals", "environmental", "operational"}
         risk_breakdown = {}
-        for category in ["legal", "financial", "regulatory", "operational"]:
-            risk_breakdown[category] = self._analyze_category_risk(
-                classification_results, category, include_evidence
-            )
+        for category in categories:
+            # Gather all results for this category
+            cat_results = [r for r in classification_results if r.get("category") == category]
+            if not cat_results:
+                # No results for this category, mark as green/low
+                risk_breakdown[category] = {
+                    "level": "green",
+                    "reasoning": f"No risks detected in {category}",
+                    "evidence": [],
+                    "confidence": 1.0
+                }
+                continue
+            # Compute most severe label (red > amber > green)
+            label_priority = {"red": 3, "amber": 2, "orange": 2, "yellow": 2, "green": 1}
+            most_severe = max(cat_results, key=lambda r: label_priority.get(r.get("label", "green"), 1))
+            # Aggregate reasoning and evidence
+            reasonings = [r.get("reason", "") for r in cat_results if r.get("reason")]
+            evidence = [r.get("title", r.get("summary", "")) for r in cat_results if r.get("title") or r.get("summary")]
+            avg_conf = sum(r.get("confidence", 1.0) for r in cat_results) / len(cat_results)
+            risk_breakdown[category] = {
+                "level": most_severe.get("label", "green"),
+                "reasoning": "; ".join(reasonings)[:300],
+                "evidence": evidence[:3] if include_evidence else [],
+                "confidence": round(avg_conf, 3)
+            }
         return risk_breakdown
+
+    def _compute_overall_risk_from_breakdown(self, risk_breakdown):
+        # Compute overall risk as max severity across all categories
+        label_priority = {"red": 3, "amber": 2, "orange": 2, "yellow": 2, "green": 1}
+        max_label = "green"
+        for cat, breakdown in risk_breakdown.items():
+            label = breakdown.get("level", "green")
+            if label_priority.get(label, 1) > label_priority.get(max_label, 1):
+                max_label = label
+        return max_label
     
     async def health_check(self) -> Dict[str, Any]:
         """Check health of management summarizer components"""
@@ -584,4 +659,36 @@ class ManagementSummarizer:
         return {
             "overall": "compliant",
             "areas": []
-        } 
+        }
+
+    def _ensure_list_of_strings(self, lst, key=None):
+        if not isinstance(lst, list):
+            return []
+        result = []
+        for item in lst:
+            if isinstance(item, str):
+                result.append(item)
+            elif isinstance(item, dict):
+                # Try to extract a main field, or join all values
+                if key and key in item:
+                    result.append(str(item[key]))
+                elif "description" in item:
+                    # Common field name for descriptions
+                    result.append(str(item["description"]))
+                elif "action" in item:
+                    # Common field name for recommendations
+                    result.append(str(item["action"]))
+                elif "type" in item and "description" in item:
+                    # Combine type and description
+                    result.append(f"{item['type']}: {item['description']}")
+                else:
+                    # Join all values for a readable string, but be more selective
+                    important_fields = []
+                    for k, v in item.items():
+                        if isinstance(v, str) and len(v) > 0:
+                            important_fields.append(f"{k}: {v}")
+                    if important_fields:
+                        result.append(' | '.join(important_fields))
+                    else:
+                        result.append(' - '.join(str(v) for v in item.values() if v))
+        return result 
