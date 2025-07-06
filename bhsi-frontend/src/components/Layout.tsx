@@ -30,6 +30,7 @@ import {
   LogOut,
   User,
   BarChart3,
+  DollarSign,
 } from "lucide-react";
 import { useAuth } from "../auth/useAuth";
 import { NotificationCenter } from "./NotificationSystem";
@@ -44,6 +45,12 @@ const navigationItems = [
   { id: "dashboard", label: "Dashboard", icon: Dashboard, path: "/dashboard" },
   { id: "search", label: "Risk Assessment", icon: Search, path: "/" },
   { id: "analytics", label: "Analytics", icon: BarChart3, path: "/analytics" },
+  {
+    id: "financial-insights",
+    label: "Financial Insights",
+    icon: DollarSign,
+    path: "/financial-insights",
+  },
   { id: "batch", label: "Batch Upload", icon: FileUp, path: "/batch" },
   {
     id: "history",
