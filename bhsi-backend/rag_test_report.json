@@ -1,0 +1,86 @@
+{
+  "timestamp": "2025-07-06T21:10:33.372274",
+  "summary": {
+    "total_tests": 10,
+    "passed": 10,
+    "failed": 0,
+    "success_rate": 100.0,
+    "duration_seconds": 56.98026
+  },
+  "test_results": [
+    {
+      "test": "RAG Configuration",
+      "passed": true,
+      "message": "All configuration valid",
+      "details": null,
+      "timestamp": "2025-07-06T21:09:36.383157"
+    },
+    {
+      "test": "Vector_Search Service Health",
+      "passed": true,
+      "message": "Service healthy",
+      "details": null,
+      "timestamp": "2025-07-06T21:09:39.317093"
+    },
+    {
+      "test": "Gemini Service Health",
+      "passed": true,
+      "message": "Service healthy",
+      "details": null,
+      "timestamp": "2025-07-06T21:09:40.506268"
+    },
+    {
+      "test": "RAG Endpoint Import",
+      "passed": true,
+      "message": "RAG classes imported successfully",
+      "details": null,
+      "timestamp": "2025-07-06T21:10:33.348942"
+    },
+    {
+      "test": "RAG Orchestrator Init",
+      "passed": true,
+      "message": "RAG orchestrator initialized",
+      "details": null,
+      "timestamp": "2025-07-06T21:10:33.349398"
+    },
+    {
+      "test": "RAG Request Model",
+      "passed": true,
+      "message": "Request created: What are the current risks for Spanish banks?...",
+      "details": null,
+      "timestamp": "2025-07-06T21:10:33.351640"
+    },
+    {
+      "test": "RAG Source Formatting",
+      "passed": true,
+      "message": "Source formatted: Regulatory Update",
+      "details": null,
+      "timestamp": "2025-07-06T21:10:33.353259"
+    },
+    {
+      "test": "RAG Confidence Calculation",
+      "passed": true,
+      "message": "Confidence: 95.0%",
+      "details": null,
+      "timestamp": "2025-07-06T21:10:33.353584"
+    },
+    {
+      "test": "Spanish RAG Prompt",
+      "passed": true,
+      "message": "Spanish prompt created correctly",
+      "details": null,
+      "timestamp": "2025-07-06T21:10:33.355434"
+    },
+    {
+      "test": "English RAG Prompt",
+      "passed": true,
+      "message": "English prompt created correctly",
+      "details": null,
+      "timestamp": "2025-07-06T21:10:33.356176"
+    }
+  ],
+  "rag_config": {
+    "vector_search_url": "https://vector-search-185303190462.europe-west1.run.app",
+    "gemini_service_url": "https://gemini-service-185303190462.europe-west1.run.app"
+  }
+}
