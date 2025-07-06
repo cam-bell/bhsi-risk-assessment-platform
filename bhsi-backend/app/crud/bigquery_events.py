@@ -72,7 +72,7 @@ class BigQueryEventsCRUD(BigQueryCRUDBase):
             query = f"""
             SELECT *
             FROM `{self.table_id}`
-            WHERE risk_level IS NULL
+            WHERE risk_label IS NULL
             ORDER BY created_at ASC
             LIMIT @limit
             """
@@ -121,7 +121,7 @@ class BigQueryEventsCRUD(BigQueryCRUDBase):
         """Update risk classification for an event"""
         try:
             update_data = {
-                "risk_level": risk_label,
+                "risk_label": risk_label,
                 "confidence": confidence,
                 "rationale": rationale,
                 "classifier_ts": datetime.utcnow().isoformat(),
@@ -144,7 +144,7 @@ class BigQueryEventsCRUD(BigQueryCRUDBase):
             query = f"""
             SELECT *
             FROM `{self.table_id}`
-            WHERE risk_level = 'High-Legal'
+            WHERE risk_label = 'High-Legal'
               AND created_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL @days DAY)
             ORDER BY confidence DESC
             """
@@ -170,12 +170,12 @@ class BigQueryEventsCRUD(BigQueryCRUDBase):
             query = f"""
             SELECT 
                 COUNT(*) as total_events,
-                COUNT(CASE WHEN risk_level = 'High-Legal' THEN 1 END) as high_legal,
-                COUNT(CASE WHEN risk_level = 'Medium-Reg' THEN 1 END) as medium_reg,
-                COUNT(CASE WHEN risk_level = 'Low-Other' THEN 1 END) as low_other,
-                COUNT(CASE WHEN risk_level = 'Unknown' THEN 1 END) as unknown,
+                COUNT(CASE WHEN risk_label = 'High-Legal' THEN 1 END) as high_legal,
+                COUNT(CASE WHEN risk_label = 'Medium-Reg' THEN 1 END) as medium_reg,
+                COUNT(CASE WHEN risk_label = 'Low-Other' THEN 1 END) as low_other,
+                COUNT(CASE WHEN risk_label = 'Unknown' THEN 1 END) as unknown,
                 COUNT(CASE WHEN embedding_status IS NULL THEN 1 END) as unembedded,
-                COUNT(CASE WHEN risk_level IS NULL THEN 1 END) as unclassified
+                COUNT(CASE WHEN risk_label IS NULL THEN 1 END) as unclassified
             FROM `{self.table_id}`
             WHERE created_at >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL @days DAY)
             """

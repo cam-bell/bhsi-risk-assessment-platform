@@ -7,6 +7,8 @@ import logging
 from typing import List, Optional, Dict, Any
 from app.crud.bigquery_crud import BigQueryCRUDBase
 from google.cloud import bigquery
+from datetime import datetime
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -16,10 +18,6 @@ class BigQueryCompanyCRUD(BigQueryCRUDBase):
     
     def __init__(self):
         super().__init__(table_name="companies")
-    
-    async def get_by_vat(self, vat: str) -> Optional[Dict[str, Any]]:
-        """Get company by VAT number"""
-        return await self.get_by_id(vat, id_field="vat")
     
     async def get_by_name(self, name: str) -> Optional[Dict[str, Any]]:
         """Get company by name"""
@@ -33,37 +31,48 @@ class BigQueryCompanyCRUD(BigQueryCRUDBase):
     async def create_company(self, company_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new company"""
         try:
-            # Ensure VAT is present
-            if 'vat' not in company_data:
-                raise ValueError("VAT number is required")
-            
-            # Check if company already exists
-            existing = await self.get_by_vat(company_data['vat'])
+            # Check if company already exists by name
+            existing = await self.get_by_name(company_data.get('name', company_data.get('company_name', '')))
             if existing:
-                logger.warning(f"Company with VAT {company_data['vat']} already exists")
+                logger.warning(f"Company with name {company_data.get('name', company_data.get('company_name', ''))} already exists")
                 return existing
             
-            # Create company
-            result = await self.create(company_data)
-            logger.info(f"✅ Created company: {company_data.get('name', 'Unknown')}")
+            # Create company with correct field mapping (no id field needed)
+            company_row = {
+                "name": company_data.get('name', company_data.get('company_name', '')),
+                "sector": company_data.get('sector'),
+                "client_tier": company_data.get('client_tier'),
+                "created_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat()
+            }
+            
+            result = await self.create(company_row)
+            logger.info(f"✅ Created company: {company_row.get('name', 'Unknown')}")
             return result
             
         except Exception as e:
             logger.error(f"❌ BigQuery create_company failed: {e}")
             raise
     
-    async def update_company(self, vat: str, company_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Update company by VAT"""
+    async def update_company(self, name: str, company_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Update company by name"""
         try:
             # Check if company exists
-            existing = await self.get_by_vat(vat)
+            existing = await self.get_by_name(name)
             if not existing:
-                logger.warning(f"Company with VAT {vat} not found")
+                logger.warning(f"Company with name {name} not found")
                 return None
             
-            # Update company
-            result = await self.update(vat, company_data, id_field="vat")
-            logger.info(f"✅ Updated company: {company_data.get('name', 'Unknown')}")
+            # Update company with correct field mapping
+            update_data = {
+                "name": company_data.get('name', company_data.get('company_name', '')),
+                "sector": company_data.get('sector'),
+                "client_tier": company_data.get('client_tier'),
+                "updated_at": datetime.utcnow().isoformat()
+            }
+            
+            result = await self.update(name, update_data, id_field="name")
+            logger.info(f"✅ Updated company: {update_data.get('name', 'Unknown')}")
             return result
             
         except Exception as e:

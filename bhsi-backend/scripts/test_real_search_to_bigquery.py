@@ -6,17 +6,17 @@ This script runs a real search for Banco Santander and saves results to BigQuery
 
 import os
 import sys
+import asyncio
 from datetime import datetime, timedelta
 
 # Add the app directory to the path so we can import our modules
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-from app.services.database_integration import DatabaseIntegrationService
-from app.db.session import SessionLocal
+from app.services.bigquery_database_integration import BigQueryDatabaseIntegrationService
 from app.core.config import settings
 from app.agents.search.streamlined_orchestrator import StreamlinedSearchOrchestrator
 
-def main():
+async def main():
     """Test real search to BigQuery flow"""
     
     # Enable BigQuery
@@ -28,9 +28,7 @@ def main():
     print(f"Dataset: {settings.BIGQUERY_DATASET}")
     print(f"Table: {settings.BIGQUERY_RAW_DOCS_TABLE}")
     
-    # Create database session
-    db = SessionLocal()
-    integration_service = DatabaseIntegrationService()
+    integration_service = BigQueryDatabaseIntegrationService()
     
     try:
         # Search parameters
@@ -45,11 +43,10 @@ def main():
         orchestrator = StreamlinedSearchOrchestrator()
         
         # Run the search
-        import asyncio
-        search_results = asyncio.run(orchestrator.search_all(
+        search_results = await orchestrator.search_all(
             query=company_name,
             days_back=days_back
-        ))
+        )
         
         print(f"\n📊 Search results summary:")
         total_articles = 0
@@ -74,10 +71,9 @@ def main():
             print("❌ No search results found. Check your API keys and search parameters.")
             return
         
-        # Save to database (BigQuery)
+        # Save to BigQuery
         print(f"\n💾 Saving search results to BigQuery...")
-        save_stats = integration_service.save_search_results(
-            db=db,
+        save_stats = await integration_service.save_search_results(
             search_results=search_results,
             query=company_name,
             company_name=company_name
@@ -94,17 +90,14 @@ def main():
         
         # Verify in BigQuery
         print(f"\n🔍 Verifying data in BigQuery...")
-        verify_bigquery_data(company_name)
+        await verify_bigquery_data(company_name)
         
     except Exception as e:
         print(f"❌ ERROR: {e}")
         import traceback
         traceback.print_exc()
-    
-    finally:
-        db.close()
 
-def verify_bigquery_data(company_name):
+async def verify_bigquery_data(company_name):
     """Verify that data was saved to BigQuery"""
     try:
         import subprocess
@@ -153,4 +146,4 @@ def verify_bigquery_data(company_name):
         print(f"   ❌ Verification failed: {e}")
 
 if __name__ == "__main__":
-    main() 
+    asyncio.run(main()) 

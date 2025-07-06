@@ -7,12 +7,15 @@ import logging
 from typing import Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from app.services.auth_service import auth_service
+from app.services.auth_service import AuthService
 
 logger = logging.getLogger(__name__)
 
 # Security scheme for JWT tokens
 security = HTTPBearer()
+
+# Create auth service instance
+auth_service = AuthService()
 
 
 async def get_current_user(

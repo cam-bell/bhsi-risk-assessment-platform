@@ -78,6 +78,11 @@ async def fetch_classification_results(company_name: str) -> List[Dict[str, Any]
     # NewsAPI
     if "newsapi" in search_results and search_results["newsapi"].get("articles"):
         for article in search_results["newsapi"]["articles"]:
+            # Type check to prevent 'str' object has no attribute 'get' errors
+            if not isinstance(article, dict):
+                logger.warning(f"Skipping non-dict NewsAPI article: {type(article)} - {article}")
+                continue
+            
             classification = await classifier.classify_document(
                 text=article.get("content", article.get("description", "")),
                 title=article.get("title", ""),

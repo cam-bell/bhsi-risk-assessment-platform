@@ -35,7 +35,12 @@ class StreamlinedBOEAgent(BaseSearchAgent):
             
             if not start_date or not end_date:
                 end_date = today.strftime("%Y-%m-%d")
-                start_date = (today - timedelta(days=days_back)).strftime("%Y-%m-%d")
+                # Ensure days_back is an integer
+                try:
+                    days_back_int = int(days_back) if days_back is not None else 7
+                except (ValueError, TypeError):
+                    days_back_int = 7
+                start_date = (today - timedelta(days=days_back_int)).strftime("%Y-%m-%d")
             else:
                 # Validate dates
                 end_dt = datetime.strptime(end_date, "%Y-%m-%d")

@@ -1,12 +1,9 @@
 from typing import List, Optional, Dict, Any
-from sqlalchemy.orm import Session  # noqa: F401
-from sqlalchemy import func  # noqa: F401
 import hashlib
 from datetime import datetime
 import json
 import logging
 
-from app.models.raw_docs import RawDoc
 from app.services.bigquery_writer import BigQueryWriter
 
 logger = logging.getLogger(__name__)
@@ -19,15 +16,14 @@ class CRUDRawDoc:
         """Generate SHA-256 hash for deduplication"""
         return hashlib.sha256(payload).hexdigest()
 
-    def create_with_dedup(
+    async def create_with_dedup(
         self, 
-        db: Session = None, 
         *,
         source: str,
         payload: bytes,
         meta: Optional[Dict[str, Any]] = None
     ) -> tuple[Optional[Any], bool]:
-        """Create raw doc with deduplication (INSERT OR IGNORE)
+        """Create raw doc with deduplication (BigQuery only)
         Returns:
             tuple: (RawDoc, is_new) where is_new=True if document was just created
         """
@@ -35,107 +31,100 @@ class CRUDRawDoc:
         meta = meta or {}
         fetched_at = datetime.utcnow()
 
-        # Fallback to SQLite
+        # BigQuery only - no SQLite fallback
         try:
-            existing = db.query(RawDoc).filter(RawDoc.raw_id == raw_id).first()
+            # Check if document already exists in BigQuery
+            from app.crud.bigquery_raw_docs import bigquery_raw_docs
+            existing = await bigquery_raw_docs.get_by_id(raw_id, id_field="raw_id")
             if existing:
                 return existing, False  # Existing document, not new
-            db_obj = RawDoc(
-                raw_id=raw_id,
-                source=source,
-                payload=payload,
-                meta=meta,
-                fetched_at=fetched_at
-            )
-            db.add(db_obj)
-            db.commit()
-            db.refresh(db_obj)
-            # Use centralized BigQueryWriter (buffered, async, retry)
-            bq_writer.queue("raw_docs", db_obj)
-            return db_obj, True  # New document created
+            
+            # Create new document in BigQuery
+            doc_data = {
+                "raw_id": raw_id,
+                "source": source,
+                "payload": payload,
+                "meta": meta,
+                "fetched_at": fetched_at.isoformat(),
+                "created_at": fetched_at.isoformat(),
+                "updated_at": fetched_at.isoformat()
+            }
+            
+            result = await bigquery_raw_docs.create(doc_data)
+            logger.info(f"✅ Created raw doc in BigQuery: {raw_id}")
+            return result, True  # New document created
+            
         except Exception as e:
-            logger.error(f"SQLite operation failed: {e}")
-            db.rollback()
-            existing_after_rollback = (
-                db.query(RawDoc).filter(RawDoc.raw_id == raw_id).first()
-            )
-            return existing_after_rollback, False
+            logger.error(f"❌ BigQuery create_with_dedup failed: {e}")
+            return None, False
 
-    def get_unparsed(self, db: Session = None, limit: int = 100) -> List[Any]:
-        """Get unparsed documents (status IS NULL)"""
+    async def get_unparsed(self, limit: int = 100) -> List[Dict[str, Any]]:
+        """Get unparsed documents (status IS NULL) - BigQuery only"""
         try:
-            return (
-                db.query(RawDoc)
-                .filter(RawDoc.status.is_(None))
-                .limit(limit)
-                .all()
-            )
+            from app.crud.bigquery_raw_docs import bigquery_raw_docs
+            return await bigquery_raw_docs.get_unparsed_docs(limit)
         except Exception as e:
-            logger.error(f"SQLite get_unparsed failed: {e}")
+            logger.error(f"❌ BigQuery get_unparsed failed: {e}")
             return []
 
-    def mark_parsed(self, db: Session, raw_id: str) -> bool:
-        """Mark document as parsed"""
+    async def mark_parsed(self, raw_id: str) -> bool:
+        """Mark document as parsed - BigQuery only"""
         try:
-            db_obj = db.query(RawDoc).filter(RawDoc.raw_id == raw_id).first()
-            if db_obj:
-                db_obj.status = "parsed"
-                db_obj.updated_at = datetime.utcnow()
-                db.commit()
-                return True
-            return False
+            from app.crud.bigquery_raw_docs import bigquery_raw_docs
+            update_data = {
+                "status": "parsed",
+                "updated_at": datetime.utcnow().isoformat()
+            }
+            result = await bigquery_raw_docs.update(raw_id, update_data, id_field="raw_id")
+            return result is not None
         except Exception as e:
-            logger.error(f"SQLite mark_parsed failed: {e}")
-            db.rollback()
+            logger.error(f"❌ BigQuery mark_parsed failed: {e}")
             return False
 
-    def mark_error(self, db: Session, raw_id: str) -> bool:
-        """Mark document as error and increment retry count"""
+    async def mark_error(self, raw_id: str) -> bool:
+        """Mark document as error and increment retry count - BigQuery only"""
         try:
-            db_obj = db.query(RawDoc).filter(RawDoc.raw_id == raw_id).first()
-            if db_obj:
-                db_obj.retries += 1
-                db_obj.status = "error" if db_obj.retries < 5 else "dlq"
-                db_obj.updated_at = datetime.utcnow()
-                db.commit()
-                return True
-            return False
+            from app.crud.bigquery_raw_docs import bigquery_raw_docs
+            
+            # Get current document to check retries
+            doc = await bigquery_raw_docs.get_by_id(raw_id, id_field="raw_id")
+            if not doc:
+                return False
+            
+            current_retries = doc.get("retries", 0)
+            new_retries = current_retries + 1
+            status = "error" if new_retries < 5 else "dlq"
+            
+            update_data = {
+                "retries": new_retries,
+                "status": status,
+                "updated_at": datetime.utcnow().isoformat()
+            }
+            
+            result = await bigquery_raw_docs.update(raw_id, update_data, id_field="raw_id")
+            return result is not None
         except Exception as e:
-            logger.error(f"SQLite mark_error failed: {e}")
-            db.rollback()
+            logger.error(f"❌ BigQuery mark_error failed: {e}")
             return False
 
-    def get_stats(self, db: Session) -> Dict[str, int]:
-        """Get processing statistics"""
+    async def get_stats(self) -> Dict[str, int]:
+        """Get processing statistics - BigQuery only"""
         try:
-            stats = {}
-            stats["total"] = db.query(RawDoc).count()
-            stats["unparsed"] = db.query(RawDoc).filter(RawDoc.status.is_(None)).count()
-            stats["parsed"] = db.query(RawDoc).filter(RawDoc.status == "parsed").count()
-            stats["errors"] = db.query(RawDoc).filter(RawDoc.status == "error").count()
-            stats["dlq"] = db.query(RawDoc).filter(RawDoc.status == "dlq").count()
-            return stats
+            from app.crud.bigquery_raw_docs import bigquery_raw_docs
+            return await bigquery_raw_docs.get_stats()
         except Exception as e:
-            logger.error(f"SQLite get_stats failed: {e}")
+            logger.error(f"❌ BigQuery get_stats failed: {e}")
             return {}
 
-    def vacuum_old(self, db: Session, days_old: int = 30) -> int:
-        """Delete old parsed documents"""
+    async def vacuum_old(self, days_old: int = 30) -> int:
+        """Delete old parsed documents - BigQuery only"""
         try:
-            cutoff_date = datetime.utcnow().date()
-            from datetime import timedelta
-            cutoff_date = cutoff_date - timedelta(days=days_old)
-            deleted = (
-                db.query(RawDoc)
-                .filter(RawDoc.status == "parsed")
-                .filter(func.date(RawDoc.fetched_at) < cutoff_date)
-                .delete()
-            )
-            db.commit()
-            return deleted
+            from app.crud.bigquery_raw_docs import bigquery_raw_docs
+            return await bigquery_raw_docs.vacuum_old_docs(days_old)
         except Exception as e:
-            logger.error(f"SQLite vacuum_old failed: {e}")
-            db.rollback()
+            logger.error(f"❌ BigQuery vacuum_old failed: {e}")
             return 0
 
+
+# Global instance
 raw_docs = CRUDRawDoc() 

@@ -10,7 +10,7 @@ from pydantic import BaseModel, EmailStr
 from datetime import datetime
 
 from app.services.auth_service import AuthService
-from app.dependencies.auth import get_current_user, get_current_active_user, get_current_admin_user
+from app.dependencies.auth import get_current_active_user, get_current_admin_user
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +122,7 @@ async def login(request: LoginRequest):
 
 
 @router.post("/refresh")
-async def refresh_token(current_user: dict = Depends(get_current_user)):
+async def refresh_token(current_user: dict = Depends(get_current_active_user)):
     """
     Refresh access token using current user
     """
@@ -236,7 +236,7 @@ async def get_all_users(current_user: dict = Depends(get_current_admin_user)):
 async def update_user(
     user_id: str,
     request: UpdateUserRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_active_user)
 ):
     """
     Update user (admin only or self)

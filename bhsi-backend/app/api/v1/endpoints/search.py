@@ -7,7 +7,8 @@ Search API Endpoints - Unified search across BOE and news sources
     This file is kept for reference and backward compatibility only.
 """
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+import logging
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import time
@@ -15,7 +16,11 @@ import datetime
 
 from app.agents.search.streamlined_orchestrator import get_search_orchestrator
 from app.agents.analysis.optimized_hybrid_classifier import OptimizedHybridClassifier
+from app.services.vector_performance_optimizer import VectorPerformanceOptimizer
+from app.dependencies.auth import get_current_active_user, get_current_admin_user
+from app.services.bigquery_database_integration import BigQueryDatabaseIntegrationService
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Request/Response Models
@@ -28,6 +33,8 @@ class SearchRequest(BaseModel):
     include_news: bool = True
     include_rss: bool = True  # Include RSS news sources
     rss_feeds: Optional[list[str]] = None  # List of selected RSS feeds
+    limit: Optional[int] = None
+    risk_filter: Optional[str] = None
 
 
 @router.post("/search")
@@ -88,16 +95,14 @@ async def search(
         )
         search_time = time.time() - search_start_time
         
-        # STEP 2: DATABASE INTEGRATION - Save raw results
-        db_start_time = time.time()
-        # Since we're using BigQuery only, skip database integration for now
-        db_stats = {
-            "raw_docs_saved": 0,
-            "events_created": 0,
-            "total_processed": 0,
-            "errors": []
-        }
-        db_time = time.time() - db_start_time
+        # STEP 2: DATABASE INTEGRATION
+        logger.info("💾 Saving search results to BigQuery...")
+        db_integration = BigQueryDatabaseIntegrationService()
+        save_stats = await db_integration.save_search_results(
+            search_results=search_results,
+            query=request.company_name,
+            company_name=request.company_name
+        )
         
         # STEP 3: CLASSIFICATION
         classification_start_time = time.time()
@@ -152,6 +157,11 @@ async def search(
         if "newsapi" in search_results and search_results["newsapi"].get("articles"):
             for article in search_results["newsapi"]["articles"]:
                 try:
+                    # Type check to prevent 'str' object has no attribute 'get' errors
+                    if not isinstance(article, dict):
+                        logger.warning(f"Skipping non-dict NewsAPI article: {type(article)} - {article}")
+                        continue
+                    
                     classification = await classifier.classify_document(
                         text=article.get("content", article.get("description", "")),
                         title=article.get("title", ""),
@@ -284,14 +294,13 @@ async def search(
                 **classifier.get_performance_stats(),
                 "total_time_seconds": f"{total_time:.2f}",
                 "search_time_seconds": f"{search_time:.2f}",
-                "classification_time_seconds": f"{classification_time:.2f}",
-                "database_time_seconds": f"{db_time:.2f}"
+                "classification_time_seconds": f"{classification_time:.2f}"
             },
             "database_stats": {
-                "raw_docs_saved": db_stats["raw_docs_saved"],
-                "events_created": db_stats["events_created"],
-                "total_processed": db_stats["total_processed"],
-                "errors": db_stats["errors"][:5]
+                "raw_docs_saved": save_stats.get("raw_docs_saved", 0),
+                "events_created": save_stats.get("events_created", 0),
+                "total_processed": save_stats.get("total_processed", 0),
+                "errors": save_stats.get("errors", [])[:5]
             }
         }
         
@@ -392,4 +401,79 @@ async def get_database_stats():
         return {
             "status": "error",
             "message": f"Could not retrieve database stats: {str(e)}"
-        } 
+        }
+
+@router.post("/semantic-search")
+async def semantic_search(
+    request: SearchRequest,
+    current_user: dict = Depends(get_current_active_user)
+):
+    """
+    Semantic search using hybrid vector approach
+    """
+    try:
+        # Initialize vector performance optimizer
+        vector_optimizer = VectorPerformanceOptimizer()
+        
+        # Perform optimized semantic search
+        search_results = await vector_optimizer.optimized_semantic_search(
+            query=request.company_name,
+            k=request.limit or 10,
+            risk_filter=request.risk_filter,
+            use_cache=True
+        )
+        
+        # Get performance metrics
+        performance_metrics = vector_optimizer.get_performance_metrics()
+        
+        return {
+            "status": "success",
+            "search_results": search_results["results"],
+            "source": search_results["source"],
+            "performance_metrics": search_results["performance_metrics"],
+            "vector_metrics": performance_metrics
+        }
+        
+    except Exception as e:
+        logger.error(f"Semantic search failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/vector-stats")
+async def get_vector_stats(
+    current_user: dict = Depends(get_current_active_user)
+):
+    """
+    Get vector search performance statistics
+    """
+    try:
+        vector_optimizer = VectorPerformanceOptimizer()
+        stats = vector_optimizer.get_performance_metrics()
+        
+        return {
+            "status": "success",
+            "vector_performance": stats
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to get vector stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/optimize-vectors")
+async def optimize_vector_storage(
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """
+    Optimize vector storage (admin only)
+    """
+    try:
+        vector_optimizer = VectorPerformanceOptimizer()
+        stats = await vector_optimizer.optimize_vector_storage()
+        
+        return {
+            "status": "success",
+            "optimization_stats": stats
+        }
+        
+    except Exception as e:
+        logger.error(f"Vector optimization failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) 

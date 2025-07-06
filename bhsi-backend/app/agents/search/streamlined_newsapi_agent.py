@@ -31,7 +31,12 @@ class StreamlinedNewsAPIAgent(BaseSearchAgent):
         
         if not start_date and not end_date:
             end_dt = today
-            start_dt = today - timedelta(days=days_back or 7)
+            # Ensure days_back is an integer
+            try:
+                days_back_int = int(days_back) if days_back is not None else 7
+            except (ValueError, TypeError):
+                days_back_int = 7
+            start_dt = today - timedelta(days=days_back_int)
         else:
             # Parse end_date
             if end_date:

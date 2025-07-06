@@ -14,6 +14,7 @@ from app.agents.search.streamlined_orchestrator import get_search_orchestrator
 from app.agents.analysis.optimized_hybrid_classifier import OptimizedHybridClassifier
 from app.services.search_cache_service import SearchCacheService
 from app.services.bigquery_database_integration import bigquery_db_integration
+from app.services.hybrid_vector_storage import HybridVectorStorage
 from app.api import deps
 from app.dependencies.auth import get_current_active_user
 
@@ -23,6 +24,7 @@ router = APIRouter()
 
 # Initialize services
 search_cache_service = SearchCacheService()
+hybrid_vector_storage = HybridVectorStorage()
 
 def map_risk_level_to_color(risk_level: str) -> str:
     """Map risk level to color (green, orange, red)"""
@@ -47,6 +49,12 @@ class StreamlinedSearchRequest(BaseModel):
     force_refresh: bool = False  # Force new search even if cached results exist
     cache_age_hours: int = 24  # Maximum age of cached results in hours
 
+class SemanticSearchRequest(BaseModel):
+    query: str
+    k: Optional[int] = 5
+    risk_filter: Optional[str] = None
+    use_cache: bool = True
+    include_metadata: bool = True
 
 @router.post("/search")
 async def streamlined_search(
@@ -221,6 +229,11 @@ async def streamlined_search(
         if "newsapi" in search_results and search_results["newsapi"].get("articles"):
             for article in search_results["newsapi"]["articles"]:
                 try:
+                    # Type check to prevent 'str' object has no attribute 'get' errors
+                    if not isinstance(article, dict):
+                        logger.warning(f"Skipping non-dict NewsAPI article: {type(article)} - {article}")
+                        continue
+                    
                     # Skip classification if already classified (cached results)
                     if article.get("method") == "cached":
                         classified_result = {
@@ -638,4 +651,143 @@ async def get_cache_stats():
             "status": "error",
             "error": str(e),
             "cache_system": "BigQuery-based caching"
+        }
+
+
+@router.post("/semantic-search")
+async def streamlined_semantic_search(
+    request: SemanticSearchRequest,
+    current_user: dict = Depends(get_current_active_user)
+):
+    """
+    HYBRID SEMANTIC SEARCH ENDPOINT
+    
+    **Features:**
+    - True hybrid vector storage (BigQuery + ChromaDB + Cloud)
+    - Semantic similarity search across all stored vectors
+    - Multi-layer caching for optimal performance
+    - Risk filtering and metadata enrichment
+    - Parallel search across multiple vector stores
+    
+    **Vector Storage:**
+    - BigQuery: Persistent vector storage with metadata
+    - ChromaDB: High-performance local similarity search
+    - Cloud Vector Service: Scalable cloud-based search
+    
+    **Performance:**
+    - Cached results: < 500ms response time
+    - Fresh searches: 1-3 seconds
+    - Parallel search across all vector stores
+    """
+    
+    start_time = time.time()
+    
+    try:
+        # Perform hybrid semantic search
+        search_results = await hybrid_vector_storage.hybrid_semantic_search(
+            query=request.query,
+            k=request.k,
+            risk_filter=request.risk_filter,
+            use_cache=request.use_cache
+        )
+        
+        # Calculate total time
+        total_time = time.time() - start_time
+        
+        # Prepare response
+        response = {
+            "status": "success",
+            "query": request.query,
+            "search_results": search_results["results"],
+            "source": search_results["source"],
+            "performance_metrics": {
+                **search_results["performance_metrics"],
+                "total_time_seconds": f"{total_time:.2f}"
+            },
+            "hybrid_storage": {
+                "bigquery_searches": search_results["performance_metrics"].get("bigquery_searches", 0),
+                "chromadb_searches": search_results["performance_metrics"].get("chromadb_searches", 0),
+                "cloud_searches": search_results["performance_metrics"].get("cloud_searches", 0),
+                "cache_hits": search_results["performance_metrics"].get("cache_hits", 0)
+            },
+            "timestamp": datetime.datetime.utcnow().isoformat()
+        }
+        
+        return response
+        
+    except Exception as e:
+        total_time = time.time() - start_time
+        logger.error(f"Semantic search failed: {e}")
+        
+        return {
+            "status": "error",
+            "query": request.query,
+            "error": str(e),
+            "performance_metrics": {
+                "total_time_seconds": f"{total_time:.2f}",
+                "error": "Semantic search failed"
+            },
+            "timestamp": datetime.datetime.utcnow().isoformat()
+        }
+
+
+@router.get("/vector-stats")
+async def get_vector_stats(
+    current_user: dict = Depends(get_current_active_user)
+):
+    """
+    Get hybrid vector storage statistics
+    """
+    try:
+        stats = hybrid_vector_storage.get_hybrid_stats()
+        
+        return {
+            "status": "success",
+            "hybrid_vector_storage": {
+                "bigquery_searches": stats["bigquery_searches"],
+                "chromadb_searches": stats["chromadb_searches"],
+                "cloud_searches": stats["cloud_searches"],
+                "cache_hits": stats["cache_hits"],
+                "cloud_service_available": stats["cloud_service_available"],
+                "local_service_available": stats["local_service_available"],
+                "bigquery_available": stats["bigquery_available"]
+            },
+            "storage_systems": {
+                "bigquery": "Persistent vector storage with metadata",
+                "chromadb": "High-performance local similarity search",
+                "cloud_vector_service": "Scalable cloud-based search"
+            },
+            "timestamp": datetime.datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Vector stats failed: {e}")
+        return {
+            "status": "error",
+            "error": str(e)
+        }
+
+
+@router.post("/migrate-vectors")
+async def migrate_vectors_to_bigquery(
+    current_user: dict = Depends(get_current_active_user)
+):
+    """
+    Migrate existing vectors from ChromaDB to BigQuery
+    """
+    try:
+        migration_stats = await hybrid_vector_storage.migrate_vectors_to_bigquery()
+        
+        return {
+            "status": "success",
+            "migration_stats": migration_stats,
+            "message": "Vector migration completed",
+            "timestamp": datetime.datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Vector migration failed: {e}")
+        return {
+            "status": "error",
+            "error": str(e)
         } 

@@ -129,6 +129,11 @@ async def analyze_company(
         # Process NewsAPI results
         news_results = search_results.get("newsapi", {}).get("articles", [])
         for article in news_results:
+            # Type check to prevent 'str' object has no attribute 'get' errors
+            if not isinstance(article, dict):
+                logger.warning(f"Skipping non-dict NewsAPI article: {type(article)} - {article}")
+                continue
+            
             # Skip classification if already classified (cached results)
             if article.get("method") == "cached":
                 article["risk_level"] = article.get("risk_level", "Unknown")
@@ -221,7 +226,6 @@ async def analyze_company(
         
         # Save company metadata to BigQuery
         company_metadata = {
-            "vat": company.vat,
             "name": company.name,
             "description": company.description,
             "sector": company.sector,
@@ -231,13 +235,13 @@ async def analyze_company(
         # Check if company exists and update/create
         existing_company = await bigquery_company.get_by_name(company.name)
         if existing_company:
-            await bigquery_company.update_company(existing_company["vat"], company_metadata)
+            await bigquery_company.update_company(company.name, company_metadata)
         else:
             await bigquery_company.create_company(company_metadata)
         
         # Save comprehensive assessment to BigQuery
         assessment_dict = {
-            "company_id": company.vat,
+            "company_id": company.name,
             "user_id": "system",  # Default user for automated assessments
             "turnover": overall_risk,
             "shareholding": overall_risk,
@@ -265,29 +269,44 @@ async def analyze_company(
         
         # Format comprehensive analysis response
         analysis = {
-            "company_name": company.name,
-            "vat": company.vat,
-            "risk_assessment": {
-                "overall_risk": overall_risk,
-                "bankruptcy_risk": bankruptcy_risk,
-                "corruption_risk": corruption_risk,
-                "total_results": total_results,
-                "high_risk_count": high_risk_count,
-                "classified_results": classified_results
+            "risk_scores": {
+                "turnover": overall_risk,
+                "shareholding": overall_risk,
+                "bankruptcy": "red" if bankruptcy_risk else "green",
+                "legal": overall_risk,
+                "corruption": "red" if corruption_risk else "green",
+                "overall": overall_risk
             },
-            "performance_stats": performance_stats,
-            "enhanced_analytics": enhanced_analytics,
-            "processing_time": {
-                "total_time": total_time,
-                "db_time": db_time
+            "processed_results": {
+                "google_results": str(search_results.get("google", {})),
+                "bing_results": str(search_results.get("bing", {})),
+                "gov_results": str(search_results.get("boe", {})),
+                "news_results": str(search_results.get("newsapi", {})),
+                "rss_results": str(rss_results),
+                "analysis_summary": str({
+                    "total_results": total_results,
+                    "high_risk_count": high_risk_count,
+                    "classified_results": classified_results,
+                    "search_method": search_method
+                })
             },
-            "cache_info": {
-                "search_method": search_method,
-                "cache_age_hours": search_data.get("cache_info", {}).get("age_hours", 0),
-                "total_events": search_data.get("cache_info", {}).get("total_events", 0),
-                "sources": search_data.get("cache_info", {}).get("sources", [])
-            },
-            "database": "BigQuery"
+            "analysis_summary": {
+                "company_name": company.name,
+                "vat": company.vat,
+                "performance_stats": performance_stats,
+                "enhanced_analytics": enhanced_analytics,
+                "processing_time": {
+                    "total_time": total_time,
+                    "db_time": db_time
+                },
+                "cache_info": {
+                    "search_method": search_method,
+                    "cache_age_hours": search_data.get("cache_info", {}).get("age_hours", 0),
+                    "total_events": search_data.get("cache_info", {}).get("total_events", 0),
+                    "sources": search_data.get("cache_info", {}).get("sources", [])
+                },
+                "database": "BigQuery"
+            }
         }
         
         return analysis
@@ -629,7 +648,6 @@ async def unified_company_analysis(
         db_start_time = time.time()
         
         company_metadata = {
-            "vat": company.vat,
             "name": company.name,
             "description": company.description,
             "sector": company.sector,
@@ -638,12 +656,12 @@ async def unified_company_analysis(
         
         existing_company = await bigquery_company.get_by_name(company.name)
         if existing_company:
-            await bigquery_company.update_company(existing_company["vat"], company_metadata)
+            await bigquery_company.update_company(company.name, company_metadata)
         else:
             await bigquery_company.create_company(company_metadata)
         
         assessment_dict = {
-            "company_id": company.vat,
+            "company_id": company.name,
             "user_id": "system",
             "turnover": overall_risk,
             "shareholding": overall_risk,

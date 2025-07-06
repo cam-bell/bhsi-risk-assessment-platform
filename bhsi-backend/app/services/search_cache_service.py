@@ -82,6 +82,21 @@ class SearchCacheService:
             Cached results if available and fresh, None otherwise
         """
         try:
+            # Ensure numeric types robustly at the very beginning
+            logger.debug(f"🔍 Initial days_back type: {type(days_back)}, value: {days_back}")
+            if days_back is not None:
+                try:
+                    days_back = int(days_back)
+                    logger.debug(f"✅ Converted days_back to int at start: {days_back}")
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"⚠️ Failed to convert days_back '{days_back}' to int at start: {e}")
+                    days_back = 30  # Safe fallback
+            if cache_age_hours is not None:
+                try:
+                    cache_age_hours = int(cache_age_hours)
+                except (ValueError, TypeError):
+                    cache_age_hours = 24
+
             search_key = self._generate_search_key(
                 company_name, start_date, end_date, days_back, active_agents
             )
@@ -151,7 +166,15 @@ class SearchCacheService:
                 
                 # Check if event is within days_back
                 if days_back and event_date:
-                    cutoff_date = datetime.utcnow() - timedelta(days=days_back)
+                    # Ensure days_back is an integer
+                    try:
+                        days_back_int = int(days_back) if days_back is not None else 30
+                        logger.debug(f"✅ Using days_back_int: {days_back_int}")
+                    except (ValueError, TypeError) as e:
+                        logger.warning(f"⚠️ Failed to convert days_back '{days_back}' to int: {e}")
+                        days_back_int = 30  # Default fallback
+                    
+                    cutoff_date = datetime.utcnow() - timedelta(days=days_back_int)
                     # Convert both to date objects for comparison
                     if isinstance(event_date, datetime):
                         event_date_only = event_date.date()
@@ -336,6 +359,21 @@ class SearchCacheService:
             Search results with cache metadata
         """
         try:
+            # Ensure numeric types
+            logger.debug(f"🔍 Initial days_back type: {type(days_back)}, value: {days_back}")
+            if days_back is not None:
+                try:
+                    days_back = int(days_back)
+                    logger.debug(f"✅ Converted days_back to int: {days_back}")
+                except Exception as e:
+                    logger.warning(f"⚠️ Failed to convert days_back '{days_back}' to int: {e}")
+                    days_back = 30  # Default fallback
+            if cache_age_hours is not None:
+                try:
+                    cache_age_hours = int(cache_age_hours)
+                except Exception:
+                    cache_age_hours = 24
+
             # Check cache first (unless force refresh)
             if not force_refresh:
                 cached_results = await self.get_cached_results(

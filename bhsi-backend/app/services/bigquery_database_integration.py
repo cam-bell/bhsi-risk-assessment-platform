@@ -207,6 +207,12 @@ class BigQueryDatabaseIntegrationService:
         
         for article in news_results:
             try:
+                # Type check to prevent 'str' object has no attribute 'get' errors
+                if not isinstance(article, dict):
+                    logger.warning(f"Skipping non-dict NewsAPI article: {type(article)} - {article}")
+                    stats["errors"].append(f"Non-dict article skipped: {type(article)}")
+                    continue
+                
                 # Create payload for raw_docs
                 payload_data = {
                     "title": article.get("title", ""),
