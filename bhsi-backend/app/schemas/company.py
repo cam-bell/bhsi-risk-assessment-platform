@@ -9,6 +9,8 @@ class CompanyBase(BaseModel):
     description: Optional[str] = Field(None, description="Company description")
     sector: Optional[str] = Field(None, description="Company sector")
     client_tier: Optional[str] = Field(None, description="Client tier")
+    vat_number: Optional[str] = Field(
+        None, description="Company VAT number (unique)")
 
 
 class CompanyCreate(CompanyBase):
@@ -19,7 +21,6 @@ class CompanyCreate(CompanyBase):
     include_boe: bool = Field(True, description="Include BOE search")
     include_news: bool = Field(True, description="Include NewsAPI search")
     include_rss: bool = Field(True, description="Include RSS news sources")
-    vat: Optional[str] = Field(None, description="Company VAT number")
 
 
 class CompanyUpdate(CompanyBase):
@@ -28,7 +29,7 @@ class CompanyUpdate(CompanyBase):
 
 class CompanyInDBBase(CompanyBase):
     model_config = ConfigDict(from_attributes=True)
-    vat: str
+    id: str
     created_at: datetime
     updated_at: datetime
 
@@ -44,7 +45,7 @@ class RiskLevel(str, Enum):
 
 
 class AssessmentBase(BaseModel):
-    vat: str = Field(..., description="Company VAT number (FK)")
+    company_id: str = Field(..., description="Company ID (FK)")
     user_id: str
     turnover: RiskLevel
     shareholding: RiskLevel

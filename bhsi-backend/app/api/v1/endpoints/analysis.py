@@ -103,10 +103,10 @@ async def generate_management_summary(
 ) -> Dict[str, Any]:
     """
     Generate an executive management summary explaining company risk classification
-
+    
     **Purpose**: Provide executive-level explanation of why a company was classified 
     with specific risk levels.
-
+    
     **Input**: Classification results from the search endpoint
     **Output**: Executive summary with risk breakdown and recommendations
     """

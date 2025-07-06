@@ -154,7 +154,12 @@ async def health_check():
                 try:
                     result = list(client.query(query))
                     table_name = ["events", "companies", "raw_docs"][i]
-                    results[table_name] = result[0].count if result else 0
+                    # BigQuery returns Row objects, convert to dict for consistent access
+                    if result:
+                        row_dict = dict(result[0]) if hasattr(result[0], '_fields') else result[0]
+                        results[table_name] = row_dict.get('count', 0)
+                    else:
+                        results[table_name] = 0
                 except Exception as e:
                     results[f"table_{i}_error"] = str(e)
             
@@ -214,7 +219,8 @@ async def get_company_analytics(identifier: str) -> CompanyAnalyticsResponse:
         if hasattr(client, 'query'):
             company_results = list(client.query(company_query))
             if company_results:
-                company_info = company_results[0]
+                # BigQuery returns Row objects, convert to dict for consistent access
+                company_info = dict(company_results[0]) if hasattr(company_results[0], '_fields') else company_results[0]
         
         if not company_info and not hasattr(client, 'query'):
             # Mock company data
@@ -242,8 +248,10 @@ async def get_company_analytics(identifier: str) -> CompanyAnalyticsResponse:
         
         if hasattr(client, 'query'):
             for row in client.query(events_query):
-                risk_level = row.risk_label or "UNKNOWN"
-                count = row.count
+                # BigQuery returns Row objects, convert to dict for consistent access
+                row_dict = dict(row) if hasattr(row, '_fields') else row
+                risk_level = row_dict.get('risk_label') or "UNKNOWN"
+                count = row_dict.get('count', 0)
                 risk_distribution[risk_level] = count
                 total_events += count
         else:
@@ -272,16 +280,18 @@ async def get_company_analytics(identifier: str) -> CompanyAnalyticsResponse:
         latest_events = []
         if hasattr(client, 'query'):
             for row in client.query(latest_query):
+                # BigQuery returns Row objects, convert to dict for consistent access
+                row_dict = dict(row) if hasattr(row, '_fields') else row
                 latest_events.append({
-                    "event_id": row.event_id,
-                    "title": row.title,
-                    "risk_label": row.risk_label,
-                    "pub_date": row.pub_date.isoformat() if row.pub_date else None,
-                    "url": row.url,
-                    "source": row.source,
-                    "vat": row.vat,
-                    "alerted": row.alerted,
-                    "rationale": row.rationale
+                    "event_id": row_dict.get("event_id"),
+                    "title": row_dict.get("title"),
+                    "risk_label": row_dict.get("risk_label"),
+                    "pub_date": row_dict.get("pub_date").isoformat() if row_dict.get("pub_date") else None,
+                    "url": row_dict.get("url"),
+                    "source": row_dict.get("source"),
+                    "vat": row_dict.get("vat"),
+                    "alerted": row_dict.get("alerted"),
+                    "rationale": row_dict.get("rationale")
                 })
         else:
             # Mock data
@@ -316,11 +326,13 @@ async def get_company_analytics(identifier: str) -> CompanyAnalyticsResponse:
         risk_trend = []
         if hasattr(client, 'query'):
             for row in client.query(trend_query):
+                # BigQuery returns Row objects, convert to dict for consistent access
+                row_dict = dict(row) if hasattr(row, '_fields') else row
                 risk_trend.append({
-                    "date": row.date.isoformat() if row.date else None,
-                    "risk_label": row.risk_label,
-                    "count": row.count,
-                    "alerts_triggered": row.alerts_triggered
+                    "date": row_dict.get("date").isoformat() if row_dict.get("date") else None,
+                    "risk_label": row_dict.get("risk_label"),
+                    "count": row_dict.get("count", 0),
+                    "alerts_triggered": row_dict.get("alerts_triggered", 0)
                 })
         else:
             # Mock data
@@ -381,13 +393,15 @@ async def get_risk_trends():
         trends = []
         if hasattr(client, 'query'):
             for row in client.query(query):
+                # BigQuery returns Row objects, convert to dict for consistent access
+                row_dict = dict(row) if hasattr(row, '_fields') else row
                 trends.append({
-                    "date": row.date.isoformat() if row.date else None,
-                    "risk_label": row.risk_label,
-                    "source": row.source,
-                    "event_count": row.event_count,
-                    "unique_companies": row.unique_companies,
-                    "alerts_triggered": row.alerts_triggered
+                    "date": row_dict.get("date").isoformat() if row_dict.get("date") else None,
+                    "risk_label": row_dict.get("risk_label"),
+                    "source": row_dict.get("source"),
+                    "event_count": row_dict.get("event_count", 0),
+                    "unique_companies": row_dict.get("unique_companies", 0),
+                    "alerts_triggered": row_dict.get("alerts_triggered", 0)
                 })
         else:
             # Mock data
@@ -433,13 +447,15 @@ async def get_alert_summary():
         alerts = []
         if hasattr(client, 'query'):
             for row in client.query(query):
+                # BigQuery returns Row objects, convert to dict for consistent access
+                row_dict = dict(row) if hasattr(row, '_fields') else row
                 alerts.append({
-                    "risk_label": row.risk_label,
-                    "source": row.source,
-                    "total_events": row.total_events,
-                    "alerts_triggered": row.alerts_triggered,
-                    "alert_rate": row.alerts_triggered / row.total_events if row.total_events > 0 else 0,
-                    "last_alert_time": row.last_alert_time.isoformat() if row.last_alert_time else None
+                    "risk_label": row_dict.get("risk_label"),
+                    "source": row_dict.get("source"),
+                    "total_events": row_dict.get("total_events", 0),
+                    "alerts_triggered": row_dict.get("alerts_triggered", 0),
+                    "alert_rate": row_dict.get("alerts_triggered", 0) / row_dict.get("total_events", 1) if row_dict.get("total_events", 0) > 0 else 0,
+                    "last_alert_time": row_dict.get("last_alert_time").isoformat() if row_dict.get("last_alert_time") else None
                 })
         else:
             # Mock data
@@ -487,14 +503,16 @@ async def get_sector_analysis():
         sectors = []
         if hasattr(client, 'query'):
             for row in client.query(query):
+                # BigQuery returns Row objects, convert to dict for consistent access
+                row_dict = dict(row) if hasattr(row, '_fields') else row
                 sectors.append({
-                    "sector": row.sector,
-                    "client_tier": row.client_tier,
-                    "total_companies": row.total_companies,
-                    "total_events": row.total_events,
-                    "high_risk_events": row.high_risk_events,
-                    "alerts_triggered": row.alerts_triggered,
-                    "risk_ratio": row.high_risk_events / row.total_events if row.total_events > 0 else 0
+                    "sector": row_dict.get("sector"),
+                    "client_tier": row_dict.get("client_tier"),
+                    "total_companies": row_dict.get("total_companies", 0),
+                    "total_events": row_dict.get("total_events", 0),
+                    "high_risk_events": row_dict.get("high_risk_events", 0),
+                    "alerts_triggered": row_dict.get("alerts_triggered", 0),
+                    "risk_ratio": row_dict.get("high_risk_events", 0) / row_dict.get("total_events", 1) if row_dict.get("total_events", 0) > 0 else 0
                 })
         else:
             # Mock data
@@ -542,13 +560,15 @@ async def get_raw_docs_stats():
         stats = []
         if hasattr(client, 'query'):
             for row in client.query(query):
+                # BigQuery returns Row objects, convert to dict for consistent access
+                row_dict = dict(row) if hasattr(row, '_fields') else row
                 stats.append({
-                    "source": row.source,
-                    "status": row.status,
-                    "fetch_date": row.fetch_date.isoformat() if row.fetch_date else None,
-                    "document_count": row.document_count,
-                    "retry_count": row.retry_count,
-                    "avg_retries": float(row.avg_retries) if row.avg_retries else 0
+                    "source": row_dict.get("source"),
+                    "status": row_dict.get("status"),
+                    "fetch_date": row_dict.get("fetch_date").isoformat() if row_dict.get("fetch_date") else None,
+                    "document_count": row_dict.get("document_count", 0),
+                    "retry_count": row_dict.get("retry_count", 0),
+                    "avg_retries": float(row_dict.get("avg_retries", 0)) if row_dict.get("avg_retries") else 0
                 })
         else:
             # Mock data
@@ -596,14 +616,16 @@ async def get_events_stats():
         stats = []
         if hasattr(client, 'query'):
             for row in client.query(query):
+                # BigQuery returns Row objects, convert to dict for consistent access
+                row_dict = dict(row) if hasattr(row, '_fields') else row
                 stats.append({
-                    "source": row.source,
-                    "risk_label": row.risk_label,
-                    "embedding_model": row.embedding_model,
-                    "classification_date": row.classification_date.isoformat() if row.classification_date else None,
-                    "event_count": row.event_count,
-                    "embedding_rate": float(row.embedding_rate) if row.embedding_rate else 0,
-                    "alert_count": row.alert_count
+                    "source": row_dict.get("source"),
+                    "risk_label": row_dict.get("risk_label"),
+                    "embedding_model": row_dict.get("embedding_model"),
+                    "classification_date": row_dict.get("classification_date").isoformat() if row_dict.get("classification_date") else None,
+                    "event_count": row_dict.get("event_count", 0),
+                    "embedding_rate": float(row_dict.get("embedding_rate", 0)) if row_dict.get("embedding_rate") else 0,
+                    "alert_count": row_dict.get("alert_count", 0)
                 })
         else:
             # Mock data

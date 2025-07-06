@@ -13,9 +13,11 @@ from sqlalchemy.orm import Session
 from app.crud.raw_docs import raw_docs
 from app.crud.events import events
 from app.agents.analysis.processor import EventNormalizer
+from app.services.bigquery_writer import BigQueryWriter
 
 logger = logging.getLogger(__name__)
 
+bigquery_writer = BigQueryWriter(batch_size=1)
 
 class DatabaseIntegrationService:
     """Service to integrate search results with database persistence"""
@@ -61,6 +63,15 @@ class DatabaseIntegrationService:
                 stats["events_created"] += boe_stats["events_created"]
                 stats["total_processed"] += boe_stats["total_processed"]
                 stats["errors"].extend(boe_stats["errors"])
+            
+            # DEBUG: Log NewsAPI structure
+            if "newsapi" in search_results:
+                logger.debug(f"NewsAPI result keys: {list(search_results['newsapi'].keys())}")
+                articles = search_results["newsapi"].get("articles")
+                if articles and isinstance(articles, list) and len(articles) > 0:
+                    logger.debug(f"First article sample: {articles[0]}")
+                else:
+                    logger.debug("No articles found or articles is not a list.")
             
             # Process NewsAPI results
             if "newsapi" in search_results and search_results["newsapi"].get("articles"):
@@ -113,7 +124,13 @@ class DatabaseIntegrationService:
                 f"{stats['raw_docs_saved']} raw docs, {stats['events_created']} events"
             )
             
-            # CloudEmbeddingAgent().process_unembedded_events()
+            # Process embeddings for events
+            from app.agents.analysis.cloud_embedder import CloudEmbeddingAgent
+            embedding_agent = CloudEmbeddingAgent()
+            embedding_stats = embedding_agent.process_unembedded_events(batch_size=50)
+            logger.info(f"Embedding processing complete: {embedding_stats}")
+            
+            bigquery_writer.flush()
             
         except Exception as e:
             logger.error(f"Database integration failed: {e}")
@@ -157,10 +174,12 @@ class DatabaseIntegrationService:
                     "identificador": result.get("identificador", "")
                 }
                 rawdoc_dict = self.build_rawdoc_dict("BOE", payload_bytes, meta)
+                logger.info(f"Attempting to create raw doc for article: {payload_data.get('titulo', '')}")
                 raw_doc, is_new = self.raw_docs_crud.create_with_dedup(
                     db,
                     **rawdoc_dict
                 )
+                logger.info(f"Raw doc created: {is_new}, Source: BOE, Title: {payload_data.get('titulo', '')}")
                 if is_new:
                     stats["raw_docs_saved"] += 1
                     
@@ -174,9 +193,11 @@ class DatabaseIntegrationService:
                                 ).date()
                             except Exception:
                                 pass
-                        event = self.normalizer.normalize_and_create_event(db, raw_doc, "BOE")
+                        event = self.normalizer.normalize_and_create_event(db, raw_doc, "BOE", company_name)
                         if event:
                             stats["events_created"] += 1
+                            bigquery_writer.queue("solid-topic-443216-b2.risk_monitoring.events", event)
+                            logger.info(f"Queued event {getattr(event, 'event_id', None)} for BigQuery: {getattr(event, 'title', None)}")
                     except Exception as e:
                         stats["errors"].append(f"Event creation error: {str(e)}")
                 stats["total_processed"] += 1
@@ -212,10 +233,12 @@ class DatabaseIntegrationService:
                     "author": article.get("author", "")
                 }
                 rawdoc_dict = self.build_rawdoc_dict("NewsAPI", payload_bytes, meta)
+                logger.info(f"Attempting to create raw doc for article: {payload_data.get('title', '')}")
                 raw_doc, is_new = self.raw_docs_crud.create_with_dedup(
                     db,
                     **rawdoc_dict
                 )
+                logger.info(f"Raw doc created: {is_new}, Source: NewsAPI, Title: {payload_data.get('title', '')}")
                 if is_new:
                     stats["raw_docs_saved"] += 1
                     
@@ -230,9 +253,11 @@ class DatabaseIntegrationService:
                                 ).date()
                             except Exception:
                                 pass
-                        event = self.normalizer.normalize_and_create_event(db, raw_doc, "NewsAPI")
+                        event = self.normalizer.normalize_and_create_event(db, raw_doc, "NewsAPI", company_name)
                         if event:
                             stats["events_created"] += 1
+                            bigquery_writer.queue("solid-topic-443216-b2.risk_monitoring.events", event)
+                            logger.info(f"Queued event {getattr(event, 'event_id', None)} for BigQuery: {getattr(event, 'title', None)}")
                     except Exception as e:
                         stats["errors"].append(f"Event creation error: {str(e)}")
                 stats["total_processed"] += 1
@@ -265,6 +290,7 @@ class DatabaseIntegrationService:
                     db,
                     **rawdoc_dict
                 )
+                logger.info(f"Raw doc created: {is_new}, Source: {source_name}, Title: {article.get('title', '')}")
                 if is_new:
                     stats["raw_docs_saved"] += 1
                     # Create event from raw doc
@@ -278,9 +304,11 @@ class DatabaseIntegrationService:
                                 ).date()
                             except Exception:
                                 pass
-                        event = self.normalizer.normalize_and_create_event(db, raw_doc, source_name.upper())
+                        event = self.normalizer.normalize_and_create_event(db, raw_doc, source_name.upper(), company_name)
                         if event:
                             stats["events_created"] += 1
+                            bigquery_writer.queue("solid-topic-443216-b2.risk_monitoring.events", event)
+                            logger.info(f"Queued event {getattr(event, 'event_id', None)} for BigQuery: {getattr(event, 'title', None)}")
                     except Exception as e:
                         stats["errors"].append(f"Event creation error: {str(e)}")
                 stats["total_processed"] += 1
@@ -311,13 +339,16 @@ class DatabaseIntegrationService:
                     db,
                     **rawdoc_dict
                 )
+                logger.info(f"Raw doc created: {is_new}, Source: YAHOO_FINANCE, Title: {financial_data.get('ticker', '')}")
                 if is_new:
                     stats["raw_docs_saved"] += 1
                     # Create event from raw doc
                     try:
-                        event = self.normalizer.normalize_and_create_event(db, raw_doc, "YAHOO_FINANCE")
+                        event = self.normalizer.normalize_and_create_event(db, raw_doc, "YAHOO_FINANCE", company_name)
                         if event:
                             stats["events_created"] += 1
+                            bigquery_writer.queue("solid-topic-443216-b2.risk_monitoring.events", event)
+                            logger.info(f"Queued event {getattr(event, 'event_id', None)} for BigQuery: {getattr(event, 'title', None)}")
                     except Exception as e:
                         stats["errors"].append(f"Event creation error: {str(e)}")
                 stats["total_processed"] += 1

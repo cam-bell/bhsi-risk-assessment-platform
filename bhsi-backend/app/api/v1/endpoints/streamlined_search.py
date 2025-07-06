@@ -26,7 +26,8 @@ class StreamlinedSearchRequest(BaseModel):
     days_back: Optional[int] = 7      # Alternative: search last N days
     include_boe: bool = True
     include_news: bool = True
-    include_rss: bool = False  # Include RSS news sources
+    include_rss: bool = True  # Include RSS news sources
+    rss_feeds: Optional[list] = None  # List of RSS feeds to include
 
 
 @router.post("/search")
@@ -69,20 +70,24 @@ async def streamlined_search(
             active_agents.append("boe")
         if request.include_news:
             active_agents.append("newsapi")
-        # RSS disabled for demo performance
-        # if request.include_rss:
-        #     # Only include El Pais and Expansion for demo speed
-        #     active_agents.extend([
-        #         "elpais", 
-        #         "expansion"
-        #         # "elmundo",  # Disabled for demo
-        #         # "abc",      # Disabled for demo
-        #         # "lavanguardia", # Disabled for demo
-        #         # "elconfidencial", # Disabled for demo
-        #         # "eldiario", # Disabled for demo
-        #         # "europapress" # Disabled for demo
-        #     ])
-            
+        # Enable RSS feeds if requested
+        if request.include_rss:
+            # Use only selected RSS feeds if provided, else default to demo feeds
+            selected_rss_feeds = getattr(request, 'rss_feeds', None)
+            if selected_rss_feeds:
+                active_agents.extend(selected_rss_feeds)
+            else:
+                active_agents.extend([
+                    "elpais",
+                    "expansion"
+                    "elmundo",  # Disabled for demo
+                    "abc",      # Disabled for demo
+                    "lavanguardia", # Disabled for demo
+                    "elconfidencial", # Disabled for demo
+                    "eldiario", # Disabled for demo
+                    "europapress" # Disabled for demo
+                ])
+        
         if not active_agents:
             raise HTTPException(
                 status_code=400,
@@ -200,64 +205,67 @@ async def streamlined_search(
                     }
                     classified_results.append(classified_result)
         
-        # RSS processing disabled for demo performance
-        # # Process RSS results (only El Pais and Expansion for demo)
-        # rss_agents = [
-        #     "elpais", 
-        #     "expansion"
-        #     # "elmundo",  # Disabled for demo
-        #     # "abc",      # Disabled for demo
-        #     # "lavanguardia", # Disabled for demo
-        #     # "elconfidencial", # Disabled for demo
-        #     # "eldiario", # Disabled for demo
-        #     # "europapress" # Disabled for demo
-        # ]
-        # for agent_name in rss_agents:
-        #     if agent_name in search_results and search_results[agent_name].get("articles"):
-        #         for article in search_results[agent_name]["articles"]:
-        #             try:
-        #                 # Optimized hybrid classification
-        #                 classification = await classifier.classify_document(
-        #                     text=article.get("content", article.get("description", "")),
-        #                     title=article.get("title", ""),
-        #                     source=f"RSS-{agent_name.upper()}"
-        #                 )
-        #                 
-        #                 classified_result = {
-        #                     "source": f"RSS-{agent_name.upper()}",
-        #                     "date": article.get("publishedAt"),
-        #                     "title": article.get("title", ""),
-        #                     "summary": article.get("description"),
-        #                     "risk_level": classification.get("label", "Unknown"),
-        #                     "confidence": classification.get("confidence", 0.5),
-        #                     "method": classification.get("method", "unknown"),
-        #                     "processing_time_ms": classification.get("processing_time_ms", 0),
-        #                     "url": article.get("url", ""),
-        #                     # RSS-specific fields
-        #                     "author": article.get("author"),
-        #                     "category": article.get("category"),
-        #                     "source_name": article.get("source_name", f"RSS-{agent_name.upper()}")
-        #                 }
-        #                 classified_results.append(classified_result)
-        #                 
-        #             except Exception as e:
-        #                 # Simple fallback
-        #                 classified_result = {
-        #                     "source": f"RSS-{agent_name.upper()}",
-        #                     "date": article.get("publishedAt"),
-        #                     "title": article.get("title", ""),
-        #                     "summary": article.get("description"),
-        #                     "risk_level": "Unknown",
-        #                     "confidence": 0.3,
-        #                     "method": "error_fallback",
-        #                     "processing_time_ms": 0,
-        #                     "url": article.get("url", ""),
-        #                     "author": article.get("author"),
-        #                     "category": article.get("category"),
-        #                     "source_name": article.get("source_name", f"RSS-{agent_name.upper()}"),
-        #                     "error": str(e)
-        #                 }
-        #                 classified_results.append(classified_result)
+        # Process RSS results (only selected feeds)
+        rss_agents = (
+            selected_rss_feeds if (request.include_rss and selected_rss_feeds)
+            else [
+                "elpais",
+                "expansion"
+                "elmundo",  # Disabled for demo
+                "abc",      # Disabled for demo
+                "lavanguardia", # Disabled for demo
+                "elconfidencial", # Disabled for demo
+                "eldiario", # Disabled for demo
+                "europapress" # Disabled for demo
+            ]
+        )
+        if request.include_rss:
+            for agent_name in rss_agents:
+                if agent_name in search_results and search_results[agent_name].get("articles"):
+                    for article in search_results[agent_name]["articles"]:
+                        try:
+                            # Optimized hybrid classification
+                            classification = await classifier.classify_document(
+                                text=article.get("content", article.get("description", "")),
+                                title=article.get("title", ""),
+                                source=f"RSS-{agent_name.upper()}"
+                            )
+                            
+                            classified_result = {
+                                "source": f"RSS-{agent_name.upper()}",
+                                "date": article.get("publishedAt"),
+                                "title": article.get("title", ""),
+                                "summary": article.get("description"),
+                                "risk_level": classification.get("label", "Unknown"),
+                                "confidence": classification.get("confidence", 0.5),
+                                "method": classification.get("method", "unknown"),
+                                "processing_time_ms": classification.get("processing_time_ms", 0),
+                                "url": article.get("url", ""),
+                                # RSS-specific fields
+                                "author": article.get("author"),
+                                "category": article.get("category"),
+                                "source_name": article.get("source_name", f"RSS-{agent_name.upper()}")
+                            }
+                            classified_results.append(classified_result)
+                            
+                        except Exception as e:
+                            # Simple fallback
+                            classified_result = {
+                                "source": f"RSS-{agent_name.upper()}",
+                                "date": article.get("publishedAt"),
+                                "title": article.get("title", ""),
+                                "summary": article.get("description"),
+                                "risk_level": "Unknown",
+                                "confidence": 0.3,
+                                "method": "error_fallback",
+                                "processing_time_ms": 0,
+                                "url": article.get("url", ""),
+                                "author": article.get("author"),
+                                "category": article.get("category"),
+                                "source_name": article.get("source_name", f"RSS-{agent_name.upper()}") ,
+                                "error": str(e)
+                            }
+                            classified_results.append(classified_result)
         
         classification_time = time.time() - classification_start_time
         
@@ -303,7 +311,7 @@ async def streamlined_search(
                 "total_results": len(valid_results),
                 "boe_results": len([r for r in valid_results if r["source"] == "BOE"]),
                 "news_results": len([r for r in valid_results if r["source"] == "News"]),
-                "rss_results": 0,  # RSS disabled for demo
+                "rss_results": len([r for r in valid_results if r["source"].startswith("RSS-")]),
                 "high_risk_results": len([r for r in valid_results if r["risk_level"] == "High-Legal"]),
                 "sources_searched": active_agents
             },
@@ -386,7 +394,7 @@ async def streamlined_search_health():
             "sources_available": [
                 "BOE (Spanish Official Gazette)",
                 "NewsAPI (International news)"
-                # "RSS feeds (Spanish news sources)" - Disabled for demo
+                "RSS feeds (Spanish news sources)"
             ]
         }
         

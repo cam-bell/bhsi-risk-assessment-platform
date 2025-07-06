@@ -24,10 +24,11 @@ class CRUDEvent:
         section: Optional[str] = None,
         pub_date: Optional[date] = None,
         url: Optional[str] = None,
-        alerted: Optional[bool] = None
+        alerted: Optional[bool] = None,
+        company_name: Optional[str] = None
     ) -> Any:
-        """Create event from raw document data"""
-        event_id = f"{source}:{raw_id}"
+        """Create event from raw document data, unique per company"""
+        event_id = f"{source}:{company_name}:{raw_id}" if company_name else f"{source}:{raw_id}"
         # Fallback to SQLite
         existing = db.query(Event).filter(Event.event_id == event_id).first()
         if existing:
@@ -45,8 +46,7 @@ class CRUDEvent:
         db.add(db_obj)
         db.commit()
         db.refresh(db_obj)
-        # Use centralized BigQueryWriter (buffered, async, retry)
-        bq_writer.queue("events", db_obj)
+        # No longer queue to BigQuery here; only after embedding is set
         return db_obj
 
     def get_unembedded(self, db: Session, limit: int = 100) -> List[Any]:
@@ -65,7 +65,7 @@ class CRUDEvent:
         event_id: str, 
         embedding_model: str = "paraphrase-multilingual-MiniLM-L12-v2"
     ) -> bool:
-        """Mark event as embedded"""
+        """Mark event as embedded and queue for BigQuery update"""
         # Fallback to SQLite
         db_obj = db.query(Event).filter(Event.event_id == event_id).first()
         if db_obj:
@@ -73,6 +73,11 @@ class CRUDEvent:
             db_obj.embedding_model = embedding_model
             db_obj.updated_at = datetime.utcnow()
             db.commit()
+            db.refresh(db_obj)
+            
+            # Queue updated event for BigQuery
+            bq_writer.queue("events", db_obj)
+            logger.info(f"Queued embedded event {event_id} for BigQuery update")
             return True
         return False
 

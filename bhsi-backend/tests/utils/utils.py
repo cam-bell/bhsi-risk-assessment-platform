@@ -28,6 +28,7 @@ def create_random_user(db: Session) -> Dict:
 
 def get_test_company_data() -> Dict:
     return {
+        "id": "test-company-id-123",
         "company_name": "Test Company",
         "days_back": 7,
         "include_boe": True,
@@ -73,6 +74,7 @@ def get_test_classification_data() -> Dict:
 
 def get_test_analysis_data() -> Dict:
     return {
+        "company_id": "test-company-id-123",
         "risk_scores": {
             "turnover": "green",
             "shareholding": "orange",

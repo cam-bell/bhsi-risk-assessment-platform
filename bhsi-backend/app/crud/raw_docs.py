@@ -15,9 +15,9 @@ logger = logging.getLogger(__name__)
 bq_writer = BigQueryWriter()
 
 class CRUDRawDoc:
-    def generate_raw_id(self, payload: bytes) -> str:
+    def generate_raw_id(self, payload: bytes, company_name: str) -> str:
         """Generate SHA-256 hash for deduplication"""
-        return hashlib.sha256(payload).hexdigest()
+        return hashlib.sha256(payload + company_name.encode('utf-8')).hexdigest()
 
     def create_with_dedup(
         self, 
@@ -31,13 +31,14 @@ class CRUDRawDoc:
         Returns:
             tuple: (RawDoc, is_new) where is_new=True if document was just created
         """
-        raw_id = self.generate_raw_id(payload)
+        raw_id = self.generate_raw_id(payload, source)
         meta = meta or {}
         fetched_at = datetime.utcnow()
 
         # Fallback to SQLite
         try:
             existing = db.query(RawDoc).filter(RawDoc.raw_id == raw_id).first()
+            logger.info(f"Dedup check: raw_id={raw_id}, exists={bool(existing)}")
             if existing:
                 return existing, False  # Existing document, not new
             db_obj = RawDoc(

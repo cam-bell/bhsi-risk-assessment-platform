@@ -1,5 +1,6 @@
 {
   "dependencies": {
-    "@reduxjs/toolkit": "^2.8.2"
+    "@reduxjs/toolkit": "^2.8.2",
+    "recharts": "^3.0.2"
   }
 }

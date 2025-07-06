@@ -224,7 +224,10 @@ async def analyze_company(
         # Save company metadata to Company table
         company_metadata = {
             "name": company.name,
-            "vat": company.vat,
+            "vat_number": company.vat_number,
+            "description": company.description,
+            "sector": company.sector,
+            "client_tier": company.client_tier,
         }
         db_company = company_crud.get_by_name(db, name=company.name)
         if db_company:
@@ -633,7 +636,10 @@ async def unified_company_analysis(
         # Save company metadata
         company_metadata = {
             "name": company.name,
-            "vat": company.vat,
+            "vat_number": company.vat_number,
+            "description": company.description,
+            "sector": company.sector,
+            "client_tier": company.client_tier,
         }
         db_company = company_crud.get_by_name(db, name=company.name)
         if db_company:
@@ -656,14 +662,12 @@ async def unified_company_analysis(
             "bing_results": "[]",
             "gov_results": str(search_results.get("boe", {})),
             "news_results": str(search_results.get("newsapi", {})),
-            "rss_results": str({k: v for k, v in search_results.items() 
-                              if k not in ["boe", "newsapi"]}),
+            "rss_results": str({k: v for k, v in search_results.items() if k not in ["boe", "newsapi"]}),
             "analysis_summary": str({
                 "total_results": total_results,
                 "high_risk_results": high_risk_count,
                 "source_counts": source_counts,
-                "rss_sources": [k for k in search_results.keys() 
-                              if k not in ["boe", "newsapi"]]
+                "rss_sources": [k for k in search_results.keys() if k not in ["boe", "newsapi"]]
             }),
         }
         assessment_crud.create(db, obj_in=assessment_dict)

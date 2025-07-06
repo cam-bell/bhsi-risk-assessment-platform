@@ -180,76 +180,43 @@ const TrendLineChart: React.FC<{
   );
 };
 
+const RiskTrendsPlaceholder = () => (
+  <Paper sx={{ p: 4, textAlign: "center", mt: 4 }}>
+    <BarChart3 size={48} color="#90caf9" />
+    <Typography variant="h5" fontWeight="bold" mt={2}>
+      Risk Trends Coming Soon
+    </Typography>
+    <Typography variant="body1" color="text.secondary" mt={1}>
+      Visualize how risk levels change over time and across sectors.
+      <br />
+      This feature will help you spot trends, outliers, and emerging risks.
+    </Typography>
+    <Button
+      variant="outlined"
+      color="primary"
+      sx={{ mt: 3 }}
+      href="/help/risk-trends"
+    >
+      Learn More About Risk Trends
+    </Button>
+    {/* Optionally, show a sample chart */}
+    <Box mt={5} width="100%" maxWidth={600} mx="auto">
+      <Typography variant="subtitle1" color="text.secondary" align="center">
+        Example Risk Trends (Sample Data)
+      </Typography>
+      {/* Insert a simple static chart or image here */}
+      {/* ... */}
+    </Box>
+  </Paper>
+);
+
 const RiskTrendsChart: React.FC = () => {
   const { data, error, isLoading } = useGetRiskTrendsQuery();
 
   if (isLoading) return <div>Loading...</div>;
   if (error) return <div>Error loading risk trends.</div>;
   if (!data || !data.system_wide_trends) {
-    return (
-      <Box display="flex" flexDirection="column" alignItems="center" mt={6}>
-        <BarChart3 size={48} color="#90caf9" />
-        <Typography variant="h5" fontWeight="bold" mt={2}>
-          No Risk Trends Data Available
-        </Typography>
-        <Typography
-          variant="body1"
-          color="text.secondary"
-          mt={1}
-          align="center"
-        >
-          Risk trends help you understand how risk levels change over time and
-          across sectors.
-          <br />
-          Analyze more companies or check back later for updated insights.
-        </Typography>
-        <Button
-          variant="outlined"
-          color="primary"
-          sx={{ mt: 3 }}
-          href="/help/risk-trends"
-        >
-          Learn More About Risk Trends
-        </Button>
-        {/* Optionally, show a sample chart */}
-        <Box mt={5} width="100%" maxWidth={600}>
-          <Typography variant="subtitle1" color="text.secondary" align="center">
-            Example Risk Trends (Sample Data)
-          </Typography>
-          <RiskDistributionChart
-            distribution={{ green: 30, orange: 15, red: 5 }}
-          />
-          <TrendLineChart
-            data={[
-              {
-                date: "2024-01",
-                green_count: 10,
-                orange_count: 5,
-                red_count: 2,
-              },
-              {
-                date: "2024-02",
-                green_count: 12,
-                orange_count: 4,
-                red_count: 3,
-              },
-              {
-                date: "2024-03",
-                green_count: 8,
-                orange_count: 6,
-                red_count: 4,
-              },
-              {
-                date: "2024-04",
-                green_count: 15,
-                orange_count: 3,
-                red_count: 1,
-              },
-            ]}
-          />
-        </Box>
-      </Box>
-    );
+    return <RiskTrendsPlaceholder />;
   }
 
   return (

@@ -25,17 +25,11 @@ import {
 } from "lucide-react";
 import ManagementSummary from "../components/ManagementSummary";
 import { useLocation } from "react-router-dom";
+import CompanyAnalyticsDashboard from "../components/CompanyAnalyticsDashboard";
+import RiskTrendsPlaceholder from "../components/RiskTrendsChart";
+import BigQueryStatusMonitor from "../components/BigQueryStatusMonitor";
 
 // Placeholder components for tabs
-const CompanyAnalyticsDashboard = ({
-  analyticsData,
-}: {
-  analyticsData: any;
-}) => (
-  <Box p={2}>
-    <Typography>Company Analytics (Coming soon)</Typography>
-  </Box>
-);
 const RiskTrendsChart = () => (
   <Box p={2}>
     <Typography>Risk Trends (Coming soon)</Typography>
@@ -140,6 +134,11 @@ const AnalyticsPage: React.FC = () => {
           Comprehensive risk analytics and insights for informed decision making
         </Typography>
       </Box>
+
+      {/* BigQuery Status Monitor */}
+      <Box mb={3}>
+        <BigQueryStatusMonitor showDetails={false} />
+      </Box>
       <Box display="flex" gap={2} mb={2}>
         <TextField
           label="Company Name"
@@ -232,7 +231,7 @@ const AnalyticsPage: React.FC = () => {
           </Tooltip>
         </Tabs>
         <TabPanel value={activeTab} index={0}>
-          <CompanyAnalyticsDashboard analyticsData={analyticsData} />
+          <CompanyAnalyticsDashboard companyName={selectedCompany} />
         </TabPanel>
         <TabPanel value={activeTab} index={1}>
           {/* Sticky language toggle + print/export */}
@@ -282,7 +281,7 @@ const AnalyticsPage: React.FC = () => {
           />
         </TabPanel>
         <TabPanel value={activeTab} index={2}>
-          <RiskTrendsChart />
+          <RiskTrendsPlaceholder />
         </TabPanel>
         <TabPanel value={activeTab} index={3}>
           <CompanyComparison />
