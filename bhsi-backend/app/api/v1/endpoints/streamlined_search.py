@@ -9,6 +9,7 @@ from typing import Optional, List, Dict, Any
 import datetime
 import time
 import logging
+import json
 
 from app.agents.search.streamlined_orchestrator import get_search_orchestrator
 from app.agents.analysis.optimized_hybrid_classifier import OptimizedHybridClassifier
@@ -791,3 +792,187 @@ async def migrate_vectors_to_bigquery(
             "status": "error",
             "error": str(e)
         } 
+
+@router.post("/embed-documents")
+async def embed_documents(
+    request: dict,
+    current_user: dict = Depends(get_current_active_user)
+):
+    """
+    Enhanced embedding endpoint for frontend to call
+    
+    Handles the complete embedding pipeline:
+    1. Apply keyword gate filter
+    2. Generate embeddings via cloud service
+    3. Store vectors in BigQuery
+    """
+    start_time = time.time()
+    
+    try:
+        documents = request.get("documents", [])
+        company_name = request.get("company_name", "")
+        
+        if not documents:
+            return {
+                "status": "error",
+                "error": "No documents provided",
+                "results": []
+            }
+        
+        # Initialize embedding components using existing infrastructure
+        from app.agents.analysis.embedder import BOEEmbeddingAgent
+        from app.services.bigquery_vector_schema import BigQueryVectorSchema
+        from google.cloud import bigquery
+        import base64
+        import numpy as np
+        
+        embedder = BOEEmbeddingAgent()
+        
+        # Initialize BigQuery vector storage using existing working schema
+        bigquery_client = bigquery.Client(project="solid-topic-443216-b2")
+        vector_schema = BigQueryVectorSchema(bigquery_client, dataset_id="bhsi_dataset")
+        
+        # Apply keyword gate filter (same logic as frontend)
+        def applies_keyword_gate(document: dict, threshold: str = "medium") -> bool:
+            risk_level = document.get("risk_level", "").lower()
+            
+            risk_hierarchy = {
+                "low": 1, "medium": 2, "high": 3, "legal": 4, "financial": 4, "regulatory": 4
+            }
+            
+            threshold_level = risk_hierarchy.get(threshold.lower(), 2)
+            
+            # Check risk level
+            for risk_keyword, level in risk_hierarchy.items():
+                if risk_keyword in risk_level and level >= threshold_level:
+                    return True
+            
+            # Check D&O keywords
+            do_keywords = [
+                "director", "consejero", "administrador", "governance", 
+                "corporate", "board", "junta", "responsabilidad",
+                "legal", "regulatory", "compliance", "audit"
+            ]
+            
+            text_content = f"{document.get('title', '')} {document.get('summary', '')}".lower()
+            return any(keyword in text_content for keyword in do_keywords)
+        
+        # Filter documents
+        filtered_docs = [doc for doc in documents if applies_keyword_gate(doc)]
+        max_docs_to_embed = min(len(filtered_docs), 15)  # Limit for performance
+        
+        embedded_results = []
+        vectors_created = 0
+        
+        for i, doc in enumerate(filtered_docs[:max_docs_to_embed]):
+            text_content = doc.get("summary", doc.get("title", ""))
+            
+            if not text_content.strip():
+                continue
+                
+            try:
+                # Generate embedding using existing BOE embedding agent
+                embedding_vector = embedder.embedder.encode(text_content[:2000]).tolist()
+                
+                if embedding_vector:
+                    # Create unique event ID for vector storage
+                    event_id = f"doc_{company_name}_{i}_{datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+                    
+                    # Encode vector for BigQuery storage (existing function)
+                    vector_array = np.array(embedding_vector, dtype=np.float32)
+                    vector_bytes = vector_array.tobytes()
+                    encoded_vector = base64.b64encode(vector_bytes).decode('utf-8')
+                    
+                    # Parse publication date to proper format
+                    pub_date = None
+                    if doc.get("date"):
+                        try:
+                            # Handle various date formats
+                            date_str = doc.get("date", "")
+                            if "T" in date_str:
+                                pub_date = datetime.datetime.fromisoformat(date_str.replace("Z", "")).date().isoformat()
+                            else:
+                                pub_date = date_str[:10]  # Take YYYY-MM-DD part
+                        except:
+                            pub_date = datetime.datetime.now().date().isoformat()
+                    
+                    # Prepare vector data for BigQuery using existing schema
+                    vector_data = {
+                        "event_id": event_id,
+                        "vector_embedding": encoded_vector,
+                        "vector_dimension": len(embedding_vector),
+                        "embedding_model": "paraphrase-multilingual-MiniLM-L12-v2",
+                        "vector_created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                        "metadata": json.dumps({
+                            "url": doc.get("url", ""),
+                            "confidence": doc.get("confidence", 0)
+                        }),
+                        "is_active": True,
+                        "company_name": company_name,
+                        "risk_level": doc.get("risk_level", ""),
+                        "publication_date": pub_date,
+                        "source": doc.get("source", ""),
+                        "title": doc.get("title", "")[:500] if doc.get("title") else "",
+                        "text_summary": text_content[:1000]
+                    }
+                    
+                    # Store in BigQuery using existing vector schema
+                    vector_result = vector_schema.insert_vector_data(vector_data)
+                    
+                    if vector_result:
+                        vectors_created += 1
+                        embedded_results.append({
+                            "document_id": i,
+                            "title": doc.get("title", ""),
+                            "vector_id": event_id,
+                            "status": "success"
+                        })
+                        logger.info(f"✅ Successfully stored vector {event_id} for {company_name}")
+                    else:
+                        embedded_results.append({
+                            "document_id": i,
+                            "title": doc.get("title", ""),
+                            "status": "storage_failed"
+                        })
+                else:
+                    embedded_results.append({
+                        "document_id": i,
+                        "title": doc.get("title", ""),
+                        "status": "embedding_failed"
+                    })
+                    
+            except Exception as e:
+                logger.error(f"Embedding error for document {i}: {e}")
+                embedded_results.append({
+                    "document_id": i,
+                    "title": doc.get("title", ""),
+                    "status": "error",
+                    "error": str(e)
+                })
+        
+        total_time = time.time() - start_time
+        
+        return {
+            "status": "success",
+            "company_name": company_name,
+            "summary": {
+                "total_documents": len(documents),
+                "filtered_documents": len(filtered_docs),
+                "processed_documents": max_docs_to_embed,
+                "vectors_created": vectors_created,
+                "processing_time_seconds": f"{total_time:.2f}"
+            },
+            "results": embedded_results,
+            "timestamp": datetime.datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        total_time = time.time() - start_time
+        logger.error(f"Document embedding failed: {e}")
+        
+        return {
+            "status": "error",
+            "error": str(e),
+            "processing_time_seconds": f"{total_time:.2f}",
+            "timestamp": datetime.datetime.utcnow().isoformat()
+        }

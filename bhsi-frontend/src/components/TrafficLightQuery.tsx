@@ -28,6 +28,11 @@ import {
   ListItemText,
   FormControlLabel,
   Chip,
+  LinearProgress,
+  Stepper,
+  Step,
+  StepLabel,
+  StepContent,
 } from "@mui/material";
 import {
   Search,
@@ -37,6 +42,8 @@ import {
   Globe,
   Calendar,
   ChevronDown,
+  Brain,
+  Upload,
 } from "lucide-react";
 import TrafficLightResult from "./TrafficLightResult";
 import SavedResults from "./SavedResults";
@@ -155,7 +162,7 @@ interface TrafficLightQueryProps {
 const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
   onRiskResult,
 }) => {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const { addAssessedCompany } = useCompanies();
   const [query, setQuery] = useState("");
   const [boeEnabled, setBoeEnabled] = useState(true);
@@ -175,6 +182,18 @@ const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
   const [selectedRssFeeds, setSelectedRssFeeds] = useState<string[]>(
     RSS_FEEDS.map((f) => f.value)
   );
+
+  // Enhanced embedding state
+  const [embeddingEnabled, setEmbeddingEnabled] = useState(true);
+  const [embeddingStatus, setEmbeddingStatus] = useState({
+    stage: 'idle',
+    progress: 0,
+    message: 'Ready to search',
+    documentsFound: 0,
+    documentsFiltered: 0,
+    vectorsCreated: 0,
+    error: ''
+  });
 
   // RTK Query hook for API calls
   const [searchCompany, { isLoading }] = useSearchCompanyMutation();
@@ -235,6 +254,84 @@ const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
     setSelectedRssFeeds(value);
   };
 
+  // Enhanced embedding functionality via backend
+  const baseUrl = "http://localhost:8000/api/v1";
+
+  const processEmbedding = async (searchResponse: SearchResponse) => {
+    if (!embeddingEnabled) {
+      console.log("📊 Embedding disabled, skipping vector creation");
+      return;
+    }
+
+    try {
+      setEmbeddingStatus({
+        stage: 'filtering',
+        progress: 20,
+        message: 'Preparing documents for embedding...',
+        documentsFound: searchResponse.results.length,
+        documentsFiltered: 0,
+        vectorsCreated: 0,
+        error: ''
+      });
+
+      // Call the backend embedding endpoint (solves CORS issue)
+      const embeddingRequest = {
+        documents: searchResponse.results,
+        company_name: searchResponse.company_name
+      };
+
+      console.log("🤖 Calling backend embedding endpoint...");
+      
+      const response = await fetch(`${baseUrl}/streamlined/embed-documents`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(embeddingRequest),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+          setEmbeddingStatus({
+            stage: 'complete',
+            progress: 100,
+            message: `✅ Successfully created ${result.summary.vectors_created} vectors for RAG`,
+            documentsFound: result.summary.total_documents,
+            documentsFiltered: result.summary.filtered_documents,
+            vectorsCreated: result.summary.vectors_created,
+            error: ''
+          });
+
+          console.log("✅ Embedding completed:", result.summary);
+          
+          // Auto-hide success message after 3 seconds
+          setTimeout(() => {
+            setEmbeddingStatus(prev => ({ ...prev, stage: 'idle', progress: 0, message: 'Ready to search' }));
+          }, 3000);
+        } else {
+          throw new Error(result.error || 'Embedding failed');
+        }
+      } else {
+        throw new Error(`Backend embedding failed: ${response.status}`);
+      }
+
+    } catch (error: any) {
+      console.error("❌ Embedding process failed:", error);
+      setEmbeddingStatus({
+        stage: 'error',
+        progress: 0,
+        message: 'Embedding failed',
+        documentsFound: searchResponse.results.length,
+        documentsFiltered: 0,
+        vectorsCreated: 0,
+        error: error.message || 'Unknown error'
+      });
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -263,6 +360,17 @@ const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
 
     setError(null);
 
+    // Reset embedding status
+    setEmbeddingStatus({
+      stage: 'searching',
+      progress: 10,
+      message: 'Searching for documents...',
+      documentsFound: 0,
+      documentsFiltered: 0,
+      vectorsCreated: 0,
+      error: ''
+    });
+
     try {
       // Prepare search request
       const searchRequest = {
@@ -275,9 +383,9 @@ const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
           : { start_date: startDate, end_date: endDate }),
       };
 
-      console.log("🔍 Sending search request:", searchRequest);
+      console.log("🔍 Sending enhanced search request:", searchRequest);
 
-      // Call the backend API
+      // Call the backend API for main search
       const searchResponse = await searchCompany(searchRequest).unwrap();
 
       console.log("✅ Search response received:", searchResponse);
@@ -316,7 +424,34 @@ const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
         });
       }
 
-      // Fetch executive summary (only executive_summary field)
+      console.log("📊 Search completed successfully");
+
+      // STEP 2: Enhanced embedding pipeline (if enabled)
+      if (embeddingEnabled) {
+        if (searchResponse.results.length > 0) {
+          console.log("🤖 Starting enhanced embedding pipeline...");
+          await processEmbedding(searchResponse);
+        } else {
+          console.log("📊 No documents found, skipping embedding");
+          // Reset embedding status when no documents to process
+          setEmbeddingStatus({
+            stage: 'complete',
+            progress: 100,
+            message: 'No documents to embed',
+            documentsFound: 0,
+            documentsFiltered: 0,
+            vectorsCreated: 0,
+            error: ''
+          });
+          
+          // Auto-hide message after 2 seconds
+          setTimeout(() => {
+            setEmbeddingStatus(prev => ({ ...prev, stage: 'idle', progress: 0, message: 'Ready to search' }));
+          }, 2000);
+        }
+      }
+
+      // STEP 3: Fetch executive summary (only executive_summary field)
       if (onRiskResult) {
         try {
           console.log(
@@ -346,6 +481,15 @@ const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
         err?.data?.detail || err?.message || "An unexpected error occurred"
       );
       setResult(null);
+      setEmbeddingStatus({
+        stage: 'error',
+        progress: 0,
+        message: 'Search failed',
+        documentsFound: 0,
+        documentsFiltered: 0,
+        vectorsCreated: 0,
+        error: err?.message || 'Unknown error'
+      });
     }
   };
 
@@ -413,10 +557,10 @@ const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
           {activeTab === 0 ? (
             <>
               <Typography variant="h6" gutterBottom>
-                Risk Assessment Search
+                Enhanced Risk Assessment Search
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                Search for company risk information across multiple data sources
+                Search for company risk information with automatic vector embedding for RAG analysis
               </Typography>
 
               <form onSubmit={handleSubmit}>
@@ -500,6 +644,7 @@ const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
                         official announcements
                       </Typography>
                     </Card>
+                    
                     {/* NewsAPI Source */}
                     <Card
                       variant="outlined"
@@ -536,6 +681,7 @@ const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
                         International news sources and business publications
                       </Typography>
                     </Card>
+                    
                     {/* RSS Feeds - Disabled for Demo */}
                     <Card
                       variant="outlined"
@@ -569,78 +715,6 @@ const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
                       </Typography>
                     </Card>
                   </Box>
-
-                  {/* RSS Feed Selection */}
-                  {rssEnabled && (
-                    <Accordion sx={{ mt: 2, "&:before": { display: "none" } }}>
-                      <AccordionSummary expandIcon={<ChevronDown />}>
-                        <Typography variant="subtitle2">
-                          Select RSS Feeds ({selectedRssFeeds.length} selected)
-                        </Typography>
-                      </AccordionSummary>
-                      <AccordionDetails>
-                        <Box
-                          sx={{
-                            display: "grid",
-                            gridTemplateColumns: {
-                              xs: "1fr",
-                              sm: "repeat(2, 1fr)",
-                              md: "repeat(4, 1fr)",
-                            },
-                            gap: 1,
-                          }}
-                        >
-                          {RSS_FEEDS.map((feed) => (
-                            <FormControlLabel
-                              key={feed.value}
-                              control={
-                                <Checkbox
-                                  checked={selectedRssFeeds.includes(
-                                    feed.value
-                                  )}
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      setSelectedRssFeeds([
-                                        ...selectedRssFeeds,
-                                        feed.value,
-                                      ]);
-                                    } else {
-                                      setSelectedRssFeeds(
-                                        selectedRssFeeds.filter(
-                                          (f) => f !== feed.value
-                                        )
-                                      );
-                                    }
-                                  }}
-                                  size="small"
-                                />
-                              }
-                              label={feed.label}
-                              sx={{ fontSize: "0.875rem" }}
-                            />
-                          ))}
-                        </Box>
-                        <Box sx={{ mt: 2, display: "flex", gap: 1 }}>
-                          <Button
-                            size="small"
-                            onClick={() =>
-                              setSelectedRssFeeds(RSS_FEEDS.map((f) => f.value))
-                            }
-                            variant="outlined"
-                          >
-                            Select All
-                          </Button>
-                          <Button
-                            size="small"
-                            onClick={() => setSelectedRssFeeds([])}
-                            variant="outlined"
-                          >
-                            Clear All
-                          </Button>
-                        </Box>
-                      </AccordionDetails>
-                    </Accordion>
-                  )}
                 </Card>
 
                 {/* Date Range Section */}
@@ -706,6 +780,84 @@ const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
                   )}
                 </Card>
 
+                {/* Enhanced Features Section */}
+                <Card variant="outlined" sx={{ mb: 3, p: 2 }}>
+                  <Typography
+                    variant="subtitle1"
+                    gutterBottom
+                    sx={{ fontWeight: 600 }}
+                  >
+                    Enhanced Features
+                  </Typography>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={embeddingEnabled}
+                        onChange={(e) => setEmbeddingEnabled(e.target.checked)}
+                        color="primary"
+                      />
+                    }
+                    label={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Brain size={16} />
+                        <Typography variant="body2">
+                          Enable Vector Embedding for RAG Analysis
+                        </Typography>
+                      </Box>
+                    }
+                  />
+                  <Typography variant="caption" color="text.secondary" sx={{ ml: 4, display: 'block' }}>
+                    Automatically create vector embeddings for improved semantic search and AI analysis
+                  </Typography>
+                </Card>
+
+                {/* Enhanced Progress Section */}
+                {embeddingEnabled && (embeddingStatus.stage !== 'idle' || isLoading) && (
+                  <Card variant="outlined" sx={{ mb: 3, p: 2 }}>
+                    <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 600 }}>
+                      Enhanced Processing Pipeline
+                    </Typography>
+                    
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                      <Upload size={20} color="#1976d2" />
+                      <Typography variant="body2">{embeddingStatus.message}</Typography>
+                    </Box>
+                    
+                    <LinearProgress 
+                      variant="determinate" 
+                      value={embeddingStatus.progress} 
+                      sx={{ mb: 2, height: 8, borderRadius: 4 }}
+                      color={embeddingStatus.stage === 'error' ? 'error' : 'primary'}
+                    />
+                    
+                    <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                      <Chip 
+                        label={`Documents: ${embeddingStatus.documentsFound}`} 
+                        size="small" 
+                        variant="outlined" 
+                      />
+                      <Chip 
+                        label={`Filtered: ${embeddingStatus.documentsFiltered}`} 
+                        size="small" 
+                        variant="outlined" 
+                        color="primary"
+                      />
+                      <Chip 
+                        label={`Vectors: ${embeddingStatus.vectorsCreated}`} 
+                        size="small" 
+                        variant="outlined" 
+                        color="success"
+                      />
+                    </Box>
+                    
+                    {embeddingStatus.error && (
+                      <Alert severity="error" sx={{ mt: 2 }}>
+                        {embeddingStatus.error}
+                      </Alert>
+                    )}
+                  </Card>
+                )}
+
                 {/* Search Button */}
                 <Box sx={{ display: "flex", justifyContent: "center", mt: 3 }}>
                   <Button
@@ -723,7 +875,12 @@ const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
                       px: 4,
                     }}
                   >
-                    {isLoading ? "Searching..." : "Search for Risk Assessment"}
+                      {isLoading 
+                        ? "Processing..." 
+                        : embeddingEnabled 
+                          ? "Enhanced Search + Embed" 
+                          : "Search for Risk Assessment"
+                      }
                   </Button>
                 </Box>
               </form>
