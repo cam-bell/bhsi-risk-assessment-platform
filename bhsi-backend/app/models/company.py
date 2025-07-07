@@ -12,8 +12,10 @@ class RiskLevel(str, enum.Enum):
 
 
 class Company(Base):
-    vat = Column(String, primary_key=True, index=True)
+    __tablename__ = "company"
+    id = Column(String, primary_key=True, index=True)
     name = Column(String, index=True, nullable=False)
+    vat_number = Column(String, unique=True, index=True, nullable=True)
     description = Column(String, nullable=True)
     sector = Column(String, nullable=True)
     client_tier = Column(String, nullable=True)
@@ -22,9 +24,10 @@ class Company(Base):
 
 
 class Assessment(Base):
+    __tablename__ = "assessment"
     id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
-    company_id = Column(String, ForeignKey("company.vat"), nullable=False)
-    user_id = Column(String, nullable=False)
+    company_id = Column(String, ForeignKey("company.id"), nullable=False)
+    user_id = Column(String, ForeignKey("user.id"), nullable=False)
     
     # Risk scores
     turnover = Column(Enum(RiskLevel), nullable=False)

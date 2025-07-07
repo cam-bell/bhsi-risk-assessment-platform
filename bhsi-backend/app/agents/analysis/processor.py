@@ -309,7 +309,7 @@ class EventNormalizer:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
 
-    def normalize_and_create_event(self, db, raw_doc, source):
+    def normalize_and_create_event(self, db, raw_doc, source, company_name=None):
         # Parse payload
         try:
             payload_str = raw_doc.payload.decode('utf-8')
@@ -365,7 +365,8 @@ class EventNormalizer:
             section=section,
             pub_date=parsed_date,
             url=url,
-            alerted=risk_label in ["High-Legal", "High-Reg"]
+            alerted=risk_label in ["High-Legal", "High-Reg"],
+            company_name=company_name
         )
         return event
 

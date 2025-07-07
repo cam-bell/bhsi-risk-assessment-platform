@@ -185,7 +185,6 @@ class BigQueryClient:
             ORDER BY created_at DESC
             LIMIT 1
             """
-            
             assessment_job = self.client.query(
                 assessment_query,
                 job_config=bigquery.QueryJobConfig(
@@ -194,10 +193,9 @@ class BigQueryClient:
                     ]
                 )
             )
-            
             assessment_results = list(assessment_job.result())
             assessment = assessment_results[0] if assessment_results else None
-            
+
             return {
                 "company_name": company.name,
                 "company_id": company_id,
@@ -232,7 +230,6 @@ class BigQueryClient:
                     )
                 } if assessment else None
             }
-                    
         except Exception as e:
             logger.error(f"BigQuery analytics error for {company_name}: {e}")
             import traceback
@@ -254,10 +251,7 @@ class BigQueryClient:
                 COUNT(DISTINCT vat) as company_count,
                 AVG(confidence) as avg_confidence
             FROM `{self.project_id}.{self.dataset_id}.events`
-            WHERE pub_date >= TIMESTAMP_SUB(
-                CURRENT_TIMESTAMP(), 
-                INTERVAL @days INTEGER DAY
-            )
+            WHERE pub_date >= DATE_SUB(CURRENT_DATE(), INTERVAL @days DAY)
             GROUP BY date, risk_label, source
             ORDER BY date DESC
             """
@@ -291,17 +285,27 @@ class BigQueryClient:
     
     def _get_fallback_analytics(self, company_name: str) -> Dict[str, Any]:
         """Enhanced fallback analytics with realistic mock data"""
-        return {
-            "company_name": company_name,
-            "vat": None,
-            "sector": "Unknown",
-            "total_events": 0,
-            "risk_distribution": {"HIGH": 0, "MEDIUM": 0, "LOW": 0},
-            "latest_events": [],
-            "assessment": None,
-            "fallback": True,
-            "message": "Using fallback data - BigQuery service unavailable"
-        }
+        try:
+            from .mock_analytics import generate_mock_analytics
+            return generate_mock_analytics(company_name)
+        except ImportError:
+            # Simple fallback if mock_analytics not available
+            return {
+                "company_name": company_name,
+                "vat": None,
+                "sector": "Unknown",
+                "total_events": 0,
+                "risk_distribution": {"HIGH": 0, "MEDIUM": 0, "LOW": 0},
+                "latest_events": [],
+                "alert_summary": {
+                    "total_alerts": 0,
+                    "high_risk_events": 0,
+                    "last_alert": None
+                },
+                "assessment": None,
+                "fallback": True,
+                "message": "Using fallback data - BigQuery service unavailable"
+            }
     
     def _get_fallback_trends(self) -> Dict[str, Any]:
         """Enhanced fallback trends with realistic mock data"""

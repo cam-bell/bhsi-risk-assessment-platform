@@ -7,6 +7,7 @@ Main application entry point combining search and analysis capabilities
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
+import logging
 
 from app.core.config import settings
 from app.api.v1.router import api_router
@@ -63,6 +64,7 @@ async def health_check():
 
 # Development server
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.DEBUG)
     uvicorn.run(
         "main:app",
         host="0.0.0.0",

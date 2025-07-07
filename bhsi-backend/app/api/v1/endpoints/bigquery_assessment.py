@@ -25,7 +25,7 @@ router = APIRouter()
 class CompanyAssessmentRequest(BaseModel):
     """Request model for company risk assessment"""
     company_name: str = Field(..., description="Company name to assess")
-    company_vat: Optional[str] = Field(None, description="Company VAT number")
+    company_id: Optional[str] = Field(None, description="Company ID")
     user_id: str = Field(..., description="User ID performing assessment")
     start_date: Optional[str] = Field(None, description="Start date (YYYY-MM-DD)")
     end_date: Optional[str] = Field(None, description="End date (YYYY-MM-DD)")
@@ -41,7 +41,7 @@ class CompanyAssessmentResponse(BaseModel):
     """Response model for company risk assessment"""
     assessment_id: str
     company_name: str
-    company_vat: Optional[str]
+    company_id: Optional[str]
     overall_risk: str
     risk_breakdown: Dict[str, str]
     financial_metrics: Optional[Dict[str, Any]]
@@ -72,7 +72,7 @@ class BatchAssessmentResponse(BaseModel):
 
 async def _perform_risk_assessment(
     company_name: str,
-    company_vat: Optional[str],
+    company_id: Optional[str],
     user_id: str,
     start_date: Optional[str],
     end_date: Optional[str],
@@ -170,7 +170,7 @@ async def _perform_risk_assessment(
     assessment_data = {
         "assessment_id": str(uuid.uuid4()),
         "company_name": company_name,
-        "company_vat": company_vat,
+        "company_id": company_id,
         "user_id": user_id,
         "overall_risk": overall_risk,
         "risk_breakdown": {
@@ -222,9 +222,9 @@ async def _save_to_bigquery_background(assessment_data: Dict[str, Any]):
         bigquery_client = get_bigquery_client()
         
         # Save company data (upsert)
-        if assessment_data.get("company_vat"):
+        if assessment_data.get("company_id"):
             await bigquery_client.save_company({
-                "vat": assessment_data["company_vat"],
+                "company_id": assessment_data["company_id"],
                 "company_name": assessment_data["company_name"],
                 "last_assessment_date": datetime.utcnow().isoformat(),
                 "overall_risk_level": assessment_data["overall_risk"],
@@ -234,7 +234,7 @@ async def _save_to_bigquery_background(assessment_data: Dict[str, Any]):
         # Save assessment data
         assessment_row = {
             "assessment_id": assessment_data["assessment_id"],
-            "company_vat": assessment_data["company_vat"],
+            "company_id": assessment_data["company_id"],
             "user_id": assessment_data["user_id"],
             "turnover_risk": assessment_data["risk_breakdown"]["turnover_risk"],
             "shareholding_risk": assessment_data["risk_breakdown"]["shareholding_risk"],
@@ -266,7 +266,7 @@ async def _save_to_bigquery_background(assessment_data: Dict[str, Any]):
         events_data = []
         for result in assessment_data.get("classified_results", []):
             event_data = {
-                "company_vat": assessment_data["company_vat"],
+                "company_id": assessment_data["company_id"],
                 "company_name": assessment_data["company_name"],
                 "title": result.get("title", ""),
                 "summary": result.get("summary", ""),
@@ -310,7 +310,7 @@ async def assess_company_risk(
         # Perform risk assessment (fast, no BigQuery operations)
         assessment_data = await _perform_risk_assessment(
             company_name=request.company_name,
-            company_vat=request.company_vat,
+            company_id=request.company_id,
             user_id=request.user_id,
             start_date=request.start_date,
             end_date=request.end_date,
@@ -345,7 +345,7 @@ async def assess_company_risk(
         return CompanyAssessmentResponse(
             assessment_id=assessment_data["assessment_id"],
             company_name=assessment_data["company_name"],
-            company_vat=assessment_data["company_vat"],
+            company_id=assessment_data["company_id"],
             overall_risk=assessment_data["overall_risk"],
             risk_breakdown=assessment_data["risk_breakdown"],
             financial_metrics=assessment_data["financial_metrics"],
@@ -387,7 +387,7 @@ async def batch_assess_companies(
             try:
                 assessment = await _perform_risk_assessment(
                     company_name=company_data["company_name"],
-                    company_vat=company_data.get("vat"),
+                    company_id=company_data.get("id"),
                     user_id=request.user_id,
                     start_date=request.assessment_config.get("start_date"),
                     end_date=request.assessment_config.get("end_date"),
@@ -501,6 +501,85 @@ async def flush_bigquery_queue() -> Dict[str, Any]:
         return {
             "status": "error",
             "error": str(e),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+
+@router.get("/bigquery/health")
+async def get_bigquery_health() -> Dict[str, Any]:
+    """Get comprehensive BigQuery health status including failures"""
+    try:
+        bigquery_client = get_bigquery_client()
+        health_status = await bigquery_client.get_health_status()
+        
+        return {
+            "status": "success",
+            "bigquery_health": health_status,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "bigquery_health": {
+                "status": "unhealthy",
+                "error": str(e),
+                "timestamp": datetime.utcnow().isoformat()
+            },
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+
+@router.get("/bigquery/failures")
+async def get_bigquery_failures() -> Dict[str, Any]:
+    """Get detailed BigQuery failure information"""
+    try:
+        bigquery_client = get_bigquery_client()
+        failure_status = await bigquery_client.get_failure_status()
+        
+        return {
+            "status": "success",
+            "failures": failure_status,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "failures": {
+                "total_failures": 0,
+                "failure_stats": {},
+                "recent_failures": [],
+                "success_stats": {},
+                "error": str(e)
+            },
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+
+@router.get("/bigquery/queue")
+async def get_bigquery_queue_status() -> Dict[str, Any]:
+    """Get BigQuery write queue status"""
+    try:
+        bigquery_client = get_bigquery_client()
+        queue_status = await bigquery_client.get_queue_status()
+        
+        return {
+            "status": "success",
+            "queue": queue_status,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "queue": {
+                "total_pending": 0,
+                "high_priority": 0,
+                "medium_priority": 0,
+                "low_priority": 0,
+                "tables": {}
+            },
             "timestamp": datetime.utcnow().isoformat()
         }
 

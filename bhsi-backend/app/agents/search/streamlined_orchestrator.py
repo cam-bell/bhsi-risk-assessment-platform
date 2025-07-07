@@ -15,7 +15,7 @@ from app.agents.search.streamlined_lavanguardia_agent import StreamlinedLaVangua
 from app.agents.search.streamlined_elconfidencial_agent import StreamlinedElConfidencialAgent
 from app.agents.search.streamlined_eldiario_agent import StreamlinedElDiarioAgent
 from app.agents.search.streamlined_europapress_agent import StreamlinedEuropaPressAgent
-from app.agents.search.streamlined_yahoo_finance_agent import StreamlinedYahooFinanceAgent
+from app.services.yahoo_finance_service import StreamlinedYahooFinanceAgent
 
 logger = logging.getLogger(__name__)
 

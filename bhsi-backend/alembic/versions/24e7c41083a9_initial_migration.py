@@ -23,8 +23,12 @@ def upgrade() -> None:
     sa.Column('name', sa.String(), nullable=False),
     sa.Column('vat', sa.String(), nullable=True),
     sa.Column('vat_number', sa.String(), nullable=True),
+    sa.Column('description', sa.String(), nullable=True),
+    sa.Column('sector', sa.String(), nullable=True),
+    sa.Column('client_tier', sa.String(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=True),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
+   
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_company_id'), 'company', ['id'], unique=False)
@@ -45,6 +49,7 @@ def upgrade() -> None:
     sa.Column('rationale', sa.Text(), nullable=True),
     sa.Column('confidence', sa.Float(), nullable=True),
     sa.Column('classifier_ts', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('alerted', sa.Boolean(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=True),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
     sa.PrimaryKeyConstraint('event_id')
@@ -97,6 +102,7 @@ def upgrade() -> None:
     sa.Column('bing_results', sa.String(), nullable=True),
     sa.Column('gov_results', sa.String(), nullable=True),
     sa.Column('news_results', sa.String(), nullable=True),
+    sa.Column('rss_results', sa.String(), nullable=True),
     sa.Column('analysis_summary', sa.String(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=True),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),

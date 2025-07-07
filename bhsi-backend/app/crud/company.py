@@ -37,6 +37,9 @@ class CRUDCompany(CRUDBase[Company, CompanyCreate, CompanyUpdate]):
         return db.query(Company).offset(skip).limit(limit).all()
     
     def create(self, db: Session, *, obj_in: Dict[str, Any]) -> Company:
+        if "id" not in obj_in:
+            import uuid
+            obj_in["id"] = str(uuid.uuid4())
         db_obj = Company(**obj_in)
         db.add(db_obj)
         db.commit()
@@ -61,7 +64,7 @@ class CRUDCompany(CRUDBase[Company, CompanyCreate, CompanyUpdate]):
         bq_writer.queue("companies", db_obj)
         return db_obj
     
-    def get(self, db: Session, id: int) -> Optional[Company]:
+    def get(self, db: Session, id: str) -> Optional[Company]:
         return db.query(Company).filter(Company.id == id).first()
 
 

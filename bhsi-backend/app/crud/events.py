@@ -20,7 +20,8 @@ class CRUDEvent:
         section: Optional[str] = None,
         pub_date: Optional[date] = None,
         url: Optional[str] = None,
-        alerted: Optional[bool] = None
+        alerted: Optional[bool] = None,
+        company_name: Optional[str] = None
     ) -> Any:
         """Create event from raw document data - BigQuery only"""
         event_id = f"{source}:{raw_id}"

@@ -21,46 +21,86 @@ class KeywordManager:
                     "laundering", "blackmail", "rigging", "ethics"
                 }
             },
-            "bankruptcy": {
+            "financial": {
                 "es": {
                     "quiebra", "insolvencia", "concurso de acreedores", "liquidación",
                     "deuda", "incumplimiento", "deudor", "reestructuración",
-                    "procedimiento concursal", "moratoria", "dificultad financiera"
+                    "procedimiento concursal", "moratoria", "dificultad financiera",
+                    "pérdidas", "caída de beneficios", "reducción de ingresos",
+                    "problemas de liquidez", "crisis financiera"
                 },
                 "en": {
                     "bankruptcy", "insolvency", "creditors' meeting", "liquidation",
                     "debt", "default", "debtor", "restructuring", "bankruptcy proceedings",
-                    "moratorium", "financial distress"
+                    "moratorium", "financial distress", "losses", "profit decline",
+                    "revenue reduction", "liquidity problems", "financial crisis"
                 }
             },
             "shareholding": {
                 "es": {
                     "cambio de accionistas", "transferencia de acciones",
-                    "tenencia de acciones", "compra de participaciones"
+                    "tenencia de acciones", "compra de participaciones",
+                    "venta de participaciones", "nuevo accionista",
+                    "modificación del capital social", "ampliación de capital"
                 },
                 "en": {
                     "change shareholders", "share transfer", "shareholding",
-                    "share purchase"
+                    "share purchase", "share sale", "new shareholder",
+                    "capital modification", "capital increase"
                 }
             },
-            "dismissal": {
+            "regulatory": {
+                "es": {
+                    "sanción", "multa", "expediente sancionador", "infracción",
+                    "cnmv", "banco de españa", "cnmc", "aepd", "dgsfp",
+                    "sepblac", "requerimiento", "advertencia", "apercibimiento",
+                    "incumplimiento normativo", "violación regulatoria"
+                },
+                "en": {
+                    "sanction", "fine", "penalty", "violation", "regulatory breach",
+                    "compliance failure", "regulatory warning", "regulatory notice",
+                    "regulatory investigation", "regulatory action"
+                }
+            },
+            "dismissals": {
                 "es": {
                     "despido colectivo", "despido", "regulación de empleo",
-                    "reducción de plantilla"
+                    "reducción de plantilla", "expediente de regulación",
+                    "ere", "despido disciplinario", "cese de empleados",
+                    "reestructuración laboral", "despido improcedente"
                 },
                 "en": {
                     "collective dismissal", "layoff", "employment regulation",
-                    "workforce reduction"
+                    "workforce reduction", "redundancy", "disciplinary dismissal",
+                    "employee termination", "labor restructuring", "unfair dismissal"
                 }
             },
             "environmental": {
                 "es": {
                     "contaminación", "sostenibilidad", "emisiones",
-                    "gestión de residuos", "impacto ambiental", "greenwashing"
+                    "gestión de residuos", "impacto ambiental", "greenwashing",
+                    "multa ambiental", "sanción ecológica", "daño ambiental",
+                    "vertido", "emisiones co2", "cambio climático"
                 },
                 "en": {
                     "pollution", "sustainability", "emissions", "waste management",
-                    "environmental impact", "greenwashing"
+                    "environmental impact", "greenwashing", "environmental fine",
+                    "ecological sanction", "environmental damage", "spill",
+                    "co2 emissions", "climate change"
+                }
+            },
+            "operational": {
+                "es": {
+                    "nombramiento", "cese", "dimisión", "renuncia", "junta general",
+                    "consejo de administración", "director", "gerente", "fusión",
+                    "adquisición", "venta", "reestructuración", "cambio de sede",
+                    "nuevo proyecto", "expansión", "cierre", "apertura"
+                },
+                "en": {
+                    "appointment", "dismissal", "resignation", "board meeting",
+                    "board of directors", "director", "manager", "merger",
+                    "acquisition", "sale", "restructuring", "headquarters change",
+                    "new project", "expansion", "closure", "opening"
                 }
             }
         }
@@ -116,15 +156,19 @@ class KeywordManager:
         # Count matches by category
         match_counts = {cat: len(keywords) for cat, keywords in matches.items()}
         
-        # Risk scoring logic
+        # Risk scoring logic with new categories
         if "corruption" in match_counts and match_counts["corruption"] >= 2:
             return "High-Legal", 0.9
-        elif "bankruptcy" in match_counts and match_counts["bankruptcy"] >= 2:
-            return "High-Legal", 0.85
-        elif "dismissal" in match_counts and match_counts["dismissal"] >= 2:
-            return "Medium-Reg", 0.8
+        elif "financial" in match_counts and match_counts["financial"] >= 2:
+            return "High-Financial", 0.85
+        elif "regulatory" in match_counts and match_counts["regulatory"] >= 2:
+            return "High-Regulatory", 0.85
+        elif "dismissals" in match_counts and match_counts["dismissals"] >= 2:
+            return "Medium-Operational", 0.8
         elif "environmental" in match_counts and match_counts["environmental"] >= 2:
-            return "Medium-Reg", 0.75
+            return "Medium-Operational", 0.75
+        elif "operational" in match_counts and match_counts["operational"] >= 2:
+            return "Low-Operational", 0.7
         elif any(count >= 1 for count in match_counts.values()):
             return "Low-Other", 0.6
             

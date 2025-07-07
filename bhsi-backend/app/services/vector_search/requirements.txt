@@ -5,6 +5,10 @@ uvicorn[standard]>=0.30.0,<0.31.0
 # HTTP client
 httpx>=0.28.0
 
+# BigQuery dependencies for persistent vector storage
+google-cloud-bigquery>=3.23.0
+numpy>=1.24.0
+
 # infra / helpers
 tenacity==8.2.3
 python-dotenv==1.0.1

@@ -154,7 +154,12 @@ async def health_check():
                 try:
                     result = list(client.query(query))
                     table_name = ["events", "companies", "raw_docs"][i]
-                    results[table_name] = result[0].count if result else 0
+                    # BigQuery returns Row objects, convert to dict for consistent access
+                    if result:
+                        row_dict = dict(result[0]) if hasattr(result[0], '_fields') else result[0]
+                        results[table_name] = row_dict.get('count', 0)
+                    else:
+                        results[table_name] = 0
                 except Exception as e:
                     results[f"table_{i}_error"] = str(e)
             

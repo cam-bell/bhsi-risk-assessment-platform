@@ -13,6 +13,7 @@ import HelpPage from "./pages/HelpPage";
 import ProfilePage from "./pages/ProfilePage";
 import UserManagementPage from "./pages/UserManagementPage";
 import CompanyAnalyticsDashboardWrapper from "./components/CompanyAnalyticsDashboardWrapper";
+import FinancialInsightsPage from "./pages/FinancialInsightsPage";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated } = useAuth();
@@ -53,6 +54,16 @@ export const RouterConfig = () => {
           <ProtectedRoute>
             <Layout currentPage="analytics">
               <AnalyticsPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/financial-insights"
+        element={
+          <ProtectedRoute>
+            <Layout currentPage="financial-insights">
+              <FinancialInsightsPage />
             </Layout>
           </ProtectedRoute>
         }

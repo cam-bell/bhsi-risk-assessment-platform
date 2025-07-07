@@ -11,9 +11,11 @@ from datetime import datetime
 from app.crud.raw_docs import raw_docs
 from app.crud.events import events
 from app.agents.analysis.processor import EventNormalizer
+from app.services.bigquery_writer import BigQueryWriter
 
 logger = logging.getLogger(__name__)
 
+bigquery_writer = BigQueryWriter(batch_size=1)
 
 class DatabaseIntegrationService:
     """Service to integrate search results with BigQuery persistence"""
@@ -60,6 +62,15 @@ class DatabaseIntegrationService:
                 stats["total_processed"] += boe_stats["total_processed"]
                 stats["errors"].extend(boe_stats["errors"])
             
+            # DEBUG: Log NewsAPI structure
+            if "newsapi" in search_results:
+                logger.debug(f"NewsAPI result keys: {list(search_results['newsapi'].keys())}")
+                articles = search_results["newsapi"].get("articles")
+                if articles and isinstance(articles, list) and len(articles) > 0:
+                    logger.debug(f"First article sample: {articles[0]}")
+                else:
+                    logger.debug("No articles found or articles is not a list.")
+            
             # Process NewsAPI results
             if "newsapi" in search_results and search_results["newsapi"].get("articles"):
                 news_stats = await self._process_news_results(
@@ -86,7 +97,27 @@ class DatabaseIntegrationService:
                     stats["total_processed"] += rss_stats["total_processed"]
                     stats["errors"].extend(rss_stats["errors"])
             
-            logger.info(f"✅ Saved {stats['total_processed']} items to BigQuery")
+            # Process Yahoo Finance results
+            if (
+                "yahoo_finance" in search_results and
+                search_results["yahoo_finance"].get("financial_data")
+            ):
+                yahoo_stats = self._process_yahoo_finance_results(
+                    db,
+                    search_results["yahoo_finance"]["financial_data"],
+                    company_name
+                )
+                stats["raw_docs_saved"] += yahoo_stats["raw_docs_saved"]
+                stats["events_created"] += yahoo_stats["events_created"]
+                stats["total_processed"] += yahoo_stats["total_processed"]
+                stats["errors"].extend(yahoo_stats["errors"])
+            
+            logger.info(
+                f"Database integration complete for '{company_name}': "
+                f"{stats['raw_docs_saved']} raw docs, {stats['events_created']} events"
+            )
+            
+           logger.info(f"✅ Saved {stats['total_processed']} items to BigQuery")
             return stats
             
         except Exception as e:
@@ -292,7 +323,46 @@ class DatabaseIntegrationService:
                 
             except Exception as e:
                 stats["errors"].append(f"RSS result processing error: {str(e)}")
-        
+        return stats
+    
+    def _process_yahoo_finance_results(
+        self,
+        db: Session,
+        financial_data_list: list,
+        company_name: str
+    ) -> dict:
+        """Process and save Yahoo Finance results"""
+        stats = {"raw_docs_saved": 0, "events_created": 0, "total_processed": 0, "errors": []}
+        for financial_data in financial_data_list:
+            try:
+                payload_bytes = json.dumps(financial_data, ensure_ascii=False).encode('utf-8')
+                meta = {
+                    "company_name": company_name,
+                    "url": financial_data.get("url", ""),
+                    "ticker": financial_data.get("ticker", ""),
+                    "risk_level": financial_data.get("risk_level", ""),
+                    "market_cap": financial_data.get("market_cap", ""),
+                }
+                rawdoc_dict = self.build_rawdoc_dict("YAHOO_FINANCE", payload_bytes, meta)
+                raw_doc, is_new = self.raw_docs_crud.create_with_dedup(
+                    db,
+                    **rawdoc_dict
+                )
+                logger.info(f"Raw doc created: {is_new}, Source: YAHOO_FINANCE, Title: {financial_data.get('ticker', '')}")
+                if is_new:
+                    stats["raw_docs_saved"] += 1
+                    # Create event from raw doc
+                    try:
+                        event = self.normalizer.normalize_and_create_event(db, raw_doc, "YAHOO_FINANCE", company_name)
+                        if event:
+                            stats["events_created"] += 1
+                            bigquery_writer.queue("solid-topic-443216-b2.risk_monitoring.events", event)
+                            logger.info(f"Queued event {getattr(event, 'event_id', None)} for BigQuery: {getattr(event, 'title', None)}")
+                    except Exception as e:
+                        stats["errors"].append(f"Event creation error: {str(e)}")
+                stats["total_processed"] += 1
+            except Exception as e:
+                stats["errors"].append(f"Yahoo Finance result processing error: {str(e)}")
         return stats
 
 
