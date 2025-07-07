@@ -92,14 +92,46 @@ async def get_risk_report(
     
     risk_result = assess_risk(financial_data, news)
     risk_level = risk_result.get("riskLevel", "Unknown")
-    
+
+    # --- Extract latest available values for score factors ---
+    def get_latest(dct, key):
+        """Get the latest (most recent) value for a key in a dict of years."""
+        if not isinstance(dct, dict):
+            return None
+        if key in dct:
+            return dct[key]
+        # If dct is a dict of years, get the latest year
+        try:
+            latest = sorted(dct.keys(), reverse=True)[0]
+            val = dct[latest]
+            if isinstance(val, dict) and key in val:
+                return val[key]
+            if key is None:
+                return val
+        except Exception:
+            pass
+        return None
+
+    # Get latest values for each metric
+    debt_to_equity = financial_data.get("debtToEquity")
+    total_revenue = get_latest(financial_data.get("financials"), "Total Revenue")
+    net_income = get_latest(financial_data.get("financials"), "Net Income")
+    current_ratio = financial_data.get("currentRatio")
+    return_on_equity = financial_data.get("returnOnEquity")
+    # Free cash flow: get from latest cashflow year
+    free_cash_flow = get_latest(financial_data.get("cashflow"), "Free Cash Flow")
+
     score_factors = {
-        "debtToEquity": financial_data.get("debtToEquity"),
-        "totalRevenue": financial_data.get("financials", {}).get("Total Revenue"),
-        "cashflow": financial_data.get("cashflow"),
-        "red_news_count": sum(1 for n in news if n.get("sentiment") == "Red")
+        "debtToEquity": debt_to_equity,
+        "totalRevenue": total_revenue,
+        "netIncome": net_income,
+        "currentRatio": current_ratio,
+        "returnOnEquity": return_on_equity,
+        "red_news_count": sum(1 for n in news if n.get("sentiment") == "Red"),
+        "freeCashFlow": free_cash_flow,
+        "cashflow": financial_data.get("cashflow"),  # keep for legacy/expansion
     }
-    
+
     response = {
         "company": company_name,
         "ticker": ticker,

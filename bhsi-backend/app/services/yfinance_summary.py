@@ -5,9 +5,46 @@ Yahoo Finance Summary Service - Gemini-powered financial analysis summaries
 
 import logging
 from typing import Dict, Any, List, Optional
-from app.services.gemini.main import generate_text
+import httpx
+
+GEMINI_SERVICE_URL = (
+    "https://gemini-service-"
+    "185303190462.europe-west1.run.app"
+)
 
 logger = logging.getLogger(__name__)
+
+
+async def call_gemini_generate(prompt: str, max_tokens: int = 512, temperature: float = 0.2) -> str:
+    try:
+        logger.info(
+            f"[call_gemini_generate] Sending prompt to Gemini service (length: {len(prompt)})"
+        )
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"{GEMINI_SERVICE_URL}/generate",
+                json={
+                    "prompt": prompt,
+                    "max_tokens": max_tokens,
+                    "temperature": temperature
+                }
+            )
+            logger.info(
+                f"[call_gemini_generate] Gemini service response status: "
+                f"{response.status_code}"
+            )
+            response.raise_for_status()
+            data = response.json()
+            logger.info(
+                f"[call_gemini_generate] Gemini service response keys: "
+                f"{list(data.keys())}"
+            )
+            return data.get("text", "")
+    except Exception as e:
+        import traceback
+        logger.error(f"[call_gemini_generate] Gemini HTTP call failed: {e}")
+        logger.error(traceback.format_exc())
+        raise
 
 
 async def generate_yfinance_summary(
@@ -29,6 +66,17 @@ async def generate_yfinance_summary(
         Generated summary text
     """
     try:
+        logger.info(
+            f"[generate_yfinance_summary] Called for company: {company_name}, "
+            f"ticker: {ticker}"
+        )
+        logger.info(
+            f"[generate_yfinance_summary] Financial data keys: "
+            f"{list(financial_data.keys())}"
+        )
+        logger.info(
+            f"[generate_yfinance_summary] News data count: {len(news_data)}"
+        )
         # Extract key financial metrics for the prompt
         key_metrics = {
             "market_cap": financial_data.get("marketCap"),
@@ -39,12 +87,18 @@ async def generate_yfinance_summary(
             "sector": financial_data.get("sector"),
             "industry": financial_data.get("industry"),
         }
-        
+        logger.info(
+            f"[generate_yfinance_summary] Key metrics: {key_metrics}"
+        )
         # Extract news sentiment summary
         red_news = [n for n in news_data if n.get("sentiment") == "Red"]
         orange_news = [n for n in news_data if n.get("sentiment") == "Orange"]
         green_news = [n for n in news_data if n.get("sentiment") == "Green"]
-        
+        logger.info(
+            f"[generate_yfinance_summary] News sentiment counts: "
+            f"red={len(red_news)}, orange={len(orange_news)}, "
+            f"green={len(green_news)}"
+        )
         # Build a structured prompt
         prompt = f"""
 Analyze the following financial and news data for {company_name} ({ticker}) and provide a concise summary focused on D&O (Directors & Officers) insurance risk assessment.
@@ -76,13 +130,28 @@ Please provide a 2-3 paragraph summary that:
 
 Focus on factors that would impact D&O policy pricing and coverage decisions.
 """
-        
-        summary = await generate_text(prompt, max_tokens=512)
+        logger.info(
+            f"[generate_yfinance_summary] Prompt length: {len(prompt)}"
+        )
+        summary = await call_gemini_generate(prompt, max_tokens=512)
+        logger.info(
+            f"[generate_yfinance_summary] Gemini summary generated successfully "
+            f"(length: {len(summary)})"
+        )
         return summary.strip()
-        
     except Exception as e:
-        logger.error(f"Failed to generate summary for {ticker}: {e}")
-        return f"Summary generation failed for {company_name} ({ticker}): {str(e)}"
+        import traceback
+        logger.error(
+            f"[generate_yfinance_summary] Failed to generate summary for "
+            f"{ticker}: {e}"
+        )
+        logger.error(traceback.format_exc())
+        msg = (
+            "Summary generation failed for " + company_name +
+            " (" + str(ticker) + ")" +
+            ": " + str(e)
+        )
+        return msg
 
 
 async def generate_financial_insights(
@@ -143,7 +212,7 @@ Please provide insights on:
 Format as a clear, professional analysis suitable for business decision-making.
 """
         
-        insights = await generate_text(prompt, max_tokens=512)
+        insights = await call_gemini_generate(prompt, max_tokens=512)
         return insights.strip()
         
     except Exception as e:
@@ -205,7 +274,7 @@ Provide a concise risk assessment that:
 Focus on factors relevant to insurance and investment decision-making.
 """
         
-        assessment = await generate_text(prompt, max_tokens=400)
+        assessment = await call_gemini_generate(prompt, max_tokens=400)
         return assessment.strip()
         
     except Exception as e:

@@ -59,6 +59,7 @@ import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { useGetManagementSummaryMutation } from "../store/api/analyticsApi";
 import StarsIcon from "@mui/icons-material/Stars";
 import { TrafficLightResponse } from "./TrafficLightQuery";
+import DOMPurify from "dompurify";
 
 interface TrafficLightResultProps {
   result: TrafficLightResponse;
@@ -180,6 +181,51 @@ const parameterToRiskLevelMap: Record<string, string[]> = {
   operational: ["Operational"],
 };
 
+// Helper to extract article title and heading from HTML or fields
+const extractTitleAndHeading = (risk: any) => {
+  // Prefer explicit fields if present
+  let title = risk.title || "";
+  let heading = risk.heading || "";
+
+  // Try to extract <title> or first non-empty line
+  if (!title) {
+    const match = risk.description?.match(/<title>(.*?)<\/title>/i);
+    if (match) {
+      title = match[1];
+    }
+  }
+
+  // Try to extract first <h1>, <h2>, or <h3>
+  if (!heading) {
+    const match = risk.description?.match(/<(h1|h2|h3)[^>]*>(.*?)<\/\1>/i);
+    if (match) {
+      heading = match[2];
+    }
+  }
+
+  // Fallback: use first and second non-empty lines of text
+  if (!title || !heading) {
+    const tmp = document.createElement("div");
+    tmp.innerHTML = risk.description || "";
+    const lines = (tmp.textContent || tmp.innerText || "")
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (!title && lines.length > 0) {
+      title = lines[0];
+    }
+    if (!heading && lines.length > 1) {
+      heading = lines[1];
+    }
+  }
+
+  // Truncate for compactness
+  const truncate = (str: string, n = 120) =>
+    str && str.length > n ? str.slice(0, n) + "..." : str;
+
+  return { title: truncate(title), heading: truncate(heading) };
+};
+
 const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -192,6 +238,7 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
     { data: summary, isLoading: summaryLoading, error: summaryError },
   ] = useGetManagementSummaryMutation();
   const [showSummary, setShowSummary] = useState(false);
+  const [openRiskIdx, setOpenRiskIdx] = useState<number | null>(null);
 
   // Trigger animation after component mounts
   useEffect(() => {
@@ -240,6 +287,14 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
     (r: SearchResultItem) => r.risk_level && r.risk_level.startsWith("Medium")
   ).length;
   const lowRiskCount = searchResults.length - highRiskCount - mediumRiskCount;
+
+  // Helper to get a plain text preview from HTML, stripping <img> tags
+  const getTextPreview = (html: string, maxLength = 200) => {
+    const tmp = document.createElement("div");
+    tmp.innerHTML = html.replace(/<img[^>]*>/g, "");
+    const text = tmp.textContent || tmp.innerText || "";
+    return text.length > maxLength ? text.slice(0, maxLength) + "..." : text;
+  };
 
   if (!hasSearchResults) {
     return (
@@ -635,9 +690,7 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
                 {summaryLoading && <CircularProgress sx={{ mt: 2 }} />}
                 {summaryError && (
                   <Alert severity="error" sx={{ mt: 2 }}>
-                    {typeof summaryError === "string"
-                      ? summaryError
-                      : "Error loading management summary. Please try again."}
+                    {String(summaryError)}
                   </Alert>
                 )}
                 {/* Management Summary display */}
@@ -1034,9 +1087,21 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
                                               </Typography>
                                             </TableCell>
                                             <TableCell>
-                                              <Typography variant="body2">
-                                                {risk.description}
-                                              </Typography>
+                                              {(() => {
+                                                const { title, heading } =
+                                                  extractTitleAndHeading(risk);
+                                                return (
+                                                  <>
+                                                    <strong>Article:</strong>{" "}
+                                                    {title || "-"}
+                                                    <br />
+                                                    <strong>
+                                                      Heading:
+                                                    </strong>{" "}
+                                                    {heading || "-"}
+                                                  </>
+                                                );
+                                              })()}
                                             </TableCell>
                                             <TableCell>
                                               <Chip
@@ -1231,83 +1296,7 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
                       </Card>
                     )}
 
-                    {/* 5. Compliance Status - Enhanced */}
-                    {summary.compliance_status && (
-                      <Card
-                        sx={{
-                          mb: 4,
-                          boxShadow: 4,
-                          borderRadius: 3,
-                          background:
-                            "linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%)",
-                          border: "1px solid #2196f3",
-                        }}
-                      >
-                        <CardContent sx={{ p: 4 }}>
-                          <Box
-                            display="flex"
-                            alignItems="center"
-                            gap={2}
-                            mb={3}
-                          >
-                            <Box
-                              sx={{
-                                p: 2,
-                                borderRadius: 2,
-                                background:
-                                  "linear-gradient(135deg, #2196f3 0%, #1976d2 100%)",
-                                color: "white",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                minWidth: 48,
-                                height: 48,
-                              }}
-                            >
-                              <Shield size={24} />
-                            </Box>
-                            <Box sx={{ flex: 1 }}>
-                              <Typography variant="h5" fontWeight={700}>
-                                Compliance Status
-                              </Typography>
-                              <Typography
-                                variant="body2"
-                                color="text.secondary"
-                              >
-                                Regulatory compliance and governance assessment
-                              </Typography>
-                            </Box>
-                            <Chip
-                              label={
-                                summary.compliance_status.overall?.toUpperCase() ||
-                                "UNKNOWN"
-                              }
-                              color={
-                                summary.compliance_status.overall ===
-                                "compliant"
-                                  ? "success"
-                                  : summary.compliance_status.overall ===
-                                    "partial"
-                                  ? "warning"
-                                  : "error"
-                              }
-                              sx={{ fontWeight: "bold" }}
-                            />
-                          </Box>
-
-                          <Typography variant="body1" color="text.secondary">
-                            {summary.compliance_status.overall === "compliant"
-                              ? "Company demonstrates strong compliance with regulatory requirements"
-                              : summary.compliance_status.overall?.replace(
-                                  "_",
-                                  " "
-                                )}
-                          </Typography>
-                        </CardContent>
-                      </Card>
-                    )}
-
-                    {/* 6. Gemini Key Findings - Enhanced */}
+                    {/* 5. Gemini Key Findings - Enhanced */}
                     {Array.isArray(summary.key_findings) &&
                       summary.key_findings.length > 0 && (
                         <Card
@@ -1348,7 +1337,7 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
                                 fontWeight={700}
                                 color="primary"
                               >
-                                Gemini Key Findings
+                                Key Findings
                               </Typography>
                             </Box>
 
@@ -1384,7 +1373,7 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
                         </Card>
                       )}
 
-                    {/* 7. Gemini Recommendations - Enhanced */}
+                    {/* 6. Gemini Recommendations - Enhanced */}
                     {Array.isArray(summary.recommendations) &&
                       summary.recommendations.length > 0 && (
                         <Card
@@ -1425,7 +1414,7 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
                                 fontWeight={700}
                                 color="primary"
                               >
-                                Gemini Recommendations
+                                Recommendations
                               </Typography>
                             </Box>
 
