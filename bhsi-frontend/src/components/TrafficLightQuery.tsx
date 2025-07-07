@@ -59,7 +59,7 @@ import { useGetManagementSummaryMutation } from "../store/api/analyticsApi";
 // Type for API response
 export interface TrafficLightResponse {
   company: string;
-  vat: string;
+
   overall: "green" | "orange" | "red";
   blocks: {
     turnover: "green" | "orange" | "red";
@@ -142,7 +142,7 @@ const convertSearchResultsToTrafficLight = (
 
   return {
     company: searchResponse.company_name,
-    vat: "N/A", // Backend doesn't provide VAT
+    
     overall,
     blocks: {
       turnover: getCategoryRisk(financialResults),
@@ -350,7 +350,7 @@ const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
     e.preventDefault();
 
     if (!query.trim()) {
-      setError("Please enter a company name or VAT number");
+              setError("Please enter a company name");
       return;
     }
 
@@ -427,7 +427,6 @@ const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
       if (user) {
         addAssessedCompany({
           name: trafficLightResult.company,
-          vat: trafficLightResult.vat,
           overallRisk: trafficLightResult.overall,
           assessedBy: user.email,
           riskFactors: {
@@ -589,12 +588,12 @@ const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
                     Company Information
                   </Typography>
                   <TextField
-                    label="Company Name or VAT Number"
+                    label="Company Name"
                     variant="outlined"
                     fullWidth
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Enter company name (e.g., Real Madrid, Banco Santander) or VAT number"
+                    placeholder="Enter company name (e.g., Real Madrid, Banco Santander)"
                     disabled={isLoading}
                     InputProps={{
                       sx: { borderRadius: 2 },

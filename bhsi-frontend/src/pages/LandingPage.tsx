@@ -73,16 +73,14 @@ const LandingPage = () => {
               BHSI Traffic Light Scoring System
             </Typography>
             <Typography
-              variant="h5"
-              sx={{
-                mb: 4,
-                opacity: 0.9,
-                fontSize: { xs: "1.1rem", sm: "1.25rem" },
-                fontWeight: 400,
-              }}
+              variant="h6"
+              component="p"
+              color="white"
+              sx={{ mb: 4, opacity: 0.9, lineHeight: 1.6 }}
             >
-              Supporting Spanish D&O policy decisions with data-driven risk
-              assessment
+              Enter a company name to receive an instant risk
+              assessment with detailed analysis and actionable insights for
+              D&amp;O insurance decisions.
             </Typography>
           </Box>
         </Container>
@@ -101,7 +99,7 @@ const LandingPage = () => {
             Company Risk Assessment
           </Typography>
           <Typography variant="body1" paragraph sx={{ mb: 4, maxWidth: 800 }}>
-            Enter a company name or VAT number to receive an instant risk
+            Enter a company name to receive an instant risk
             assessment based on our proprietary algorithm analyzing turnover,
             shareholding structure, bankruptcy history, and legal issues.
           </Typography>

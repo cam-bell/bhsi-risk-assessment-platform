@@ -60,10 +60,9 @@ const AssessmentHistoryPage = () => {
                 <Table>
                   <TableHead>
                     <TableRow>
-                      <TableCell>Company Name</TableCell>
-                      <TableCell>VAT</TableCell>
-                      <TableCell>Risk Level</TableCell>
-                      <TableCell>Assessed At</TableCell>
+                      <TableCell>Company</TableCell>
+                      <TableCell>Overall Risk</TableCell>
+                      <TableCell>Assessed Date</TableCell>
                       <TableCell>Assessed By</TableCell>
                     </TableRow>
                   </TableHead>
@@ -71,7 +70,6 @@ const AssessmentHistoryPage = () => {
                     {assessedCompanies.map((company) => (
                       <TableRow key={company.id}>
                         <TableCell>{company.name}</TableCell>
-                        <TableCell>{company.vat}</TableCell>
                         <TableCell>
                           <Chip
                             label={company.overallRisk.toUpperCase()}

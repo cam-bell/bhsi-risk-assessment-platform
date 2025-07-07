@@ -20,7 +20,7 @@ import {
 } from "@mui/material";
 import {
   Menu as MenuIcon,
-  BarChart3 as Dashboard,
+  Gauge as Dashboard,
   Search,
   FileUp,
   History,
@@ -45,7 +45,7 @@ interface LayoutProps {
 const navigationItems = [
   { id: "dashboard", label: "Dashboard", icon: Dashboard, path: "/dashboard" },
   { id: "search", label: "Risk Assessment", icon: Search, path: "/" },
-  { id: "analytics", label: "Analytics", icon: BarChart3, path: "/analytics" },
+  { id: "analytics", label: "Intelligent Analytics", icon: BarChart3, path: "/analytics" },
   {
     id: "financial-insights",
     label: "Financial Insights",
@@ -63,13 +63,8 @@ const navigationItems = [
   { id: "help", label: "Help & Support", icon: HelpCircle, path: "/help" },
 ];
 
-const adminNavigationItems = [
-  {
-    id: "user-management",
-    label: "User Management",
-    icon: Users,
-    path: "/user-management",
-  },
+const adminNavigationItems: Array<{ id: string; label: string; icon: any; path: string; }> = [
+  // User Management tab removed per user request
 ];
 
 const Layout = ({ children, currentPage = "search" }: LayoutProps) => {
@@ -128,7 +123,6 @@ const Layout = ({ children, currentPage = "search" }: LayoutProps) => {
     if (location.pathname === "/settings") return "settings";
     if (location.pathname === "/help") return "help";
     if (location.pathname === "/profile") return "profile";
-    if (location.pathname === "/user-management") return "user-management";
     return currentPage;
   };
 

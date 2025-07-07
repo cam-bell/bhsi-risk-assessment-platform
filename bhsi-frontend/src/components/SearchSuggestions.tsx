@@ -10,96 +10,76 @@ import {
 } from '@mui/material';
 import { Building2, FileText } from 'lucide-react';
 
-interface SearchSuggestion {
+interface Suggestion {
   id: string;
   name: string;
-  vat?: string;
-  type: 'company' | 'recent';
+  type: 'company' | 'sector' | 'location';
 }
 
-interface SearchSuggestionsProps {
-  value: string;
-  onChange: (value: string) => void;
-  recentSearches: string[];
-  onSearch: () => void;
-}
-
-const mockSuggestions: SearchSuggestion[] = [
-  { id: '1', name: 'ACME Solutions S.A.', vat: 'ESX78901234', type: 'company' },
-  { id: '2', name: 'TechVision Global S.A.', vat: 'ESX45678901', type: 'company' },
-  { id: '3', name: 'RiskCorp Industries S.A.', vat: 'ESX12345678', type: 'company' },
-  { id: '4', name: 'Nova Enterprises S.A.', vat: 'ESX23456789', type: 'company' },
+const defaultSuggestions: Suggestion[] = [
+  { id: '1', name: 'ACME Solutions S.A.', type: 'company' },
+  { id: '2', name: 'TechVision Global S.A.', type: 'company' },
+  { id: '3', name: 'RiskCorp Industries S.A.', type: 'company' },
+  { id: '4', name: 'Nova Enterprises S.A.', type: 'company' },
+  { id: '5', name: 'Banking Sector', type: 'sector' },
+  { id: '6', name: 'Technology Sector', type: 'sector' },
+  { id: '7', name: 'Energy Sector', type: 'sector' },
+  { id: '8', name: 'Madrid Region', type: 'location' },
+  { id: '9', name: 'Catalonia Region', type: 'location' },
+  { id: '10', name: 'Basque Country', type: 'location' },
 ];
 
-const SearchSuggestions = ({ value, onChange, recentSearches, onSearch }: SearchSuggestionsProps) => {
-  const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
+interface SearchSuggestionsProps {
+  onSuggestionSelect?: (suggestion: string) => void;
+}
 
-  useEffect(() => {
-    if (value.length < 2) {
-      const recentSuggestions = recentSearches.slice(0, 3).map((search, index) => ({
-        id: `recent-${index}`,
-        name: search,
-        type: 'recent' as const
-      }));
-      setSuggestions(recentSuggestions);
-      return;
-    }
+const SearchSuggestions: React.FC<SearchSuggestionsProps> = ({ onSuggestionSelect }) => {
+  const [suggestions, setSuggestions] = useState<Suggestion[]>(defaultSuggestions);
 
-    const filtered = mockSuggestions.filter(
-      suggestion =>
-        suggestion.name.toLowerCase().includes(value.toLowerCase()) ||
-        suggestion.vat?.toLowerCase().includes(value.toLowerCase())
-    );
-    setSuggestions(filtered);
-  }, [value, recentSearches]);
+  const getSuggestions = (value: string) => {
+    const inputValue = value.trim().toLowerCase();
+    const inputLength = inputValue.length;
+    
+    return inputLength === 0 
+      ? defaultSuggestions
+      : suggestions.filter(suggestion => 
+          suggestion.name.toLowerCase().includes(value.toLowerCase())
+        );
+  };
 
   return (
-    <Autocomplete
-      freeSolo
-      value={value}
-      onInputChange={(_: unknown, newValue: string) => onChange(newValue)}
-      options={suggestions}
-      getOptionLabel={(option: string | SearchSuggestion) => typeof option === 'string' ? option : option.name}
-      renderInput={(params: AutocompleteRenderInputParams) => (
-        <TextField
-          {...params}
-          label="Company name or VAT number"
-          placeholder="e.g., ACME Solutions or ESX78901234"
-          fullWidth
-          onKeyPress={(e: React.KeyboardEvent) => {
-            if (e.key === 'Enter') {
-              onSearch();
-            }
-          }}
-        />
-      )}
-      renderOption={(props: React.HTMLAttributes<HTMLLIElement>, option: SearchSuggestion) => (
-        <Box component="li" {...props}>
-          <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-            {option.type === 'company' ? (
-              <Building2 size={16} style={{ marginRight: 8, color: '#666' }} />
-            ) : (
-              <FileText size={16} style={{ marginRight: 8, color: '#666' }} />
-            )}
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="body2">{option.name}</Typography>
-              {option.vat && (
-                <Typography variant="caption" color="text.secondary">
-                  {option.vat}
-                </Typography>
-              )}
+    <Box sx={{ width: '100%', maxWidth: 400 }}>
+      <Autocomplete
+        options={getSuggestions('')}
+        getOptionLabel={(option) => option.name}
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            label="Company name"
+            variant="outlined"
+            size="small"
+          />
+        )}
+        renderOption={(props, option) => (
+          <Box component="li" {...props}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+              <Typography variant="body2">
+                {option.name}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {option.type.charAt(0).toUpperCase() + option.type.slice(1)}
+              </Typography>
             </Box>
-            {option.type === 'recent' && (
-              <Chip label="Recent" size="small" variant="outlined" />
-            )}
           </Box>
-        </Box>
-      )}
-      PaperComponent={(props: React.ComponentProps<typeof Paper>) => (
-        <Paper {...props} sx={{ mt: 1, boxShadow: 3 }} />
-      )}
-      noOptionsText="No companies found"
-    />
+        )}
+        onChange={(_, newValue) => {
+          if (newValue && onSuggestionSelect) {
+            onSuggestionSelect(newValue.name);
+          }
+        }}
+        filterOptions={(options, { inputValue }) => getSuggestions(inputValue)}
+      />
+    </Box>
   );
 };
 

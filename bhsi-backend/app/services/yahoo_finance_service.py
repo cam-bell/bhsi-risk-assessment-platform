@@ -41,10 +41,185 @@ class StreamlinedYahooFinanceAgent(BaseSearchAgent):
         
     def _get_expanded_ticker_mapping(self) -> Dict[str, str]:
         """
-        Expanded mapping of Spanish company names to ticker symbols
-        Includes major Spanish companies across different sectors
+        Comprehensive mapping of company names to ticker symbols
+        Includes major global companies, automotive, tech, finance, and Spanish companies
         """
         return {
+            # === TECHNOLOGY GIANTS ===
+            "tesla": "TSLA",
+            "tesla motors": "TSLA",
+            "apple": "AAPL",
+            "microsoft": "MSFT",
+            "google": "GOOGL",
+            "alphabet": "GOOGL",
+            "amazon": "AMZN",
+            "meta": "META",
+            "facebook": "META",
+            "netflix": "NFLX",
+            "nvidia": "NVDA",
+            "intel": "INTC",
+            "oracle": "ORCL",
+            "salesforce": "CRM",
+            "adobe": "ADBE",
+            "ibm": "IBM",
+            "cisco": "CSCO",
+            "qualcomm": "QCOM",
+            "broadcom": "AVGO",
+            "advanced micro devices": "AMD",
+            "amd": "AMD",
+            
+            # === AUTOMOTIVE COMPANIES ===
+            "ford": "F",
+            "ford motor": "F",
+            "general motors": "GM",
+            "gm": "GM",
+            "toyota": "TM",
+            "toyota motor": "TM",
+            "volkswagen": "VWAGY",
+            "bmw": "BMWYY",
+            "mercedes": "DDAIF",
+            "mercedes benz": "DDAIF",
+            "daimler": "DDAIF",
+            "ferrari": "RACE",
+            "porsche": "POAHY",
+            "stellantis": "STLA",
+            "nissan": "NSANY",
+            "honda": "HMC",
+            "hyundai": "HYMTF",
+            "lucid": "LCID",
+            "lucid motors": "LCID",
+            "rivian": "RIVN",
+            "nio": "NIO",
+            "xpeng": "XPEV",
+            "li auto": "LI",
+            
+            # === FINANCIAL SERVICES ===
+            "jpmorgan": "JPM",
+            "jp morgan": "JPM",
+            "jpmorgan chase": "JPM",
+            "bank of america": "BAC",
+            "wells fargo": "WFC",
+            "goldman sachs": "GS",
+            "morgan stanley": "MS",
+            "american express": "AXP",
+            "citigroup": "C",
+            "visa": "V",
+            "mastercard": "MA",
+            "paypal": "PYPL",
+            "berkshire hathaway": "BRK-A",
+            "berkshire": "BRK-A",
+            
+            # === AIRLINES & LOGISTICS ===
+            "dhl": "DPSGY",
+            "deutsche post": "DPSGY",
+            "fedex": "FDX",
+            "ups": "UPS",
+            "american airlines": "AAL",
+            "delta": "DAL",
+            "delta air lines": "DAL",
+            "united airlines": "UAL",
+            "southwest": "LUV",
+            "southwest airlines": "LUV",
+            "lufthansa": "DLAKY",
+            "boeing": "BA",
+            "airbus": "EADSY",
+            
+            # === ENERGY & OIL ===
+            "exxon": "XOM",
+            "exxon mobil": "XOM",
+            "chevron": "CVX",
+            "shell": "SHEL",
+            "royal dutch shell": "SHEL",
+            "bp": "BP",
+            "british petroleum": "BP",
+            "totalenergies": "TTE",
+            "conocophillips": "COP",
+            "schlumberger": "SLB",
+            "halliburton": "HAL",
+            
+            # === HEALTHCARE & PHARMA ===
+            "johnson & johnson": "JNJ",
+            "jnj": "JNJ",
+            "pfizer": "PFE",
+            "moderna": "MRNA",
+            "abbott": "ABT",
+            "merck": "MRK",
+            "bristol myers": "BMY",
+            "bristol myers squibb": "BMY",
+            "eli lilly": "LLY",
+            "novartis": "NVS",
+            "roche": "RHHBY",
+            "astrazeneca": "AZN",
+            "glaxosmithkline": "GSK",
+            "gsk": "GSK",
+            
+            # === CONSUMER GOODS & RETAIL ===
+            "coca cola": "KO",
+            "cocacola": "KO",
+            "pepsi": "PEP",
+            "pepsico": "PEP",
+            "procter gamble": "PG",
+            "pg": "PG",
+            "unilever": "UL",
+            "nestle": "NSRGY",
+            "walmart": "WMT",
+            "amazon": "AMZN",
+            "target": "TGT",
+            "costco": "COST",
+            "home depot": "HD",
+            "mcdonalds": "MCD",
+            "starbucks": "SBUX",
+            "nike": "NKE",
+            "adidas": "ADDYY",
+            
+            # === TELECOMMUNICATIONS ===
+            "verizon": "VZ",
+            "at&t": "T",
+            "att": "T",
+            "vodafone": "VOD",
+            "deutsche telekom": "DTEGY",
+            "orange": "ORAN",
+            "comcast": "CMCSA",
+            "charter": "CHTR",
+            
+            # === ENTERTAINMENT & MEDIA ===
+            "disney": "DIS",
+            "walt disney": "DIS",
+            "warner bros": "WBD",
+            "discovery": "WBD",
+            "paramount": "PARA",
+            "sony": "SONY",
+            "nintendo": "NTDOY",
+            
+            # === SEMICONDUCTORS ===
+            "nvidia": "NVDA",
+            "intel": "INTC",
+            "amd": "AMD",
+            "advanced micro devices": "AMD",
+            "qualcomm": "QCOM",
+            "broadcom": "AVGO",
+            "taiwan semiconductor": "TSM",
+            "tsmc": "TSM",
+            "micron": "MU",
+            "micron technology": "MU",
+            "applied materials": "AMAT",
+            
+            # === INDUSTRIAL & AEROSPACE ===
+            "caterpillar": "CAT",
+            "boeing": "BA",
+            "lockheed martin": "LMT",
+            "raytheon": "RTX",
+            "general electric": "GE",
+            "ge": "GE",
+            "honeywell": "HON",
+            "3m": "MMM",
+            
+            # === REAL ESTATE & REITS ===
+            "american tower": "AMT",
+            "prologis": "PLD",
+            "crown castle": "CCI",
+            
+            # === SPANISH COMPANIES ===
             # Banking & Financial Services
             "santander": "SAN",
             "banco santander": "SAN",
@@ -108,7 +283,6 @@ class StreamlinedYahooFinanceAgent(BaseSearchAgent):
             # Technology & Media
             "amadeus": "AMS",
             "indra": "IDR",
-            "telefonica": "TEF",
             "mediaset": "TL5",
             "atresmedia": "A3M",
             
@@ -149,7 +323,6 @@ class StreamlinedYahooFinanceAgent(BaseSearchAgent):
             "nh hoteles": "NH",
             "sol melia": "MEL",
             "barceló": "BAR",
-            "iberostar": "IBEROSTAR",
         }
     
     def _clean_company_name(self, company_name: str) -> str:
@@ -221,34 +394,83 @@ class StreamlinedYahooFinanceAgent(BaseSearchAgent):
     
     async def _search_ticker_dynamically(self, company_name: str) -> Optional[str]:
         """
-        Dynamically search for ticker symbol using yfinance search
+        Dynamically search for ticker symbol using multiple strategies
+        Updated to handle international companies with better fallbacks
         """
         try:
-            # Use yfinance's search functionality
-            search_results = yf.Tickers(company_name)
+            # Try direct ticker creation first (most reliable approach)
+            potential_tickers = [
+                company_name.upper(),  # Exact match
+                company_name.upper().replace(" ", ""),  # Remove spaces
+            ]
             
-            # Get the first result that looks like a valid ticker
-            for ticker in search_results.tickers:
-                ticker_symbol = ticker.ticker
-                info = ticker.info
-                
-                # Check if this is a valid stock with basic info
-                if (info.get("regularMarketPrice") and 
-                    info.get("longName") and 
-                    not ticker_symbol.endswith('.TO') and  # Avoid Canadian stocks
-                    not ticker_symbol.endswith('.L') and   # Avoid London stocks
-                    len(ticker_symbol) <= 5):  # Most major stocks have short symbols
+            # Add common ticker variations for known companies
+            name_lower = company_name.lower()
+            ticker_variations = {
+                "tesla": ["TSLA"],
+                "tesla motors": ["TSLA"], 
+                "apple": ["AAPL"],
+                "microsoft": ["MSFT"],
+                "google": ["GOOGL", "GOOG"],
+                "alphabet": ["GOOGL", "GOOG"],
+                "amazon": ["AMZN"],
+                "meta": ["META"],
+                "facebook": ["META"],
+                "netflix": ["NFLX"],
+                "nvidia": ["NVDA"],
+                "mercedes": ["DDAIF", "MBG.DE"],
+                "mercedes benz": ["DDAIF", "MBG.DE"],
+                "ferrari": ["RACE"],
+                "bmw": ["BMWYY", "BMW.DE"],
+                "volkswagen": ["VWAGY", "VOW.DE"],
+                "toyota": ["TM", "7203.T"],
+                "ford": ["F"],
+                "general motors": ["GM"],
+                "dhl": ["DPSGY", "DPW.DE"],
+                "deutsche post": ["DPSGY", "DPW.DE"],
+                "boeing": ["BA"],
+                "airbus": ["EADSY", "AIR.PA"],
+                "coca cola": ["KO"],
+                "pepsi": ["PEP"],
+                "mcdonalds": ["MCD"],
+                "walmart": ["WMT"],
+                "disney": ["DIS"],
+                "nike": ["NKE"],
+                "visa": ["V"],
+                "mastercard": ["MA"],
+                "johnson & johnson": ["JNJ"],
+                "pfizer": ["PFE"],
+                "exxon": ["XOM"],
+                "chevron": ["CVX"],
+                "shell": ["SHEL"],
+                "bp": ["BP"],
+                # Spanish companies
+                "santander": ["SAN"],
+                "banco santander": ["SAN"],
+                "bbva": ["BBVA"],
+                "telefonica": ["TEF"],
+                "iberdrola": ["IBE"],
+                "repsol": ["REP"],
+                "inditex": ["IDEXY", "ITX.MC"],
+            }
+            
+            for key, tickers in ticker_variations.items():
+                if key in name_lower:
+                    potential_tickers.extend(tickers)
+            
+            # Test each potential ticker
+            for ticker_symbol in potential_tickers:
+                try:
+                    ticker_obj = yf.Ticker(ticker_symbol)
+                    info = ticker_obj.info
                     
-                    # Verify it's a Spanish company by checking country or name
-                    long_name = info.get("longName", "").lower()
-                    country = info.get("country", "").lower()
-                    
-                    if ("spain" in country or 
-                        "españa" in country or 
-                        "madrid" in long_name or 
-                        "barcelona" in long_name or
-                        any(spanish_word in long_name for spanish_word in ["banco", "telefónica", "iberdrola", "repsol"])):
+                    # Check if this is a valid stock with basic info
+                    if info and (info.get("longName") or info.get("marketCap") or info.get("regularMarketPrice")):
+                        logger.info(f"Found valid ticker {ticker_symbol} for {company_name}")
                         return ticker_symbol
+                        
+                except Exception as e:
+                    continue
             
             return None
             
@@ -274,33 +496,51 @@ class StreamlinedYahooFinanceAgent(BaseSearchAgent):
             except Exception:
                 pass
 
-        # 2. Try direct mapping (case-insensitive, normalized)
+        # 2. Try direct mapping (case-insensitive, normalized) - improved matching
         ticker_mapping = self._get_expanded_ticker_mapping()
         company_normalized = company_name_or_ticker.strip().lower()
+        
+        # First try exact matches
         for key, ticker in ticker_mapping.items():
-            if key in company_normalized:
-                print(f"[DEBUG] Matched '{company_normalized}' to '{key}' -> {ticker}")
+            if company_normalized == key:
+                logger.debug(f"Exact match '{company_normalized}' to '{key}' -> {ticker}")
+                return ticker
+        
+        # Then try partial matches (both ways)
+        for key, ticker in ticker_mapping.items():
+            if (key in company_normalized or company_normalized in key) and len(company_normalized) >= 3:
+                logger.debug(f"Partial match '{company_normalized}' to '{key}' -> {ticker}")
                 return ticker
 
         # 3. Fuzzy matching
         fuzzy_match = self._fuzzy_match_company_name(company_name_or_ticker)
         if fuzzy_match:
-            print(f"[DEBUG] Fuzzy matched '{company_name_or_ticker}' to '{fuzzy_match}'")
+            logger.debug(f"Fuzzy matched '{company_name_or_ticker}' to '{fuzzy_match}'")
             return fuzzy_match
 
-        # 4. Dynamic search (async, run synchronously here)
+        # 4. Dynamic search - use simple implementation to avoid async issues
         try:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            dynamic_match = loop.run_until_complete(self._search_ticker_dynamically(company_name_or_ticker))
-            loop.close()
-            if dynamic_match:
-                print(f"[DEBUG] Dynamically matched '{company_name_or_ticker}' to '{dynamic_match}'")
-                return dynamic_match
-        except Exception:
-            pass
+            # Try some common variations first
+            variations = [
+                company_name_or_ticker.upper(),
+                company_name_or_ticker.upper().replace(" ", ""),
+                company_name_or_ticker.upper().replace(" ", "-"),
+            ]
+            
+            for variation in variations:
+                try:
+                    ticker_obj = yf.Ticker(variation)
+                    info = ticker_obj.info
+                    if info and (info.get("longName") or info.get("marketCap") or info.get("regularMarketPrice")):
+                        logger.debug(f"Found ticker {variation} for {company_name_or_ticker}")
+                        return variation
+                except Exception:
+                    continue
 
-        print(f"[DEBUG] No ticker found for '{company_name_or_ticker}'")
+        except Exception as e:
+            logger.warning(f"Ticker variation search failed for '{company_name_or_ticker}': {e}")
+
+        logger.debug(f"No ticker found for '{company_name_or_ticker}'")
         return None
 
     def _analyze_stock_data(self, stock: yf.Ticker, company_name: str) -> Dict[str, Any]:
@@ -458,10 +698,12 @@ class StreamlinedYahooFinanceAgent(BaseSearchAgent):
         """
         Fetches comprehensive financial data for a company using yfinance.
         Returns a dictionary with info, financials, balance sheet, cashflow, and recommendations.
+        Provides fallback data when information is not available.
         """
         try:
             stock = yf.Ticker(ticker)
             info = stock.info
+            
             # Convert DataFrames to dicts if possible
             def safe_to_dict(df):
                 try:
@@ -469,11 +711,22 @@ class StreamlinedYahooFinanceAgent(BaseSearchAgent):
                 except Exception:
                     return {}
             
+            # Get company name fallbacks
+            company_name = (
+                info.get("longName") or 
+                info.get("shortName") or
+                info.get("displayName") or
+                ticker
+            )
+            
+            # Build comprehensive data with fallbacks
             raw_data = {
-                "longName": info.get("longName"),
-                "country": info.get("country"),
-                "sector": info.get("sector"),
-                "industry": info.get("industry"),
+                "longName": company_name,
+                "shortName": info.get("shortName", ticker),
+                "ticker": ticker,
+                "country": info.get("country", "Unknown"),
+                "sector": info.get("sector", "Unknown"),
+                "industry": info.get("industry", "Unknown"),
                 "marketCap": info.get("marketCap"),
                 "totalRevenue": info.get("totalRevenue"),
                 "ebitda": info.get("ebitda"),
@@ -485,18 +738,58 @@ class StreamlinedYahooFinanceAgent(BaseSearchAgent):
                 "enterpriseValue": info.get("enterpriseValue"),
                 "trailingPE": info.get("trailingPE"),
                 "totalCash": info.get("totalCash"),
+                "currentPrice": info.get("regularMarketPrice") or info.get("previousClose"),
+                "currency": info.get("currency", "USD"),
+                "exchange": info.get("exchange", "Unknown"),
+                "website": info.get("website"),
+                "business_summary": info.get("longBusinessSummary", f"No business summary available for {company_name}."),
                 "financials": safe_to_dict(stock.financials),
                 "balance_sheet": safe_to_dict(stock.balance_sheet),
                 "cashflow": safe_to_dict(stock.cashflow),
                 "recommendations": safe_to_dict(stock.recommendations),
             }
             
+            # Add data availability flags for frontend
+            raw_data["data_availability"] = {
+                "has_financial_data": bool(raw_data["marketCap"] or raw_data["totalRevenue"]),
+                "has_detailed_financials": bool(raw_data["financials"]),
+                "has_balance_sheet": bool(raw_data["balance_sheet"]),
+                "has_cashflow": bool(raw_data["cashflow"]),
+                "has_recommendations": bool(raw_data["recommendations"]),
+                "data_completeness": self._calculate_data_completeness(raw_data)
+            }
+            
+            # If no financial data is available, provide estimated/placeholder data
+            if not raw_data["data_availability"]["has_financial_data"]:
+                raw_data["data_note"] = f"Limited financial data available for {company_name}. This may be due to the company being private, unlisted, or having restricted data access."
+                
             # Clean data for JSON serialization before returning
             return self._clean_for_json(raw_data)
             
         except Exception as e:
             logger.error(f"Failed to fetch company financial data for {ticker}: {e}")
-            return {"error": str(e)}
+            # Return structured error with fallback company info
+            return {
+                "error": str(e),
+                "ticker": ticker,
+                "longName": ticker,
+                "shortName": ticker,
+                "data_note": f"Unable to fetch financial data for {ticker}. The company may not be publicly traded or the ticker symbol may be incorrect.",
+                "data_availability": {
+                    "has_financial_data": False,
+                    "has_detailed_financials": False,
+                    "has_balance_sheet": False,
+                    "has_cashflow": False,
+                    "has_recommendations": False,
+                    "data_completeness": 0
+                }
+            }
+    
+    def _calculate_data_completeness(self, data: dict) -> float:
+        """Calculate completeness score as percentage"""
+        key_fields = ["marketCap", "totalRevenue", "debtToEquity", "profitMargins", "beta"]
+        available_fields = sum(1 for field in key_fields if data.get(field) is not None)
+        return round((available_fields / len(key_fields)) * 100, 1)
 
     # --- Gemini-powered ticker lookup with hybrid fallback ---
     async def get_ticker_symbol_llm(self, company_name: str) -> str:

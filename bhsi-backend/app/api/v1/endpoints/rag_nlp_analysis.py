@@ -153,8 +153,11 @@ class RAGOrchestrator:
                 
                 if response.status_code == 200:
                     result = response.json()
+                    raw_answer = result.get("text", "No analysis generated")
+                    # Remove asterisks and other markdown formatting to make text cleaner
+                    clean_answer = self._clean_markdown_formatting(raw_answer)
                     return {
-                        "answer": result.get("text", "No analysis generated"),
+                        "answer": clean_answer,
                         "confidence": self._calculate_confidence(documents)
                     }
                 else:
@@ -217,6 +220,30 @@ INSTRUCCIONES:
 
 ANÁLISIS:
 """
+    
+    def _clean_markdown_formatting(self, text: str) -> str:
+        """🧹 Remove asterisks and other markdown formatting to make text cleaner and more appealing"""
+        
+        if not text:
+            return text
+        
+        # Remove bold markdown formatting (**text**)
+        import re
+        
+        # Remove double asterisks (bold formatting)
+        text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
+        
+        # Remove single asterisks (italic formatting) 
+        text = re.sub(r'\*([^*]+)\*', r'\1', text)
+        
+        # Clean up any remaining standalone asterisks
+        text = re.sub(r'\*+', '', text)
+        
+        # Clean up extra whitespace that might result from removing formatting
+        text = re.sub(r'\n\s*\n\s*\n', '\n\n', text)  # Reduce multiple newlines
+        text = re.sub(r'^\s+', '', text, flags=re.MULTILINE)  # Remove leading whitespace on lines
+        
+        return text.strip()
     
     def _calculate_confidence(self, documents: List[Dict[str, Any]]) -> float:
         """📊 Calculate confidence based on document relevance scores"""

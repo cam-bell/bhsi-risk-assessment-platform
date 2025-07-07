@@ -136,14 +136,55 @@ const SummaryTab: React.FC<{ summary: any; loading: boolean }> = ({
       <CircularProgress />
     ) : summary ? (
       <>
+        {/* Handle error cases */}
+        {summary.error && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            <Typography variant="subtitle2" gutterBottom>
+              {summary.error}
+            </Typography>
+          </Alert>
+        )}
+        
+        {/* Show suggestions if available */}
+        {summary.suggestions && (
+          <Paper sx={{ p: 2, mb: 2 }}>
+            <Typography variant="subtitle2" gutterBottom>
+              Suggestions:
+            </Typography>
+            <ul>
+              {summary.suggestions.map((suggestion: string, index: number) => (
+                <li key={index}>
+                  <Typography variant="body2">{suggestion}</Typography>
+                </li>
+              ))}
+            </ul>
+          </Paper>
+        )}
+        
         <Typography variant="h5" gutterBottom>
           Executive Summary
         </Typography>
+        
+        {/* Data availability indicator */}
+        {summary.data_availability && (
+          <Alert 
+            severity={summary.data_availability.data_completeness > 70 ? "success" : 
+                     summary.data_availability.data_completeness > 30 ? "warning" : "info"} 
+            sx={{ mb: 2 }}
+          >
+            <Typography variant="body2">
+              Summary based on {summary.data_availability.data_completeness}% data completeness
+              {summary.data_note && ` - ${summary.data_note}`}
+            </Typography>
+          </Alert>
+        )}
+        
         <Paper sx={{ p: 3, mb: 2, background: "#f9f9f9" }}>
           <Typography variant="body1" sx={{ whiteSpace: "pre-line" }}>
             {summary.summary || summary.ai_summary || summary}
           </Typography>
         </Paper>
+        
         <Typography variant="subtitle2" color="text.secondary">
           Company: {summary.company} ({summary.ticker})
         </Typography>
@@ -168,6 +209,7 @@ const RiskTab: React.FC<{ risk: any; loading: boolean }> = ({
     { key: "red_news_count", label: "Red News Count" },
     { key: "freeCashFlow", label: "Free Cash Flow" },
   ];
+  
   // Try to extract these from risk.scoreFactors or risk.financials
   const getScoreFactor = (key: string) => {
     if (!risk) return undefined;
@@ -194,12 +236,43 @@ const RiskTab: React.FC<{ risk: any; loading: boolean }> = ({
     }
     return undefined;
   };
+  
   return (
     <Box>
       {loading ? (
         <CircularProgress />
       ) : risk ? (
         <>
+          {/* Handle error cases */}
+          {risk.error && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              <Typography variant="subtitle2" gutterBottom>
+                {risk.error}
+              </Typography>
+              {risk.data_note && (
+                <Typography variant="body2">
+                  {risk.data_note}
+                </Typography>
+              )}
+            </Alert>
+          )}
+          
+          {/* Show suggestions if available */}
+          {risk.suggestions && (
+            <Paper sx={{ p: 2, mb: 2 }}>
+              <Typography variant="subtitle2" gutterBottom>
+                Suggestions:
+              </Typography>
+              <ul>
+                {risk.suggestions.map((suggestion: string, index: number) => (
+                  <li key={index}>
+                    <Typography variant="body2">{suggestion}</Typography>
+                  </li>
+                ))}
+              </ul>
+            </Paper>
+          )}
+          
           <Stack direction="row" spacing={2} alignItems="center" mb={2}>
             <Typography variant="h5">Risk Report</Typography>
             <Chip
@@ -213,6 +286,21 @@ const RiskTab: React.FC<{ risk: any; loading: boolean }> = ({
               aria-label={`Risk level: ${risk.riskLevel}`}
             />
           </Stack>
+          
+          {/* Data availability indicator */}
+          {risk.data_availability && (
+            <Alert 
+              severity={risk.data_availability.data_completeness > 70 ? "success" : 
+                       risk.data_availability.data_completeness > 30 ? "warning" : "info"} 
+              sx={{ mb: 2 }}
+            >
+              <Typography variant="body2">
+                Risk assessment based on {risk.data_availability.data_completeness}% data completeness
+                {risk.data_note && ` - ${risk.data_note}`}
+              </Typography>
+            </Alert>
+          )}
+          
           <Paper sx={{ p: 2, mb: 3 }}>
             <Typography variant="subtitle1" gutterBottom>
               Score Factors
@@ -233,6 +321,7 @@ const RiskTab: React.FC<{ risk: any; loading: boolean }> = ({
               </TableBody>
             </Table>
           </Paper>
+          
           {risk.ai_risk_summary && (
             <Paper
               sx={{
@@ -250,6 +339,7 @@ const RiskTab: React.FC<{ risk: any; loading: boolean }> = ({
               </Typography>
             </Paper>
           )}
+          
           <Paper sx={{ p: 2, mb: 2 }}>
             <Typography variant="subtitle1" gutterBottom>
               Recent News
@@ -309,18 +399,77 @@ const FinancialsTab: React.FC<{ financials: any; loading: boolean }> = ({
 }) => {
   // Show only high-level metrics in summary, and expandable panels for details
   if (loading) return <CircularProgress />;
-  if (!financials)
+  
+  if (!financials) {
     return (
       <Typography color="text.secondary">
         No financial data available.
       </Typography>
     );
+  }
+
+  // Handle error cases with helpful information
+  if (financials.error) {
+    return (
+      <Box>
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          <Typography variant="subtitle2" gutterBottom>
+            {financials.error}
+          </Typography>
+          {financials.data_note && (
+            <Typography variant="body2">
+              {financials.data_note}
+            </Typography>
+          )}
+        </Alert>
+        
+        {financials.suggestions && (
+          <Paper sx={{ p: 2, mb: 2 }}>
+            <Typography variant="subtitle2" gutterBottom>
+              Suggestions:
+            </Typography>
+            <ul>
+              {financials.suggestions.map((suggestion: string, index: number) => (
+                <li key={index}>
+                  <Typography variant="body2">{suggestion}</Typography>
+                </li>
+              ))}
+            </ul>
+          </Paper>
+        )}
+        
+        <Typography variant="h5" gutterBottom>
+          Financial Data - Limited Information
+        </Typography>
+        <Paper sx={{ p: 2 }}>
+          <Table size="small">
+            <TableBody>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 600 }}>Company</TableCell>
+                <TableCell>{financials.longName || financials.ticker || "Unknown"}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 600 }}>Ticker</TableCell>
+                <TableCell>{financials.ticker || "N/A"}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 600 }}>Data Status</TableCell>
+                <TableCell>Limited or unavailable</TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </Paper>
+      </Box>
+    );
+  }
+  
   // Extract high-level fields
   const summaryFields = [
     "longName",
-    "symbol",
+    "ticker",
     "sector",
     "industry",
+    "country",
     "marketCap",
     "totalRevenue",
     "netIncome",
@@ -330,10 +479,14 @@ const FinancialsTab: React.FC<{ financials: any; loading: boolean }> = ({
     "grossProfits",
     "operatingCashflow",
     "freeCashFlow",
+    "currentPrice",
+    "currency",
   ];
+  
   const summaryData = summaryFields
     .map((k) => [k, financials[k]])
     .filter(([_, v]) => v !== undefined && v !== null);
+  
   // Find nested objects for details
   const details = [
     ["Financials", financials.financials],
@@ -341,11 +494,27 @@ const FinancialsTab: React.FC<{ financials: any; loading: boolean }> = ({
     ["Cash Flow", financials.cashflow],
     ["Recommendations", financials.recommendations],
   ];
+  
   return (
     <Box>
       <Typography variant="h5" gutterBottom>
         Financial Data
       </Typography>
+      
+      {/* Data availability indicator */}
+      {financials.data_availability && (
+        <Alert 
+          severity={financials.data_availability.data_completeness > 70 ? "success" : 
+                   financials.data_availability.data_completeness > 30 ? "warning" : "info"} 
+          sx={{ mb: 2 }}
+        >
+          <Typography variant="body2">
+            Data completeness: {financials.data_availability.data_completeness}%
+            {financials.data_note && ` - ${financials.data_note}`}
+          </Typography>
+        </Alert>
+      )}
+      
       <Paper sx={{ p: 2, mb: 2 }}>
         <Table size="small">
           <TableBody>
@@ -364,12 +533,17 @@ const FinancialsTab: React.FC<{ financials: any; loading: boolean }> = ({
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={2}>N/A</TableCell>
+                <TableCell colSpan={2}>
+                  <Typography color="text.secondary">
+                    Basic financial metrics not available for this ticker.
+                  </Typography>
+                </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </Paper>
+      
       {details.map(([title, data]) => (
         <ExpandablePanel
           key={title as string}
@@ -377,11 +551,21 @@ const FinancialsTab: React.FC<{ financials: any; loading: boolean }> = ({
           data={data}
         />
       ))}
+      
       {financials.ai_insights && (
         <Paper sx={{ p: 2, background: "#f9f9f9" }}>
           <Typography variant="subtitle1">AI Financial Insights</Typography>
           <Typography variant="body2" sx={{ whiteSpace: "pre-line" }}>
             {financials.ai_insights}
+          </Typography>
+        </Paper>
+      )}
+      
+      {financials.business_summary && (
+        <Paper sx={{ p: 2, mt: 2, background: "#f9f9f9" }}>
+          <Typography variant="subtitle1">Business Summary</Typography>
+          <Typography variant="body2">
+            {financials.business_summary}
           </Typography>
         </Paper>
       )}

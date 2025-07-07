@@ -20,7 +20,7 @@ const faqs = [
   {
     question: "How do I perform a company risk assessment?",
     answer:
-      "Go to the Risk Assessment page, enter a company name or VAT number, and click Get Score. You will receive an instant risk assessment with detailed results.",
+      "Go to the Risk Assessment page, enter a company name, and click Get Score. You will receive an instant risk assessment with detailed results.",
   },
   {
     question: "What data sources are used?",

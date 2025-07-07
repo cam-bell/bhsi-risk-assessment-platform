@@ -8,10 +8,12 @@ from app.services.yfinance_summary import (
     generate_risk_assessment_summary
 )
 import re
+import logging
 
 router = APIRouter()
 
 yahoo_agent = StreamlinedYahooFinanceAgent()
+logger = logging.getLogger(__name__)
 
 
 @router.get("/financials")
@@ -22,32 +24,72 @@ async def get_financial_info(
     )
 ):
     yahoo_agent = StreamlinedYahooFinanceAgent()
+    
+    # Enhanced ticker resolution with better error handling
+    ticker = None
+    company_name = query.strip()
+    
     # If query looks like a ticker, use it directly
     if re.match(r'^[A-Z0-9.]{1,7}$', query.strip().upper()):
         ticker = query.strip().upper()
     else:
-        ticker = await yahoo_agent.get_ticker_symbol_llm(query)
+        # Try LLM-based resolution first
+        try:
+            ticker = await yahoo_agent.get_ticker_symbol_llm(query)
+        except Exception as e:
+            logger.warning(f"LLM ticker resolution failed for {query}: {e}")
+        
+        # Fallback to basic resolution
         if not ticker:
-            raise HTTPException(
-                status_code=404, 
-                detail="Could not resolve ticker for company name"
-            )
+            ticker = yahoo_agent._get_ticker_symbol(query)
+    
+    # If still no ticker found, provide informative response
+    if not ticker:
+        return {
+            "longName": company_name,
+            "ticker": query.upper(),
+            "error": f"Could not resolve ticker symbol for '{query}'",
+            "data_note": f"Unable to find financial data for '{query}'. This company may not be publicly traded or may be listed under a different name.",
+            "data_availability": {
+                "has_financial_data": False,
+                "has_detailed_financials": False,
+                "has_balance_sheet": False,
+                "has_cashflow": False,
+                "has_recommendations": False,
+                "data_completeness": 0
+            },
+            "suggestions": [
+                "Try using the stock ticker symbol instead (e.g., TSLA for Tesla)",
+                "Check if the company name is spelled correctly",
+                "Verify that the company is publicly traded"
+            ]
+        }
     
     # Get raw financial info (already cleaned by the service)
     financial_data = yahoo_agent.get_company_financial_data(ticker)
-    if "error" in financial_data:
-        raise HTTPException(status_code=500, detail=financial_data["error"])
     
-    # Add AI insights if requested
-    if include_insights:
+    # Even if there's an error, try to provide useful fallback information
+    if "error" in financial_data:
+        financial_data.update({
+            "query": query,
+            "attempted_ticker": ticker,
+            "suggestions": [
+                f"Verify that {ticker} is the correct ticker symbol",
+                "Check if the company is actively traded",
+                "Try searching by company name instead of ticker"
+            ]
+        })
+    
+    # Add AI insights if requested and data is available
+    if include_insights and not financial_data.get("error"):
         try:
-            company_name = (
+            company_name_for_insights = (
                 financial_data.get("longName") or 
                 financial_data.get("company_name") or 
                 ticker
             )
             insights = await generate_financial_insights(
-                financial_data, company_name, ticker
+                financial_data, company_name_for_insights, ticker
             )
             financial_data["ai_insights"] = insights
         except Exception as e:
@@ -64,34 +106,73 @@ async def get_risk_report(
     )
 ):
     yahoo_agent = StreamlinedYahooFinanceAgent()
-    # If query looks like a ticker, use it directly
+    
+    # Enhanced ticker resolution (same as financials endpoint)
+    ticker = None
+    company_name = query.strip()
+    
     if re.match(r'^[A-Z0-9.]{1,7}$', query.strip().upper()):
         ticker = query.strip().upper()
     else:
-        ticker = await yahoo_agent.get_ticker_symbol_llm(query)
+        try:
+            ticker = await yahoo_agent.get_ticker_symbol_llm(query)
+        except Exception as e:
+            logger.warning(f"LLM ticker resolution failed for {query}: {e}")
+        
         if not ticker:
-            raise HTTPException(
-                status_code=404, 
-                detail="Could not resolve ticker for company name"
-            )
+            ticker = yahoo_agent._get_ticker_symbol(query)
     
-    # Now proceed as before (data already cleaned by service)
+    # If no ticker found, provide risk assessment based on available info
+    if not ticker:
+        return {
+            "company": company_name,
+            "ticker": query.upper(),
+            "riskLevel": "Unknown",
+            "error": f"Could not resolve ticker symbol for '{query}'",
+            "data_note": f"Risk assessment unavailable for '{query}' due to lack of financial data.",
+            "scoreFactors": {
+                "debtToEquity": None,
+                "totalRevenue": None,
+                "netIncome": None,
+                "currentRatio": None,
+                "returnOnEquity": None,
+                "red_news_count": 0,
+                "freeCashFlow": None,
+            },
+            "news": [],
+            "suggestions": [
+                "Try using the stock ticker symbol instead",
+                "Verify the company name spelling",
+                "Check if the company is publicly traded"
+            ]
+        }
+    
+    # Get financial data with error handling
     financial_data = yahoo_agent.get_company_financial_data(ticker)
-    if "error" in financial_data:
-        raise HTTPException(status_code=500, detail=financial_data["error"])
     
-    company_name = (
+    company_name_final = (
         financial_data.get("longName") or 
         financial_data.get("company_name") or 
+        company_name or
         ticker
     )
     
+    # Get news data
     news_agent = StreamlinedYahooNewsAgent()
-    news_result = await news_agent.search(ticker=ticker)
-    news = news_result.get("articles", [])
+    try:
+        news_result = await news_agent.search(ticker=ticker)
+        news = news_result.get("articles", [])
+    except Exception as e:
+        logger.warning(f"News search failed for {ticker}: {e}")
+        news = []
     
-    risk_result = assess_risk(financial_data, news)
-    risk_level = risk_result.get("riskLevel", "Unknown")
+    # Assess risk even with limited data
+    try:
+        risk_result = assess_risk(financial_data, news)
+        risk_level = risk_result.get("riskLevel", "Unknown")
+    except Exception as e:
+        logger.warning(f"Risk assessment failed for {ticker}: {e}")
+        risk_level = "Unknown"
 
     # --- Extract latest available values for score factors ---
     def get_latest(dct, key):
@@ -100,7 +181,6 @@ async def get_risk_report(
             return None
         if key in dct:
             return dct[key]
-        # If dct is a dict of years, get the latest year
         try:
             latest = sorted(dct.keys(), reverse=True)[0]
             val = dct[latest]
@@ -112,14 +192,13 @@ async def get_risk_report(
             pass
         return None
 
-    # Get latest values for each metric
+    # Get latest values for each metric with fallbacks
     debt_to_equity = financial_data.get("debtToEquity")
-    total_revenue = get_latest(financial_data.get("financials"), "Total Revenue")
-    net_income = get_latest(financial_data.get("financials"), "Net Income")
+    total_revenue = get_latest(financial_data.get("financials", {}), "Total Revenue")
+    net_income = get_latest(financial_data.get("financials", {}), "Net Income")
     current_ratio = financial_data.get("currentRatio")
     return_on_equity = financial_data.get("returnOnEquity")
-    # Free cash flow: get from latest cashflow year
-    free_cash_flow = get_latest(financial_data.get("cashflow"), "Free Cash Flow")
+    free_cash_flow = get_latest(financial_data.get("cashflow", {}), "Free Cash Flow")
 
     score_factors = {
         "debtToEquity": debt_to_equity,
@@ -129,11 +208,11 @@ async def get_risk_report(
         "returnOnEquity": return_on_equity,
         "red_news_count": sum(1 for n in news if n.get("sentiment") == "Red"),
         "freeCashFlow": free_cash_flow,
-        "cashflow": financial_data.get("cashflow"),  # keep for legacy/expansion
+        "cashflow": financial_data.get("cashflow"),
     }
 
     response = {
-        "company": company_name,
+        "company": company_name_final,
         "ticker": ticker,
         "riskLevel": risk_level,
         "financials": financial_data,
@@ -141,11 +220,16 @@ async def get_risk_report(
         "scoreFactors": score_factors
     }
     
+    # Add error information if present
+    if financial_data.get("error"):
+        response["data_note"] = financial_data.get("data_note", "Limited financial data available")
+        response["data_availability"] = financial_data.get("data_availability", {})
+    
     # Add AI risk summary if requested
     if include_summary:
         try:
             risk_summary = await generate_risk_assessment_summary(
-                financial_data, news, risk_level, company_name, ticker
+                financial_data, news, risk_level, company_name_final, ticker
             )
             response["ai_risk_summary"] = risk_summary
         except Exception as e:
@@ -159,44 +243,73 @@ async def get_gemini_summary(
     query: str = Query(..., description="Ticker or company name")
 ):
     yahoo_agent = StreamlinedYahooFinanceAgent()
-    # Ticker resolution logic (same as /risk)
+    
+    # Enhanced ticker resolution (same as other endpoints)
+    ticker = None
+    company_name = query.strip()
+    
     if re.match(r'^[A-Z0-9.]{1,7}$', query.strip().upper()):
         ticker = query.strip().upper()
     else:
-        ticker = await yahoo_agent.get_ticker_symbol_llm(query)
+        try:
+            ticker = await yahoo_agent.get_ticker_symbol_llm(query)
+        except Exception as e:
+            logger.warning(f"LLM ticker resolution failed for {query}: {e}")
+        
         if not ticker:
-            raise HTTPException(
-                status_code=404, 
-                detail="Could not resolve ticker for company name"
-            )
+            ticker = yahoo_agent._get_ticker_symbol(query)
     
-    # Fetch data (already cleaned by service)
+    # If no ticker found, provide general summary
+    if not ticker:
+        return {
+            "company": company_name, 
+            "ticker": query.upper(), 
+            "summary": f"Unable to generate financial summary for '{query}' due to unavailable market data. This company may not be publicly traded or may be listed under a different name. For publicly traded companies, try using the official stock ticker symbol.",
+            "error": "Ticker resolution failed",
+            "suggestions": [
+                "Try using the stock ticker symbol instead",
+                "Verify the company name spelling",
+                "Check if the company is publicly traded"
+            ]
+        }
+    
+    # Fetch data with error handling
     financial_data = yahoo_agent.get_company_financial_data(ticker)
-    if "error" in financial_data:
-        raise HTTPException(status_code=500, detail=financial_data["error"])
     
-    news_agent = StreamlinedYahooNewsAgent()
-    news_result = await news_agent.search(ticker=ticker)
-    news = news_result.get("articles", [])
+    # Get news data
+    try:
+        news_agent = StreamlinedYahooNewsAgent()
+        news_result = await news_agent.search(ticker=ticker)
+        news = news_result.get("articles", [])
+    except Exception as e:
+        logger.warning(f"News search failed for {ticker}: {e}")
+        news = []
     
-    company_name = (
+    company_name_final = (
         financial_data.get("longName") or 
         financial_data.get("company_name") or 
+        company_name or
         ticker
     )
     
-    # Generate summary using the new service
+    # Generate summary with available data
     try:
         summary = await generate_yfinance_summary(
-            financial_data, news, company_name, ticker
+            financial_data, news, company_name_final, ticker
         )
         return {
-            "company": company_name, 
+            "company": company_name_final, 
             "ticker": ticker, 
-            "summary": summary
+            "summary": summary,
+            "data_availability": financial_data.get("data_availability", {}),
+            "data_note": financial_data.get("data_note")
         }
     except Exception as e:
-        raise HTTPException(
-            status_code=500, 
-            detail=f"Gemini summary failed: {e}"
-        ) 
+        logger.error(f"Summary generation failed for {ticker}: {e}")
+        return {
+            "company": company_name_final,
+            "ticker": ticker,
+            "summary": f"Summary generation failed for {company_name_final}. This may be due to limited available data or service connectivity issues.",
+            "error": str(e),
+            "data_availability": financial_data.get("data_availability", {})
+        } 

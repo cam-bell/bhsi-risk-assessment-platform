@@ -11,7 +11,7 @@ import AssessmentHistoryPage from "./pages/AssessmentHistoryPage";
 import SettingsPage from "./pages/SettingsPage";
 import HelpPage from "./pages/HelpPage";
 import ProfilePage from "./pages/ProfilePage";
-import UserManagementPage from "./pages/UserManagementPage";
+
 import CompanyAnalyticsDashboardWrapper from "./components/CompanyAnalyticsDashboardWrapper";
 import FinancialInsightsPage from "./pages/FinancialInsightsPage";
 
@@ -118,16 +118,7 @@ export const RouterConfig = () => {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/user-management"
-        element={
-          <ProtectedRoute>
-            <Layout currentPage="user-management">
-              <UserManagementPage />
-            </Layout>
-          </ProtectedRoute>
-        }
-      />
+
       <Route
         path="/companies/:companyName/analytics"
         element={

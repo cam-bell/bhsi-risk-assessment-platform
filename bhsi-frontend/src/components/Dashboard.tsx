@@ -378,16 +378,12 @@ const CompanyCard = ({
           <Box sx={{ flex: 1 }}>
             <Box sx={{ display: "flex", alignItems: "center", mb: 1 }}>
               <Building2 size={16} style={{ marginRight: 8, color: "#666" }} />
-              <Typography variant="subtitle2" fontWeight="bold">
+              <Typography variant="h6" sx={{ fontWeight: 600 }}>
                 {company.name}
               </Typography>
             </Box>
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              display="block"
-            >
-              VAT: {company.vat}
+            <Typography variant="body2" color="text.secondary">
+              {company.sector}
             </Typography>
             <Typography
               variant="caption"

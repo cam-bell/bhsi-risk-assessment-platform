@@ -374,7 +374,7 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
                   <strong>Company:</strong> {result.company}
                 </Typography>
                 <Typography variant="body2" color="text.secondary" gutterBottom>
-                  <strong>VAT:</strong> {result.vat}
+                                      <strong>Company:</strong> {result.company}
                 </Typography>
                 <Chip
                   label={result.overall.toUpperCase()}

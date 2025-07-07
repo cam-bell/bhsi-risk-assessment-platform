@@ -50,8 +50,7 @@ const SavedResults = ({ results, onDelete }: SavedResultsProps) => {
   // Filter results by search term and current user
   const filteredResults = results.filter(result => 
     result.savedBy === user?.email && // Only show results for current user
-    (result.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    result.vat.toLowerCase().includes(searchTerm.toLowerCase()))
+    result.company.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleViewResult = (result: SavedResult) => {
@@ -109,7 +108,6 @@ const SavedResults = ({ results, onDelete }: SavedResultsProps) => {
             <TableHead>
               <TableRow>
                 <TableCell><strong>Company</strong></TableCell>
-                <TableCell><strong>VAT</strong></TableCell>
                 <TableCell><strong>Risk Level</strong></TableCell>
                 <TableCell><strong>Saved Date</strong></TableCell>
                 <TableCell><strong>Actions</strong></TableCell>
@@ -122,7 +120,6 @@ const SavedResults = ({ results, onDelete }: SavedResultsProps) => {
                   sx={{ '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.04)' } }}
                 >
                   <TableCell>{result.company}</TableCell>
-                  <TableCell>{result.vat}</TableCell>
                   <TableCell>
                     <Chip
                       label={result.overall.toUpperCase()}

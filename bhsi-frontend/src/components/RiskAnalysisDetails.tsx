@@ -46,18 +46,18 @@ interface RiskFactor {
   recommendation?: string;
 }
 
-interface CompanyDetails {
+interface Company {
+  id: string;
   name: string;
-  vat: string;
   industry: string;
-  employees: string;
+  location: string;
+  employees: number;
   revenue: string;
-  founded: string;
-  headquarters: string;
+  founded: number;
 }
 
 interface RiskAnalysisDetailsProps {
-  company: CompanyDetails;
+  company: Company;
   overallRisk: "green" | "orange" | "red";
   riskFactors: RiskFactor[];
   confidence: number;
@@ -110,7 +110,7 @@ async function fetchWikidataCompanyInfo(
 export const convertSearchResultsToRiskAnalysis = (
   searchResponse: SearchResponse
 ): {
-  company: CompanyDetails;
+  company: Company;
   overallRisk: "green" | "orange" | "red";
   riskFactors: RiskFactor[];
   confidence: number;
@@ -285,13 +285,13 @@ export const convertSearchResultsToRiskAnalysis = (
 
   return {
     company: {
+      id: "1",
       name: searchResponse.company_name,
-      vat: "N/A",
       industry: "Not specified",
-      employees: "Not available",
+      location: "Not available",
+      employees: 0,
       revenue: "Not available",
-      founded: "Not available",
-      headquarters: "Not available",
+      founded: 0,
     },
     overallRisk,
     riskFactors,
@@ -299,15 +299,36 @@ export const convertSearchResultsToRiskAnalysis = (
   };
 };
 
+const mockCompanies: Company[] = [
+  {
+    id: "1",
+    name: "Banco de España",
+    industry: "Banking & Finance", 
+    location: "Madrid, Spain",
+    employees: 3200,
+    revenue: "€2.1B",
+    founded: 1782,
+  },
+  {
+    id: "2",
+    name: "Repsol S.A.",
+    industry: "Energy & Petroleum",
+    location: "Madrid, Spain", 
+    employees: 25000,
+    revenue: "€48.7B",
+    founded: 1987,
+  },
+];
+
 const mockData: RiskAnalysisDetailsProps = {
   company: {
-    name: "TechVision Global S.A.",
-    vat: "ESX45678901",
-    industry: "Software Development",
-    employees: "150-200",
-    revenue: "€8.5M",
-    founded: "2018",
-    headquarters: "Madrid, Spain",
+    id: "1",
+    name: "Banco de España",
+    industry: "Banking & Finance",
+    location: "Madrid, Spain",
+    employees: 3200,
+    revenue: "€2.1B",
+    founded: 1782,
   },
   overallRisk: "green",
   confidence: 87,
@@ -431,7 +452,7 @@ const RiskAnalysisDetails = ({
                 {company.name}
               </Typography>
               <Typography variant="body1" color="text.secondary" gutterBottom>
-                VAT: {company.vat} • {company.industry}
+                {company.industry}
               </Typography>
               {searchResults && (
                 <Typography variant="body2" color="text.secondary">
@@ -560,7 +581,7 @@ const RiskAnalysisDetails = ({
                   <CircularProgress size={16} />
                 ) : (
                   wikidata?.headquarters ||
-                  company.headquarters ||
+                  company.location ||
                   "Not available"
                 )}
               </Typography>

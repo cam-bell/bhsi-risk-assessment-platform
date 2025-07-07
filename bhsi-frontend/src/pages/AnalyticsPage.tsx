@@ -64,7 +64,7 @@ const API_BASE_URL =
 
 interface CompanyAnalytics {
   company_name: string;
-  vat_number?: string;
+
   sector?: string;
   total_events: number;
   risk_distribution: {
@@ -211,7 +211,7 @@ const AnalyticsPage: React.FC = () => {
       });
       setCompanyAnalytics({
         company_name: data.company_name,
-        vat_number: undefined, // Not available in merged response
+
         sector: undefined, // Not available in merged response
         total_events: data.total_results || (data.metadata?.total_results ?? 0),
         risk_distribution: riskDistribution,
@@ -363,7 +363,7 @@ const AnalyticsPage: React.FC = () => {
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <Box mb={2}>
         <Typography variant="h3" fontWeight="bold" gutterBottom>
-          Analytics Dashboard
+          Intelligent Analytics Dashboard
         </Typography>
         <Typography variant="body1" color="text.secondary">
           Comprehensive risk analytics and insights for informed decision making
@@ -466,11 +466,7 @@ const AnalyticsPage: React.FC = () => {
                           <Typography variant="h6">
                             {companyAnalytics.company_name}
                           </Typography>
-                          {companyAnalytics.vat_number && (
-                            <Typography variant="body2" color="text.secondary">
-                              VAT: {companyAnalytics.vat_number}
-                            </Typography>
-                          )}
+
                           {companyAnalytics.sector && (
                             <Typography variant="body2" color="text.secondary">
                               Sector: {companyAnalytics.sector}
