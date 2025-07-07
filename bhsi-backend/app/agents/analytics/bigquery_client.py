@@ -206,9 +206,6 @@ class BigQueryClient:
                     "HIGH": high_risk_count,
                     "MEDIUM": medium_risk_count,
                     "LOW": low_risk_count
-                    "HIGH": high_risk_count,
-                    "MEDIUM": medium_risk_count,
-                    "LOW": low_risk_count
                 },
                 "latest_events": latest_events,
                 "alert_summary": {

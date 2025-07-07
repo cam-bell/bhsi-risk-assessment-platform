@@ -31,3 +31,4 @@ api_router.include_router(rag_nlp_analysis.router, prefix="/analysis", tags=["ra
 # Finance endpoints - Yahoo Finance integration
 api_router.include_router(
     finance.router, prefix="/finance", tags=["finance"]
+)
