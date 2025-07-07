@@ -28,14 +28,12 @@ def scrape_company_news(ticker: str) -> List[Dict[str, Any]]:
     resp = requests.get(url, headers=headers, timeout=10)
     soup = BeautifulSoup(resp.text, "html.parser")
     news_items = []
-    for item in soup.select("li.js-stream-content"):
-        headline_tag = item.find("h3")
-        if not headline_tag:
-            continue
-        link_tag = headline_tag.find("a")
+    for item in soup.select("li.stream-item.story-item"):
+        # Find the headline link
+        link_tag = item.find("a", class_="subtle-link")
         if not link_tag or not isinstance(link_tag, Tag):
             continue
-        headline = headline_tag.get_text(strip=True)
+        headline = link_tag.get_text(strip=True)
         link_url = link_tag.get("href", "")
         if not link_url:
             continue
@@ -54,9 +52,6 @@ def scrape_company_news(ticker: str) -> List[Dict[str, Any]]:
         })
         if len(news_items) >= 5:
             break
-    print(f"[DEBUG] scrape_company_news: Found {len(news_items)} news items for ticker {ticker}")
-    for n in news_items:
-        print(f"[DEBUG] Headline: {n['headline']}")
     return news_items
 
 

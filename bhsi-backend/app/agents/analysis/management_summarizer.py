@@ -254,8 +254,16 @@ class ManagementSummarizer:
                     f"{response.text}"
                 )
             gemini_result = response.json()
-            # If the response is wrapped in a 'text' field, extract and parse the JSON
-            if 'text' in gemini_result:
+            
+            # Handle different response formats from Gemini service
+            # Case 1: Direct JSON response (current format)
+            if isinstance(gemini_result, dict) and any(k in gemini_result for k in ["executive_summary", "key_findings", "recommendations"]):
+                logger.info("Received direct JSON response from Gemini service")
+                # Response is already in the correct format, no parsing needed
+                pass
+            # Case 2: Response wrapped in 'text' field (legacy format)
+            elif 'text' in gemini_result:
+                logger.info("Received text-wrapped response from Gemini service, attempting to parse")
                 text_content = gemini_result['text']
                 text_content = re.sub(r'^```json\n?|^```|```$', '', text_content.strip(), flags=re.MULTILINE)
                 text_content = re.sub(r'^json\s*', '', text_content.strip(), flags=re.IGNORECASE)
@@ -299,6 +307,10 @@ class ManagementSummarizer:
                         except Exception as manual_exc:
                             logger.error("All JSON parsing attempts failed")
                             raise Exception(f"Failed to parse Gemini 'text' field as JSON: {parse_exc}")
+            else:
+                logger.error(f"Unexpected Gemini response format: {type(gemini_result)}")
+                logger.error(f"Response keys: {list(gemini_result.keys()) if isinstance(gemini_result, dict) else 'not a dict'}")
+                raise Exception("Unexpected Gemini response format")
             required_fields = ["executive_summary", "key_findings", "recommendations"]
             if not all(k in gemini_result for k in required_fields):
                 logger.error(
@@ -667,8 +679,20 @@ class ManagementSummarizer:
             if isinstance(item, str):
                 result.append(item)
             elif isinstance(item, dict):
+                # Handle key_findings structure: {type, description, evidence}
+                if "type" in item and "description" in item:
+                    finding_text = f"{item['type']}: {item['description']}"
+                    if "evidence" in item and item["evidence"]:
+                        finding_text += f" (Evidence: {item['evidence']})"
+                    result.append(finding_text)
+                # Handle recommendations structure: {target, action, reasoning}
+                elif "target" in item and "action" in item:
+                    rec_text = f"{item['target']}: {item['action']}"
+                    if "reasoning" in item and item["reasoning"]:
+                        rec_text += f" (Reason: {item['reasoning']})"
+                    result.append(rec_text)
                 # Try to extract a main field, or join all values
-                if key and key in item:
+                elif key and key in item:
                     result.append(str(item[key]))
                 elif "description" in item:
                     # Common field name for descriptions
@@ -676,9 +700,6 @@ class ManagementSummarizer:
                 elif "action" in item:
                     # Common field name for recommendations
                     result.append(str(item["action"]))
-                elif "type" in item and "description" in item:
-                    # Combine type and description
-                    result.append(f"{item['type']}: {item['description']}")
                 else:
                     # Join all values for a readable string, but be more selective
                     important_fields = []
