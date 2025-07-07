@@ -8,9 +8,7 @@ import logging
 import httpx
 from typing import Dict, Any, List
 from datetime import datetime
-from app.agents.search.streamlined_yahoo_finance_agent import (
-    StreamlinedYahooFinanceAgent,
-)
+from app.services.yahoo_finance_service import StreamlinedYahooFinanceAgent
 import hashlib
 import json
 from app.agents.analytics.cache_manager import AnalyticsCacheManager

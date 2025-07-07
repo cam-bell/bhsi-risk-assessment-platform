@@ -11,6 +11,8 @@ from app.agents.search.base_agent import BaseSearchAgent
 import re
 from difflib import SequenceMatcher
 import asyncio
+from app.services.gemini.main import generate_text  # Import your Gemini text generation function
+import math
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +23,21 @@ class StreamlinedYahooFinanceAgent(BaseSearchAgent):
         self.source = "Yahoo Finance"
         # Cache for ticker lookups to avoid repeated API calls
         self._ticker_cache = {}
+        
+    def _clean_for_json(self, obj):
+        """
+        Clean Yahoo Finance data for JSON serialization by replacing inf/nan values with None
+        """
+        if isinstance(obj, dict):
+            return {k: self._clean_for_json(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self._clean_for_json(item) for item in obj]
+        elif isinstance(obj, float):
+            if math.isnan(obj) or math.isinf(obj):
+                return None
+            return obj
+        else:
+            return obj
         
     def _get_expanded_ticker_mapping(self) -> Dict[str, str]:
         """
@@ -435,4 +452,71 @@ class StreamlinedYahooFinanceAgent(BaseSearchAgent):
                     "errors": [str(e)]
                 },
                 "financial_data": []
-            } 
+            }
+
+    def get_company_financial_data(self, ticker: str) -> dict:
+        """
+        Fetches comprehensive financial data for a company using yfinance.
+        Returns a dictionary with info, financials, balance sheet, cashflow, and recommendations.
+        """
+        try:
+            stock = yf.Ticker(ticker)
+            info = stock.info
+            # Convert DataFrames to dicts if possible
+            def safe_to_dict(df):
+                try:
+                    return df.to_dict() if hasattr(df, 'to_dict') else {}
+                except Exception:
+                    return {}
+            
+            raw_data = {
+                "longName": info.get("longName"),
+                "country": info.get("country"),
+                "sector": info.get("sector"),
+                "industry": info.get("industry"),
+                "marketCap": info.get("marketCap"),
+                "totalRevenue": info.get("totalRevenue"),
+                "ebitda": info.get("ebitda"),
+                "debtToEquity": info.get("debtToEquity"),
+                "returnOnAssets": info.get("returnOnAssets"),
+                "returnOnEquity": info.get("returnOnEquity"),
+                "profitMargins": info.get("profitMargins"),
+                "beta": info.get("beta"),
+                "enterpriseValue": info.get("enterpriseValue"),
+                "trailingPE": info.get("trailingPE"),
+                "totalCash": info.get("totalCash"),
+                "financials": safe_to_dict(stock.financials),
+                "balance_sheet": safe_to_dict(stock.balance_sheet),
+                "cashflow": safe_to_dict(stock.cashflow),
+                "recommendations": safe_to_dict(stock.recommendations),
+            }
+            
+            # Clean data for JSON serialization before returning
+            return self._clean_for_json(raw_data)
+            
+        except Exception as e:
+            logger.error(f"Failed to fetch company financial data for {ticker}: {e}")
+            return {"error": str(e)}
+
+    # --- Gemini-powered ticker lookup with hybrid fallback ---
+    async def get_ticker_symbol_llm(self, company_name: str) -> str:
+        """
+        Use Gemini LLM to resolve a company name to its primary stock ticker symbol.
+        Falls back to the existing logic if Gemini fails or returns an invalid ticker.
+        """
+        prompt = (
+            f"Given the company name '{company_name}', return the primary stock ticker symbol "
+            "for this company (preferably from the Madrid or NYSE exchanges). Only return the ticker symbol."
+        )
+        try:
+            ticker = await generate_text(prompt, max_tokens=10)
+            ticker = ticker.strip().upper()
+            if re.match(r'^[A-Z0-9.]{1,7}$', ticker):
+                return ticker
+        except Exception:
+            pass
+        # Fallback to existing logic
+        return self._get_ticker_symbol(company_name)
+
+    # Example usage in your class:
+    # ticker = await self.get_ticker_symbol_llm(company_name) 
