@@ -47,9 +47,11 @@ import {
   Shield,
   TrendingDown,
   TrendingUp as TrendingUpIcon,
+  Bot,
 } from "lucide-react";
 import { useAuth } from "../auth/useAuth";
 import axios from "axios";
+import RAGChatbot from "../components/RAGChatbot";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1";
@@ -340,479 +342,506 @@ const AnalyticsPage: React.FC = () => {
               }
             />
           </Tooltip>
+          <Tooltip
+            title="AI-powered chatbot for natural language risk analysis"
+            arrow
+          >
+            <Tab
+              label={
+                <Box display="flex" alignItems="center" gap={1}>
+                  <Bot size={16} />
+                  AI Assistant
+                </Box>
+              }
+            />
+          </Tooltip>
         </Tabs>
 
         {/* Company Analytics Tab */}
         <TabPanel value={activeTab} index={0}>
-          <Box display="flex" gap={2} mb={3}>
-            <TextField
-              label="Company Name"
-              value={selectedCompany}
-              onChange={handleCompanyInput}
-              fullWidth
-              placeholder="Enter company name (e.g., Banco Santander, Repsol)"
-            />
-            <Button
-              variant="contained"
-              onClick={handleAnalyze}
-              disabled={!selectedCompany.trim() || loading}
-            >
-              {companyAnalytics ? "Refresh Analysis" : "Analyze Company"}
-            </Button>
-          </Box>
-
-          {loading && (
-            <Box
-              display="flex"
-              justifyContent="center"
-              alignItems="center"
-              minHeight={200}
-            >
-              <CircularProgress />
+          <Box p={2} borderRadius={2} bgcolor="background.paper" boxShadow={1}>
+            {/* Company Analytics Content */}
+            <Box display="flex" gap={2} mb={3}>
+              <TextField
+                label="Company Name"
+                value={selectedCompany}
+                onChange={handleCompanyInput}
+                fullWidth
+                placeholder="Enter company name (e.g., Banco Santander, Repsol)"
+              />
+              <Button
+                variant="contained"
+                onClick={handleAnalyze}
+                disabled={!selectedCompany.trim() || loading}
+              >
+                {companyAnalytics ? "Refresh Analysis" : "Analyze Company"}
+              </Button>
             </Box>
-          )}
 
-          {companyAnalytics && (
-            <Grid container spacing={3}>
-              {/* Company Overview */}
-              <Grid item xs={12} md={6}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      Company Overview
-                    </Typography>
-                    <Box display="flex" alignItems="center" gap={2} mb={2}>
-                      <Avatar sx={{ bgcolor: "primary.main" }}>
-                        <Building2 size={20} />
-                      </Avatar>
-                      <Box>
-                        <Typography variant="h6">
-                          {companyAnalytics.company_name}
-                        </Typography>
-                        {companyAnalytics.vat_number && (
-                          <Typography variant="body2" color="text.secondary">
-                            VAT: {companyAnalytics.vat_number}
-                          </Typography>
-                        )}
-                        {companyAnalytics.sector && (
-                          <Typography variant="body2" color="text.secondary">
-                            Sector: {companyAnalytics.sector}
-                          </Typography>
-                        )}
-                      </Box>
-                    </Box>
-                    <Box display="flex" gap={2}>
-                      <Box textAlign="center">
-                        <Typography variant="h4" color="primary">
-                          {companyAnalytics.total_events ?? 0}
-                        </Typography>
-                        <Typography variant="body2">Total Events</Typography>
-                      </Box>
-                      <Box textAlign="center">
-                        <Typography variant="h4" color="error">
-                          {companyAnalytics.alert_summary?.total_alerts ?? 0}
-                        </Typography>
-                        <Typography variant="body2">Alerts</Typography>
-                      </Box>
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
+            {loading && (
+              <Box
+                display="flex"
+                justifyContent="center"
+                alignItems="center"
+                minHeight={200}
+              >
+                <CircularProgress />
+              </Box>
+            )}
 
-              {/* Risk Distribution */}
-              <Grid item xs={12} md={6}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      Risk Distribution
-                    </Typography>
-                    <Box display="flex" flexDirection="column" gap={1}>
-                      {Object.entries(
-                        companyAnalytics.risk_distribution || {}
-                      ).map(([risk, count]) => (
-                        <Box
-                          key={risk}
-                          display="flex"
-                          justifyContent="space-between"
-                          alignItems="center"
-                        >
-                          <Chip
-                            label={risk}
-                            color={getRiskColor(risk) as any}
-                            size="small"
-                          />
-                          <Typography variant="h6">{count}</Typography>
+            {companyAnalytics && (
+              <Grid container spacing={3}>
+                {/* Company Overview */}
+                <Grid item xs={12} md={6}>
+                  <Card>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom>
+                        Company Overview
+                      </Typography>
+                      <Box display="flex" alignItems="center" gap={2} mb={2}>
+                        <Avatar sx={{ bgcolor: "primary.main" }}>
+                          <Building2 size={20} />
+                        </Avatar>
+                        <Box>
+                          <Typography variant="h6">
+                            {companyAnalytics.company_name}
+                          </Typography>
+                          {companyAnalytics.vat_number && (
+                            <Typography variant="body2" color="text.secondary">
+                              VAT: {companyAnalytics.vat_number}
+                            </Typography>
+                          )}
+                          {companyAnalytics.sector && (
+                            <Typography variant="body2" color="text.secondary">
+                              Sector: {companyAnalytics.sector}
+                            </Typography>
+                          )}
                         </Box>
-                      ))}
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
+                      </Box>
+                      <Box display="flex" gap={2}>
+                        <Box textAlign="center">
+                          <Typography variant="h4" color="primary">
+                            {companyAnalytics.total_events ?? 0}
+                          </Typography>
+                          <Typography variant="body2">Total Events</Typography>
+                        </Box>
+                        <Box textAlign="center">
+                          <Typography variant="h4" color="error">
+                            {companyAnalytics.alert_summary?.total_alerts ?? 0}
+                          </Typography>
+                          <Typography variant="body2">Alerts</Typography>
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
 
-              {/* Assessment */}
-              {companyAnalytics.assessment && (
+                {/* Risk Distribution */}
+                <Grid item xs={12} md={6}>
+                  <Card>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom>
+                        Risk Distribution
+                      </Typography>
+                      <Box display="flex" flexDirection="column" gap={1}>
+                        {Object.entries(
+                          companyAnalytics.risk_distribution || {}
+                        ).map(([risk, count]) => (
+                          <Box
+                            key={risk}
+                            display="flex"
+                            justifyContent="space-between"
+                            alignItems="center"
+                          >
+                            <Chip
+                              label={risk}
+                              color={getRiskColor(risk) as any}
+                              size="small"
+                            />
+                            <Typography variant="h6">{count}</Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                {/* Assessment */}
+                {companyAnalytics.assessment && (
+                  <Grid item xs={12}>
+                    <Card>
+                      <CardContent>
+                        <Typography variant="h6" gutterBottom>
+                          Risk Assessment
+                        </Typography>
+                        <Grid container spacing={2}>
+                          {Object.entries(companyAnalytics.assessment || {}).map(
+                            ([key, value]) => {
+                              if (key === "summary" || key === "last_updated")
+                                return null;
+                              return (
+                                <Grid item xs={6} md={3} key={key}>
+                                  <Box textAlign="center">
+                                    <Chip
+                                      label={key.toUpperCase()}
+                                      color={getRiskColor(value) as any}
+                                      size="small"
+                                      sx={{ mb: 1 }}
+                                    />
+                                    <Typography
+                                      variant="h6"
+                                      color={getRiskColor(value) as any}
+                                    >
+                                      {value}
+                                    </Typography>
+                                  </Box>
+                                </Grid>
+                              );
+                            }
+                          )}
+                        </Grid>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                )}
+
+                {/* Latest Events */}
                 <Grid item xs={12}>
                   <Card>
                     <CardContent>
                       <Typography variant="h6" gutterBottom>
-                        Risk Assessment
+                        Latest Events
                       </Typography>
-                      <Grid container spacing={2}>
-                        {Object.entries(companyAnalytics.assessment || {}).map(
-                          ([key, value]) => {
-                            if (key === "summary" || key === "last_updated")
-                              return null;
-                            return (
-                              <Grid item xs={6} md={3} key={key}>
-                                <Box textAlign="center">
-                                  <Chip
-                                    label={key.toUpperCase()}
-                                    color={getRiskColor(value) as any}
-                                    size="small"
-                                    sx={{ mb: 1 }}
-                                  />
-                                  <Typography
-                                    variant="h6"
-                                    color={getRiskColor(value) as any}
-                                  >
-                                    {value}
-                                  </Typography>
-                                </Box>
-                              </Grid>
-                            );
-                          }
-                        )}
-                      </Grid>
+                      <TableContainer>
+                        <Table>
+                          <TableHead>
+                            <TableRow>
+                              <TableCell>Event</TableCell>
+                              <TableCell>Risk Level</TableCell>
+                              <TableCell>Source</TableCell>
+                              <TableCell>Date</TableCell>
+                              <TableCell>Alerted</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {(companyAnalytics.latest_events || []).map(
+                              (event) => (
+                                <TableRow key={event.event_id}>
+                                  <TableCell>
+                                    <Typography variant="body2" fontWeight={500}>
+                                      {event.title}
+                                    </Typography>
+                                    <Typography
+                                      variant="caption"
+                                      color="text.secondary"
+                                    >
+                                      {event.rationale}
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Chip
+                                      label={event.risk_label}
+                                      color={
+                                        getRiskColor(event.risk_label) as any
+                                      }
+                                      size="small"
+                                    />
+                                  </TableCell>
+                                  <TableCell>{event.source}</TableCell>
+                                  <TableCell>
+                                    {formatDate(event.pub_date)}
+                                  </TableCell>
+                                  <TableCell>
+                                    {event.alerted ? (
+                                      <Chip
+                                        label="Yes"
+                                        color="error"
+                                        size="small"
+                                      />
+                                    ) : (
+                                      <Chip
+                                        label="No"
+                                        color="default"
+                                        size="small"
+                                      />
+                                    )}
+                                  </TableCell>
+                                </TableRow>
+                              )
+                            )}
+                          </TableBody>
+                        </Table>
+                      </TableContainer>
                     </CardContent>
                   </Card>
                 </Grid>
-              )}
-
-              {/* Latest Events */}
-              <Grid item xs={12}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      Latest Events
-                    </Typography>
-                    <TableContainer>
-                      <Table>
-                        <TableHead>
-                          <TableRow>
-                            <TableCell>Event</TableCell>
-                            <TableCell>Risk Level</TableCell>
-                            <TableCell>Source</TableCell>
-                            <TableCell>Date</TableCell>
-                            <TableCell>Alerted</TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {(companyAnalytics.latest_events || []).map(
-                            (event) => (
-                              <TableRow key={event.event_id}>
-                                <TableCell>
-                                  <Typography variant="body2" fontWeight={500}>
-                                    {event.title}
-                                  </Typography>
-                                  <Typography
-                                    variant="caption"
-                                    color="text.secondary"
-                                  >
-                                    {event.rationale}
-                                  </Typography>
-                                </TableCell>
-                                <TableCell>
-                                  <Chip
-                                    label={event.risk_label}
-                                    color={
-                                      getRiskColor(event.risk_label) as any
-                                    }
-                                    size="small"
-                                  />
-                                </TableCell>
-                                <TableCell>{event.source}</TableCell>
-                                <TableCell>
-                                  {formatDate(event.pub_date)}
-                                </TableCell>
-                                <TableCell>
-                                  {event.alerted ? (
-                                    <Chip
-                                      label="Yes"
-                                      color="error"
-                                      size="small"
-                                    />
-                                  ) : (
-                                    <Chip
-                                      label="No"
-                                      color="default"
-                                      size="small"
-                                    />
-                                  )}
-                                </TableCell>
-                              </TableRow>
-                            )
-                          )}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  </CardContent>
-                </Card>
               </Grid>
-            </Grid>
-          )}
+            )}
+          </Box>
         </TabPanel>
 
         {/* System Analytics Tab */}
         <TabPanel value={activeTab} index={1}>
-          {systemAnalytics ? (
-            <Grid container spacing={3}>
-              {/* Risk Trends */}
-              <Grid item xs={12} md={6}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      Risk Trends (Last 30 Days)
-                    </Typography>
-                    <List>
-                      {systemAnalytics.trends
-                        .slice(0, 10)
-                        .map((trend, index) => (
+          <Box p={2} borderRadius={2} bgcolor="background.paper" boxShadow={1}>
+            {/* System Analytics Content */}
+            {systemAnalytics ? (
+              <Grid container spacing={3}>
+                {/* Risk Trends */}
+                <Grid item xs={12} md={6}>
+                  <Card>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom>
+                        Risk Trends (Last 30 Days)
+                      </Typography>
+                      <List>
+                        {systemAnalytics.trends
+                          .slice(0, 10)
+                          .map((trend, index) => (
+                            <ListItem key={index}>
+                              <ListItemIcon>
+                                <Calendar size={16} />
+                              </ListItemIcon>
+                              <ListItemText
+                                primary={formatDate(trend.date)}
+                                secondary={`${trend.count} events, ${trend.alerts_triggered} alerts`}
+                              />
+                              <Chip
+                                label={trend.risk_label}
+                                color={getRiskColor(trend.risk_label) as any}
+                                size="small"
+                              />
+                            </ListItem>
+                          ))}
+                      </List>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                {/* Sector Analysis */}
+                <Grid item xs={12} md={6}>
+                  <Card>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom>
+                        Sector Risk Analysis
+                      </Typography>
+                      <List>
+                        {systemAnalytics.sectors.map((sector, index) => (
                           <ListItem key={index}>
                             <ListItemIcon>
-                              <Calendar size={16} />
+                              <Globe size={16} />
                             </ListItemIcon>
                             <ListItemText
-                              primary={formatDate(trend.date)}
-                              secondary={`${trend.count} events, ${trend.alerts_triggered} alerts`}
+                              primary={sector.sector}
+                              secondary={`${sector.total_companies} companies, ${sector.total_events} events`}
                             />
-                            <Chip
-                              label={trend.risk_label}
-                              color={getRiskColor(trend.risk_label) as any}
-                              size="small"
-                            />
+                            <Box textAlign="right">
+                              <Typography variant="body2" color="error">
+                                {sector.high_risk_events} high risk
+                              </Typography>
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                              >
+                                {sector.alerts_triggered} alerts
+                              </Typography>
+                            </Box>
                           </ListItem>
                         ))}
-                    </List>
-                  </CardContent>
-                </Card>
-              </Grid>
+                      </List>
+                    </CardContent>
+                  </Card>
+                </Grid>
 
-              {/* Sector Analysis */}
-              <Grid item xs={12} md={6}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      Sector Risk Analysis
-                    </Typography>
-                    <List>
-                      {systemAnalytics.sectors.map((sector, index) => (
-                        <ListItem key={index}>
-                          <ListItemIcon>
-                            <Globe size={16} />
-                          </ListItemIcon>
-                          <ListItemText
-                            primary={sector.sector}
-                            secondary={`${sector.total_companies} companies, ${sector.total_events} events`}
-                          />
-                          <Box textAlign="right">
-                            <Typography variant="body2" color="error">
-                              {sector.high_risk_events} high risk
+                {/* System Overview */}
+                <Grid item xs={12}>
+                  <Card>
+                    <CardContent>
+                      <Typography variant="h6" gutterBottom>
+                        System Overview
+                      </Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} md={3}>
+                          <Box textAlign="center">
+                            <Typography variant="h4" color="primary">
+                              {systemAnalytics.alerts?.total_alerts ?? 0}
                             </Typography>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                            >
-                              {sector.alerts_triggered} alerts
+                            <Typography variant="body2">Total Alerts</Typography>
+                          </Box>
+                        </Grid>
+                        <Grid item xs={12} md={3}>
+                          <Box textAlign="center">
+                            <Typography variant="h4" color="error">
+                              {systemAnalytics.alerts?.high_risk_alerts ?? 0}
+                            </Typography>
+                            <Typography variant="body2">
+                              High Risk Alerts
                             </Typography>
                           </Box>
-                        </ListItem>
-                      ))}
-                    </List>
-                  </CardContent>
-                </Card>
+                        </Grid>
+                        <Grid item xs={12} md={3}>
+                          <Box textAlign="center">
+                            <Typography variant="h4" color="warning">
+                              {systemAnalytics.sectors?.length ?? 0}
+                            </Typography>
+                            <Typography variant="body2">
+                              Sectors Monitored
+                            </Typography>
+                          </Box>
+                        </Grid>
+                        <Grid item xs={12} md={3}>
+                          <Box textAlign="center">
+                            <Typography variant="h4" color="info">
+                              {systemAnalytics.trends?.length ?? 0}
+                            </Typography>
+                            <Typography variant="body2">Active Trends</Typography>
+                          </Box>
+                        </Grid>
+                      </Grid>
+                    </CardContent>
+                  </Card>
+                </Grid>
               </Grid>
-
-              {/* System Overview */}
-              <Grid item xs={12}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      System Overview
-                    </Typography>
-                    <Grid container spacing={2}>
-                      <Grid item xs={12} md={3}>
-                        <Box textAlign="center">
-                          <Typography variant="h4" color="primary">
-                            {systemAnalytics.alerts?.total_alerts ?? 0}
-                          </Typography>
-                          <Typography variant="body2">Total Alerts</Typography>
-                        </Box>
-                      </Grid>
-                      <Grid item xs={12} md={3}>
-                        <Box textAlign="center">
-                          <Typography variant="h4" color="error">
-                            {systemAnalytics.alerts?.high_risk_alerts ?? 0}
-                          </Typography>
-                          <Typography variant="body2">
-                            High Risk Alerts
-                          </Typography>
-                        </Box>
-                      </Grid>
-                      <Grid item xs={12} md={3}>
-                        <Box textAlign="center">
-                          <Typography variant="h4" color="warning">
-                            {systemAnalytics.sectors?.length ?? 0}
-                          </Typography>
-                          <Typography variant="body2">
-                            Sectors Monitored
-                          </Typography>
-                        </Box>
-                      </Grid>
-                      <Grid item xs={12} md={3}>
-                        <Box textAlign="center">
-                          <Typography variant="h4" color="info">
-                            {systemAnalytics.trends?.length ?? 0}
-                          </Typography>
-                          <Typography variant="body2">Active Trends</Typography>
-                        </Box>
-                      </Grid>
-                    </Grid>
-                  </CardContent>
-                </Card>
-              </Grid>
-            </Grid>
-          ) : (
-            <Box
-              display="flex"
-              justifyContent="center"
-              alignItems="center"
-              minHeight={200}
-            >
-              <CircularProgress />
-            </Box>
-          )}
+            ) : (
+              <Box
+                display="flex"
+                justifyContent="center"
+                alignItems="center"
+                minHeight={200}
+              >
+                <CircularProgress />
+              </Box>
+            )}
+          </Box>
         </TabPanel>
 
         {/* Risk Comparison Tab */}
         <TabPanel value={activeTab} index={2}>
-          <Box display="flex" gap={2} mb={3}>
-            <TextField
-              label="Companies (comma-separated)"
-              value={comparisonCompanies}
-              onChange={(e) => setComparisonCompanies(e.target.value)}
-              fullWidth
-              placeholder="Enter company names separated by commas (e.g., Banco Santander, Repsol, Telefonica)"
-            />
-            <Button
-              variant="contained"
-              onClick={handleCompare}
-              disabled={!comparisonCompanies.trim() || loading}
-            >
-              Compare Companies
-            </Button>
-          </Box>
-
-          {loading && (
-            <Box
-              display="flex"
-              justifyContent="center"
-              alignItems="center"
-              minHeight={200}
-            >
-              <CircularProgress />
+          <Box p={2} borderRadius={2} bgcolor="background.paper" boxShadow={1}>
+            {/* Risk Comparison Content */}
+            <Box display="flex" gap={2} mb={3}>
+              <TextField
+                label="Companies (comma-separated)"
+                value={comparisonCompanies}
+                onChange={(e) => setComparisonCompanies(e.target.value)}
+                fullWidth
+                placeholder="Enter company names separated by commas (e.g., Banco Santander, Repsol, Telefonica)"
+              />
+              <Button
+                variant="contained"
+                onClick={handleCompare}
+                disabled={!comparisonCompanies.trim() || loading}
+              >
+                Compare Companies
+              </Button>
             </Box>
-          )}
 
-          {riskComparison && (
-            <Grid container spacing={3}>
-              {/* Comparison Summary */}
-              <Grid item xs={12}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" gutterBottom>
-                      Comparison Summary
-                    </Typography>
-                    <Grid container spacing={2}>
-                      <Grid item xs={12} md={4}>
-                        <Box textAlign="center">
-                          <Typography variant="h6" color="error">
-                            {riskComparison.comparison?.highest_risk ?? "N/A"}
-                          </Typography>
-                          <Typography variant="body2">
-                            Highest Risk Company
-                          </Typography>
-                        </Box>
-                      </Grid>
-                      <Grid item xs={12} md={4}>
-                        <Box textAlign="center">
-                          <Typography variant="h6" color="warning">
-                            {riskComparison.comparison?.most_alerts ?? "N/A"}
-                          </Typography>
-                          <Typography variant="body2">Most Alerts</Typography>
-                        </Box>
-                      </Grid>
-                      <Grid item xs={12} md={4}>
-                        <Box textAlign="center">
-                          <Typography variant="h6" color="info">
-                            {riskComparison.comparison?.riskiest_sector ??
-                              "N/A"}
-                          </Typography>
-                          <Typography variant="body2">
-                            Riskiest Sector
-                          </Typography>
-                        </Box>
-                      </Grid>
-                    </Grid>
-                  </CardContent>
-                </Card>
-              </Grid>
+            {loading && (
+              <Box
+                display="flex"
+                justifyContent="center"
+                alignItems="center"
+                minHeight={200}
+              >
+                <CircularProgress />
+              </Box>
+            )}
 
-              {/* Company Comparisons */}
-              {riskComparison.companies.map((company, index) => (
-                <Grid item xs={12} md={6} key={index}>
+            {riskComparison && (
+              <Grid container spacing={3}>
+                {/* Comparison Summary */}
+                <Grid item xs={12}>
                   <Card>
                     <CardContent>
                       <Typography variant="h6" gutterBottom>
-                        {company.company_name}
+                        Comparison Summary
                       </Typography>
-                      <Box display="flex" gap={2} mb={2}>
-                        <Box textAlign="center">
-                          <Typography variant="h4" color="primary">
-                            {company.total_events ?? 0}
-                          </Typography>
-                          <Typography variant="body2">Events</Typography>
-                        </Box>
-                        <Box textAlign="center">
-                          <Typography variant="h4" color="error">
-                            {company.alert_summary?.total_alerts ?? 0}
-                          </Typography>
-                          <Typography variant="body2">Alerts</Typography>
-                        </Box>
-                        <Box textAlign="center">
-                          <Typography variant="h4" color="warning">
-                            {company.alert_summary?.high_risk_events ?? 0}
-                          </Typography>
-                          <Typography variant="body2">High Risk</Typography>
-                        </Box>
-                      </Box>
-                      <Box display="flex" gap={1}>
-                        {Object.entries(company.risk_distribution || {}).map(
-                          ([risk, count]) => (
-                            <Chip
-                              key={risk}
-                              label={`${risk}: ${count}`}
-                              color={getRiskColor(risk) as any}
-                              size="small"
-                            />
-                          )
-                        )}
-                      </Box>
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} md={4}>
+                          <Box textAlign="center">
+                            <Typography variant="h6" color="error">
+                              {riskComparison.comparison?.highest_risk ?? "N/A"}
+                            </Typography>
+                            <Typography variant="body2">
+                              Highest Risk Company
+                            </Typography>
+                          </Box>
+                        </Grid>
+                        <Grid item xs={12} md={4}>
+                          <Box textAlign="center">
+                            <Typography variant="h6" color="warning">
+                              {riskComparison.comparison?.most_alerts ?? "N/A"}
+                            </Typography>
+                            <Typography variant="body2">Most Alerts</Typography>
+                          </Box>
+                        </Grid>
+                        <Grid item xs={12} md={4}>
+                          <Box textAlign="center">
+                            <Typography variant="h6" color="info">
+                              {riskComparison.comparison?.riskiest_sector ??
+                                "N/A"}
+                            </Typography>
+                            <Typography variant="body2">
+                              Riskiest Sector
+                            </Typography>
+                          </Box>
+                        </Grid>
+                      </Grid>
                     </CardContent>
                   </Card>
                 </Grid>
-              ))}
-            </Grid>
-          )}
+
+                {/* Company Comparisons */}
+                {riskComparison.companies.map((company, index) => (
+                  <Grid item xs={12} md={6} key={index}>
+                    <Card>
+                      <CardContent>
+                        <Typography variant="h6" gutterBottom>
+                          {company.company_name}
+                        </Typography>
+                        <Box display="flex" gap={2} mb={2}>
+                          <Box textAlign="center">
+                            <Typography variant="h4" color="primary">
+                              {company.total_events ?? 0}
+                            </Typography>
+                            <Typography variant="body2">Events</Typography>
+                          </Box>
+                          <Box textAlign="center">
+                            <Typography variant="h4" color="error">
+                              {company.alert_summary?.total_alerts ?? 0}
+                            </Typography>
+                            <Typography variant="body2">Alerts</Typography>
+                          </Box>
+                          <Box textAlign="center">
+                            <Typography variant="h4" color="warning">
+                              {company.alert_summary?.high_risk_events ?? 0}
+                            </Typography>
+                            <Typography variant="body2">High Risk</Typography>
+                          </Box>
+                        </Box>
+                        <Box display="flex" gap={1}>
+                          {Object.entries(company.risk_distribution || {}).map(
+                            ([risk, count]) => (
+                              <Chip
+                                key={risk}
+                                label={`${risk}: ${count}`}
+                                color={getRiskColor(risk) as any}
+                                size="small"
+                              />
+                            )
+                          )}
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+            )}
+          </Box>
+        </TabPanel>
+
+        {/* AI Assistant Tab */}
+        <TabPanel value={activeTab} index={3}>
+          <RAGChatbot />
         </TabPanel>
       </Paper>
     </Container>

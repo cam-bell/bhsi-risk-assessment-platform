@@ -152,6 +152,48 @@ export interface AnalyticsHealthResponse {
   error?: string;
 }
 
+// RAG Chatbot Types
+export interface RAGQueryRequest {
+  question: string;
+  max_documents?: number;
+  company_filter?: string;
+  language?: string;
+}
+
+export interface RAGDocumentSource {
+  id: string;
+  score: number;
+  title: string;
+  company: string;
+  date: string;
+  source: string;
+  text_preview: string;
+}
+
+export interface RAGAnalysisResponse {
+  question: string;
+  answer: string;
+  sources: RAGDocumentSource[];
+  confidence: number;
+  methodology: string;
+  response_time_ms: number;
+  timestamp: string;
+}
+
+export interface RAGExamplesResponse {
+  spanish_examples: string[];
+  english_examples: string[];
+  tips: string[];
+}
+
+export interface RAGHealthResponse {
+  rag_orchestrator: string;
+  vector_search_service: string;
+  gemini_service: string;
+  status: string;
+  timestamp: string;
+}
+
 // Define the analytics API slice
 export const analyticsApi = createApi({
   reducerPath: "analyticsApi",
@@ -164,6 +206,7 @@ export const analyticsApi = createApi({
     "ManagementSummary",
     "RiskTrends",
     "CompanyComparison",
+    "RAG",
   ],
   endpoints: (builder) => ({
     // Get management summary for a company
@@ -218,6 +261,32 @@ export const analyticsApi = createApi({
       }),
       providesTags: ["Analytics"],
     }),
+
+    // RAG Chatbot endpoints
+    askRAGQuestion: builder.mutation<RAGAnalysisResponse, RAGQueryRequest>({
+      query: (body) => ({
+        url: "/analysis/nlp/ask",
+        method: "POST",
+        data: body,
+      }),
+      invalidatesTags: ["RAG"],
+    }),
+
+    getRAGExamples: builder.query<RAGExamplesResponse, void>({
+      query: () => ({
+        url: "/analysis/nlp/examples",
+        method: "GET",
+      }),
+      providesTags: ["RAG"],
+    }),
+
+    getRAGHealth: builder.query<RAGHealthResponse, void>({
+      query: () => ({
+        url: "/analysis/nlp/health",
+        method: "GET",
+      }),
+      providesTags: ["RAG"],
+    }),
   }),
 });
 
@@ -228,4 +297,7 @@ export const {
   useCompareCompaniesQuery,
   useGetAnalyticsHealthQuery,
   useGetSystemStatusQuery,
+  useAskRAGQuestionMutation,
+  useGetRAGExamplesQuery,
+  useGetRAGHealthQuery,
 } = analyticsApi;
