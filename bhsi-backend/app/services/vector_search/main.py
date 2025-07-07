@@ -65,7 +65,10 @@ class SearchResponse(BaseModel):
     query: str
     total_results: int
 
-# In-memory vector store (fallback - in production this would use Vertex AI Vector Search)
+# Import BigQuery Vector Store
+from bigquery_vector_store import BigQueryVectorStore
+
+# DEPRECATED: In-memory vector store (replaced by BigQuery for persistence)
 class MemoryVectorStore:
     def __init__(self):
         self.documents = {}  # id -> {embedding, metadata, text}
@@ -186,8 +189,8 @@ class MemoryVectorStore:
             "embedder_service": embedder_service_url
         }
 
-# Initialize vector store
-vector_store = MemoryVectorStore()
+# Initialize BigQuery vector store for persistent enterprise storage
+vector_store = BigQueryVectorStore()
 
 @app.post("/embed")
 async def embed_documents(request: EmbedRequest):
@@ -205,32 +208,65 @@ async def embed_documents(request: EmbedRequest):
 
 @app.post("/search", response_model=SearchResponse)
 async def search_documents(request: SearchRequest):
-    """Search for similar documents"""
+    """Search for similar documents using BigQuery vectors"""
     try:
+        # Get query embedding
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            embed_response = await client.post(
+                f"{embedder_service_url}/embed",
+                json={"text": request.query}
+            )
+            
+            if embed_response.status_code != 200:
+                raise Exception(f"Embedder service failed: {embed_response.status_code}")
+            
+            query_vector = embed_response.json()["embedding"]
+        
+        # Search BigQuery vectors
         results = await vector_store.search(
-            query=request.query,
+            query_vector=query_vector,
             k=request.k,
-            filter_dict=request.filter
+            filters=request.filter
         )
         
+        # Convert BigQuery results to API format
+        api_results = []
+        for result in results:
+            api_results.append(SearchResult(
+                id=result["id"],
+                score=result["score"],
+                metadata=result["metadata"],
+                document=result["document"]
+            ))
+        
         return SearchResponse(
-            results=results,
+            results=api_results,
             query=request.query,
-            total_results=len(results)
+            total_results=len(api_results)
         )
         
     except Exception as e:
-        logger.error(f"Search failed: {str(e)}")
+        logger.error(f"BigQuery search failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/stats")
 async def get_stats():
-    """Get vector store statistics"""
+    """Get BigQuery vector store statistics"""
     try:
-        stats = vector_store.get_stats()
+        stats = await vector_store.get_stats()
+        vector_count = await vector_store.get_vector_count()
+        companies = await vector_store.get_companies()
+        
         return {
             "status": "healthy",
-            "vector_store": stats,
+            "backend": "BigQuery",
+            "vector_store": {
+                "total_documents": vector_count,
+                "companies": len(companies),
+                "company_list": companies[:10],  # First 10 companies
+                "store_type": "bigquery_persistent",
+                **stats
+            },
             "endpoints": {
                 "embed": "/embed",
                 "search": "/search",
@@ -238,23 +274,33 @@ async def get_stats():
             }
         }
     except Exception as e:
-        logger.error(f"Stats failed: {str(e)}")
+        logger.error(f"BigQuery stats failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
+    """Health check endpoint with BigQuery vector status"""
     try:
         # Test embedder service connectivity
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(f"{embedder_service_url}/health")
             embedder_healthy = response.status_code == 200
         
+        # Get BigQuery vector count
+        vector_count = await vector_store.get_vector_count()
+        companies = await vector_store.get_companies()
+        
         return {
             "status": "healthy",
             "embedder_service": embedder_healthy,
-            "vector_store": "ready",
-            "documents_count": len(vector_store.documents)
+            "vector_store": {
+                "backend": "BigQuery",
+                "status": "ready",
+                "total_documents": vector_count,
+                "companies": len(companies),
+                "store_type": "bigquery_persistent"
+            },
+            "service_info": "Vector Search with BigQuery backend"
         }
         
     except Exception as e:
