@@ -6,6 +6,8 @@ STREAMLINED Search API Endpoints - Ultra-fast search with optimized hybrid class
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
+from google.cloud import bigquery
+import json
 import datetime
 import time
 import logging
@@ -25,6 +27,16 @@ router = APIRouter()
 # Initialize services
 search_cache_service = SearchCacheService()
 hybrid_vector_storage = HybridVectorStorage()
+
+async def save_search_json_to_bigquery(company_name: str, search_json: dict, table_id: str):
+    client = bigquery.Client()
+    row = {
+        "company name": company_name,
+        "search result": json.dumps(search_json)  # Store as string, or use JSON column type
+    }
+    errors = client.insert_rows_json(table_id, [row])
+    if errors:
+        raise Exception(f"BigQuery insert errors: {errors}")
 
 def map_risk_level_to_color(risk_level: str) -> str:
     """Map risk level to color (green, orange, red)"""
@@ -471,7 +483,8 @@ async def streamlined_search(
                 "low_risk_articles": risk_counts["green"]
             }
         }
-        
+        table_id = "solid-topic-443216-b2.risk_monitoring.risk_assessment"
+        await save_search_json_to_bigquery(request.company_name, response, table_id)
         return response
         
     except Exception as e:
