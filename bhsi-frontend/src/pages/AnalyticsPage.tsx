@@ -30,6 +30,10 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  MenuItem,
+  Select,
+  FormControl,
+  InputLabel,
 } from "@mui/material";
 import {
   BarChart3,
@@ -158,6 +162,25 @@ const AnalyticsPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [comparisonCompanies, setComparisonCompanies] = useState<string>("");
+  const [sortOrder, setSortOrder] = useState<'date_desc' | 'date_asc'>('date_desc');
+  const [riskFilter, setRiskFilter] = useState<string>('ALL');
+
+  // Extract unique risk labels for filter options
+  const riskLabelOptions = React.useMemo(() => {
+    const labels = new Set<string>();
+    (companyAnalytics?.latest_events || []).forEach(e => {
+      if (e.risk_label) labels.add(e.risk_label);
+    });
+    return Array.from(labels).sort();
+  }, [companyAnalytics]);
+
+  const riskFilterOptions = [
+    { value: 'ALL', label: 'All' },
+    { value: 'NO', label: 'No' },
+    { value: 'LOW', label: 'Low' },
+    { value: 'MEDIUM', label: 'Medium' },
+    { value: 'HIGH', label: 'High' },
+  ];
 
   // Fetch system analytics on mount
   useEffect(() => {
@@ -168,15 +191,47 @@ const AnalyticsPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
+      // Use the new merged search endpoint
       const response = await axios.get(
-        `${API_BASE_URL}/companies/${encodeURIComponent(company)}/analytics`,
+        `${API_BASE_URL}/streamlined/search/merged/${encodeURIComponent(company)}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         }
       );
-      setCompanyAnalytics(response.data);
+      // Map the merged response to the CompanyAnalytics interface for display
+      const data = response.data;
+      // Compute risk distribution from results
+      const riskDistribution = { HIGH: 0, MEDIUM: 0, LOW: 0 };
+      (data.results || []).forEach((event: any) => {
+        if (event.risk_color === 'red') riskDistribution.HIGH += 1;
+        else if (event.risk_color === 'orange') riskDistribution.MEDIUM += 1;
+        else if (event.risk_color === 'green') riskDistribution.LOW += 1;
+      });
+      setCompanyAnalytics({
+        company_name: data.company_name,
+        vat_number: undefined, // Not available in merged response
+        sector: undefined, // Not available in merged response
+        total_events: data.total_results || (data.metadata?.total_results ?? 0),
+        risk_distribution: riskDistribution,
+        latest_events: (data.results || []).map((event: any, idx: number) => ({
+          event_id: event.url || idx, // Use URL as unique ID fallback
+          title: event.title || '',
+          risk_label: event.risk_level || event.risk_color || 'Unknown',
+          pub_date: event.date || '',
+          url: event.url || '',
+          source: event.source || '',
+          rationale: event.url || '', // Store the link instead of the summary
+          alerted: false, // Not available in merged response
+        })),
+        alert_summary: {
+          total_alerts: data.metadata?.high_risk_results || 0,
+          high_risk_events: data.metadata?.high_risk_results || 0,
+          last_alert: undefined,
+        },
+        assessment: undefined, // Not available in merged response
+      });
     } catch (err: any) {
       setError(
         err.response?.data?.detail || "Failed to fetch company analytics"
@@ -281,6 +336,27 @@ const AnalyticsPage: React.FC = () => {
       month: "short",
       day: "numeric",
     });
+  };
+
+  // Helper to sort events
+  const sortEvents = (events: any[]) => {
+    if (sortOrder === 'date_desc') {
+      return [...events].sort((a, b) => new Date(b.pub_date).getTime() - new Date(a.pub_date).getTime());
+    } else if (sortOrder === 'date_asc') {
+      return [...events].sort((a, b) => new Date(a.pub_date).getTime() - new Date(b.pub_date).getTime());
+    }
+    return events;
+  };
+
+  // Helper to filter and sort events
+  const filterAndSortEvents = (events: any[]) => {
+    let filtered = events;
+    if (riskFilter !== 'ALL') {
+      filtered = events.filter(e =>
+        (e.risk_label || '').toLowerCase().includes(riskFilter.toLowerCase())
+      );
+    }
+    return sortEvents(filtered);
   };
 
   return (
@@ -511,9 +587,38 @@ const AnalyticsPage: React.FC = () => {
                 <Grid item xs={12}>
                   <Card>
                     <CardContent>
-                      <Typography variant="h6" gutterBottom>
-                        Latest Events
-                      </Typography>
+                      <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
+                        <Typography variant="h6" gutterBottom>
+                          Latest Events
+                        </Typography>
+                        <Box display="flex" gap={2}>
+                          <FormControl size="small" sx={{ minWidth: 140 }}>
+                            <InputLabel id="risk-filter-label">Risk Level</InputLabel>
+                            <Select
+                              labelId="risk-filter-label"
+                              value={riskFilter}
+                              label="Risk Level"
+                              onChange={(e) => setRiskFilter(e.target.value)}
+                            >
+                              {riskFilterOptions.map(opt => (
+                                <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                          <FormControl size="small" sx={{ minWidth: 180 }}>
+                            <InputLabel id="sort-order-label">Sort By</InputLabel>
+                            <Select
+                              labelId="sort-order-label"
+                              value={sortOrder}
+                              label="Sort By"
+                              onChange={(e) => setSortOrder(e.target.value as 'date_desc' | 'date_asc')}
+                            >
+                              <MenuItem value="date_desc">Date (Newest First)</MenuItem>
+                              <MenuItem value="date_asc">Date (Oldest First)</MenuItem>
+                            </Select>
+                          </FormControl>
+                        </Box>
+                      </Box>
                       <TableContainer>
                         <Table>
                           <TableHead>
@@ -526,26 +631,25 @@ const AnalyticsPage: React.FC = () => {
                             </TableRow>
                           </TableHead>
                           <TableBody>
-                            {(companyAnalytics.latest_events || []).map(
+                            {filterAndSortEvents(companyAnalytics.latest_events || []).map(
                               (event) => (
                                 <TableRow key={event.event_id}>
                                   <TableCell>
                                     <Typography variant="body2" fontWeight={500}>
                                       {event.title}
                                     </Typography>
-                                    <Typography
-                                      variant="caption"
-                                      color="text.secondary"
-                                    >
-                                      {event.rationale}
-                                    </Typography>
+                                    {event.rationale && (
+                                      <Typography variant="caption" color="text.secondary">
+                                        <a href={event.rationale} target="_blank" rel="noopener noreferrer">
+                                          {event.rationale}
+                                        </a>
+                                      </Typography>
+                                    )}
                                   </TableCell>
                                   <TableCell>
                                     <Chip
                                       label={event.risk_label}
-                                      color={
-                                        getRiskColor(event.risk_label) as any
-                                      }
+                                      color={getRiskColor(event.risk_label) as any}
                                       size="small"
                                     />
                                   </TableCell>
