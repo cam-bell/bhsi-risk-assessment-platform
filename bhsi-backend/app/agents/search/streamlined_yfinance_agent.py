@@ -29,21 +29,19 @@ def scrape_company_news(ticker: str) -> List[Dict[str, Any]]:
     soup = BeautifulSoup(resp.text, "html.parser")
     news_items = []
     for item in soup.select("li.stream-item.story-item"):
-        # Find the headline link
-        link_tag = item.find("a", class_="subtle-link")
-        if not link_tag or not isinstance(link_tag, Tag):
+        link_tag = item.select_one('a.subtle-link')
+        headline_tag = item.select_one('h3')
+        if not link_tag or not headline_tag:
             continue
-        headline = link_tag.get_text(strip=True)
-        link_url = link_tag.get("href", "")
+        headline = headline_tag.get_text(strip=True)
+        link_url = link_tag['href'] if 'href' in link_tag.attrs else None
         if not link_url:
             continue
         if not link_url.startswith("http"):
             link_url = "https://finance.yahoo.com" + link_url
-        # Extract date if available
+        # Try to extract date from <time>, else None
         date_tag = item.find("time")
-        pub_date = None
-        if date_tag and isinstance(date_tag, Tag):
-            pub_date = date_tag.get("datetime")
+        pub_date = date_tag.get("datetime") if date_tag and isinstance(date_tag, Tag) else None
         news_items.append({
             "headline": headline,
             "url": link_url,
