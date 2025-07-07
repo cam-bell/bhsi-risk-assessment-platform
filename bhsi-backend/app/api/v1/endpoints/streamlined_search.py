@@ -817,12 +817,12 @@ async def embed_documents(
     current_user: dict = Depends(get_current_active_user)
 ):
     """
-    Enhanced embedding endpoint for frontend to call
+    🚀 CLOUD-NATIVE embedding endpoint
     
-    Handles the complete embedding pipeline:
+    Full microservice integration:
     1. Apply keyword gate filter
-    2. Generate embeddings via cloud service
-    3. Store vectors in BigQuery
+    2. Generate embeddings via CLOUD embedding service  
+    3. Store vectors via CLOUD vector search service → BigQuery
     """
     start_time = time.time()
     
@@ -837,18 +837,12 @@ async def embed_documents(
                 "results": []
             }
         
-        # Initialize embedding components using existing infrastructure
-        from app.agents.analysis.embedder import BOEEmbeddingAgent
-        from app.services.bigquery_vector_schema import BigQueryVectorSchema
-        from google.cloud import bigquery
-        import base64
-        import numpy as np
+        # 🌐 CLOUD SERVICES: Use deployed microservices  
+        from app.core.config import settings
+        import httpx
         
-        embedder = BOEEmbeddingAgent()
-        
-        # Initialize BigQuery vector storage using existing working schema
-        bigquery_client = bigquery.Client(project="solid-topic-443216-b2")
-        vector_schema = BigQueryVectorSchema(bigquery_client, dataset_id="bhsi_dataset")
+        EMBEDDER_SERVICE_URL = settings.EMBEDDER_SERVICE_URL
+        VECTOR_SEARCH_URL = settings.VECTOR_SEARCH_SERVICE_URL
         
         # Apply keyword gate filter (same logic as frontend)
         def applies_keyword_gate(document: dict, threshold: str = "medium") -> bool:
@@ -882,6 +876,9 @@ async def embed_documents(
         embedded_results = []
         vectors_created = 0
         
+        # 🎯 PREPARE DOCUMENTS for cloud vector service
+        cloud_documents = []
+        
         for i, doc in enumerate(filtered_docs[:max_docs_to_embed]):
             text_content = doc.get("summary", doc.get("title", ""))
             
@@ -889,78 +886,51 @@ async def embed_documents(
                 continue
                 
             try:
-                # Generate embedding using existing BOE embedding agent
-                embedding_vector = embedder.embedder.encode(text_content[:2000]).tolist()
+                # Create unique document ID for cloud storage
+                doc_id = f"doc_{company_name}_{i}_{datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
                 
-                if embedding_vector:
-                    # Create unique event ID for vector storage
-                    event_id = f"doc_{company_name}_{i}_{datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
-                    
-                    # Encode vector for BigQuery storage (existing function)
-                    vector_array = np.array(embedding_vector, dtype=np.float32)
-                    vector_bytes = vector_array.tobytes()
-                    encoded_vector = base64.b64encode(vector_bytes).decode('utf-8')
-                    
-                    # Parse publication date to proper format
-                    pub_date = None
-                    if doc.get("date"):
-                        try:
-                            # Handle various date formats
-                            date_str = doc.get("date", "")
-                            if "T" in date_str:
-                                pub_date = datetime.datetime.fromisoformat(date_str.replace("Z", "")).date().isoformat()
-                            else:
-                                pub_date = date_str[:10]  # Take YYYY-MM-DD part
-                        except:
-                            pub_date = datetime.datetime.now().date().isoformat()
-                    
-                    # Prepare vector data for BigQuery using existing schema
-                    vector_data = {
-                        "event_id": event_id,
-                        "vector_embedding": encoded_vector,
-                        "vector_dimension": len(embedding_vector),
-                        "embedding_model": "paraphrase-multilingual-MiniLM-L12-v2",
-                        "vector_created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                        "metadata": json.dumps({
-                            "url": doc.get("url", ""),
-                            "confidence": doc.get("confidence", 0)
-                        }),
-                        "is_active": True,
-                        "company_name": company_name,
-                        "risk_level": doc.get("risk_level", ""),
-                        "publication_date": pub_date,
-                        "source": doc.get("source", ""),
-                        "title": doc.get("title", "")[:500] if doc.get("title") else "",
-                        "text_summary": text_content[:1000]
-                    }
-                    
-                    # Store in BigQuery using existing vector schema
-                    vector_result = vector_schema.insert_vector_data(vector_data)
-                    
-                    if vector_result:
-                        vectors_created += 1
-                        embedded_results.append({
-                            "document_id": i,
-                            "title": doc.get("title", ""),
-                            "vector_id": event_id,
-                            "status": "success"
-                        })
-                        logger.info(f"✅ Successfully stored vector {event_id} for {company_name}")
-                    else:
-                        embedded_results.append({
-                            "document_id": i,
-                            "title": doc.get("title", ""),
-                            "status": "storage_failed"
-                        })
-                else:
-                    embedded_results.append({
-                        "document_id": i,
-                        "title": doc.get("title", ""),
-                        "status": "embedding_failed"
-                    })
-                    
+                # Parse publication date to proper format
+                pub_date = None
+                if doc.get("date"):
+                    try:
+                        # Handle various date formats
+                        date_str = doc.get("date", "")
+                        if "T" in date_str:
+                            pub_date = datetime.datetime.fromisoformat(date_str.replace("Z", "")).date().isoformat()
+                        else:
+                            pub_date = date_str[:10]  # Take YYYY-MM-DD part
+                    except:
+                        pub_date = datetime.datetime.now().date().isoformat()
+                
+                # 📋 PREPARE metadata for BigQuery storage
+                metadata = {
+                    "company_name": company_name,
+                    "risk_level": doc.get("risk_level", ""),
+                    "publication_date": pub_date,
+                    "source": doc.get("source", ""),
+                    "title": doc.get("title", "")[:500] if doc.get("title") else "",
+                    "text_summary": text_content[:1000],
+                    "url": doc.get("url", ""),
+                    "confidence": doc.get("confidence", 0),
+                    "embedding_model": "text-embedding-004",  # Google's cloud model
+                    "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat()
+                }
+                
+                cloud_documents.append({
+                    "id": doc_id,
+                    "text": text_content[:2000],  # Limit text length
+                    "metadata": metadata
+                })
+                
+                embedded_results.append({
+                    "document_id": i,
+                    "title": doc.get("title", ""),
+                    "vector_id": doc_id,
+                    "status": "prepared"
+                })
+                
             except Exception as e:
-                logger.error(f"Embedding error for document {i}: {e}")
+                logger.error(f"Document preparation error for document {i}: {e}")
                 embedded_results.append({
                     "document_id": i,
                     "title": doc.get("title", ""),
@@ -968,15 +938,56 @@ async def embed_documents(
                     "error": str(e)
                 })
         
+        # 🚀 CALL CLOUD VECTOR SEARCH SERVICE for embedding + storage
+        if cloud_documents:
+            try:
+                async with httpx.AsyncClient(timeout=120.0) as client:
+                    response = await client.post(
+                        f"{VECTOR_SEARCH_URL}/embed",
+                        json={"documents": cloud_documents}
+                    )
+                    
+                    if response.status_code == 200:
+                        cloud_result = response.json()
+                        vectors_created = cloud_result.get("added_documents", 0)
+                        
+                        # Update results with success status
+                        for result in embedded_results:
+                            if result["status"] == "prepared":
+                                result["status"] = "success"
+                                
+                        logger.info(f"✅ Cloud vector service stored {vectors_created} vectors for {company_name}")
+                        
+                    else:
+                        logger.error(f"❌ Cloud vector service failed: {response.status_code} - {response.text}")
+                        # Update results with failure status
+                        for result in embedded_results:
+                            if result["status"] == "prepared":
+                                result["status"] = "cloud_service_failed"
+                                result["error"] = f"Vector service returned {response.status_code}"
+                        
+            except Exception as e:
+                logger.error(f"❌ Cloud vector service call failed: {e}")
+                # Update results with failure status
+                for result in embedded_results:
+                    if result["status"] == "prepared":
+                        result["status"] = "cloud_service_error"
+                        result["error"] = str(e)
+        
         total_time = time.time() - start_time
         
         return {
             "status": "success",
             "company_name": company_name,
+            "cloud_integration": {
+                "embedder_service": EMBEDDER_SERVICE_URL,
+                "vector_search_service": VECTOR_SEARCH_URL,
+                "embedding_model": "text-embedding-004"
+            },
             "summary": {
                 "total_documents": len(documents),
                 "filtered_documents": len(filtered_docs),
-                "processed_documents": max_docs_to_embed,
+                "processed_documents": len(cloud_documents),
                 "vectors_created": vectors_created,
                 "processing_time_seconds": f"{total_time:.2f}"
             },
@@ -986,7 +997,7 @@ async def embed_documents(
         
     except Exception as e:
         total_time = time.time() - start_time
-        logger.error(f"Document embedding failed: {e}")
+        logger.error(f"🚀 Cloud-native document embedding failed: {e}")
         
         return {
             "status": "error",

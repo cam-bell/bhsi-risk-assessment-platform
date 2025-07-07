@@ -3,7 +3,7 @@ RAG Natural Language Analysis Endpoint
 
 🚀 NEW FEATURE: Natural Language Risk Analysis using RAG
 📁 ADDITIVE: This file is completely new and separate from existing endpoints
-🔄 LEVERAGES: Existing cloud services (Vector Search + Gemini)
+🔄 LEVERAGES: Existing cloud services (Vector Search + Gemini) + BigQuery vectors
 ⚠️ REMOVABLE: Can be deleted without affecting existing functionality
 
 Usage: POST /api/v1/analysis/nlp/ask
@@ -22,13 +22,17 @@ import os
 # 🔒 SAFE IMPORT: Only using auth from existing system
 from app.dependencies.auth import get_current_active_user
 
+# 🔗 NEW IMPORT: Use BigQuery vector store for accurate searches
+from app.services.vector_search.bigquery_vector_store import VectorSearchService
+from sentence_transformers import SentenceTransformer
+
 logger = logging.getLogger(__name__)
 
 # 📝 NEW ROUTER: Completely separate from existing routers
 router = APIRouter()
 
 # 🌐 CLOUD SERVICES: Using existing deployed services
-VECTOR_SEARCH_URL = os.getenv("VECTOR_SEARCH_URL", "https://vector-search-185303190462.europe-west1.run.app")
+VECTOR_SEARCH_URL = os.getenv("VECTOR_SEARCH_SERVICE_URL", "https://vector-search-185303190462.europe-west1.run.app")
 GEMINI_SERVICE_URL = os.getenv("GEMINI_SERVICE_URL", "https://gemini-service-185303190462.europe-west1.run.app")
 
 # 📋 NEW MODELS: RAG-specific request/response models
@@ -59,8 +63,8 @@ class RAGAnalysisResponse(BaseModel):
 # 🧠 RAG ORCHESTRATOR: Core RAG logic (NEW CLASS)
 class RAGOrchestrator:
     """
-    🚀 NEW SERVICE: RAG orchestration using existing cloud services
-    ⚠️ REMOVABLE: Self-contained, no dependencies on existing code
+    🚀 CLOUD-NATIVE RAG: Full integration with deployed microservices
+    ✅ Uses: Vector Search Service (BigQuery) + Gemini Service
     """
     
     def __init__(self):

@@ -89,7 +89,7 @@ class BigQueryVectorStore:
                 "event_id": event_id,
                 "vector_embedding": self.encode_vector(vector),
                 "vector_dimension": len(vector),
-                "embedding_model": metadata.get("embedding_model", "paraphrase-multilingual-MiniLM-L12-v2"),
+                "embedding_model": metadata.get("embedding_model", "text-embedding-004"),
                 "vector_created_at": datetime.now(timezone.utc).isoformat(),
                 "metadata": json.dumps(metadata),
                 "is_active": True,
@@ -114,6 +114,86 @@ class BigQueryVectorStore:
         except Exception as e:
             print(f"❌ Failed to add vector to BigQuery: {e}")
             return ""
+    
+    async def add_documents(self, documents) -> Dict[str, Any]:
+        """
+        Add multiple documents to BigQuery vector store
+        
+        Args:
+            documents: List of documents with id, text, and metadata
+            
+        Returns:
+            Dictionary with processing results
+        """
+        try:
+            import httpx
+            import os
+            
+            # Get embedder service URL 
+            embedder_service_url = os.getenv("EMBEDDER_SERVICE_URL", "https://embedder-service-185303190462.europe-west1.run.app")
+            
+            added_count = 0
+            errors = []
+            
+            print(f"🚀 Processing {len(documents)} documents for BigQuery storage...")
+            
+            for doc in documents:
+                try:
+                    # Get embedding from cloud embedder service
+                    async with httpx.AsyncClient(timeout=60.0) as client:
+                        embed_response = await client.post(
+                            f"{embedder_service_url}/embed",
+                            json={
+                                "text": doc.text,
+                                "model": "models/text-embedding-004"
+                            }
+                        )
+                        
+                        if embed_response.status_code != 200:
+                            raise Exception(f"Embedder failed: {embed_response.status_code} - {embed_response.text}")
+                        
+                        embedding_result = embed_response.json()
+                        embedding_vector = embedding_result["embedding"]
+                    
+                    # Store vector in BigQuery
+                    event_id = await self.add_vector(
+                        vector=embedding_vector,
+                        metadata=doc.metadata,
+                        vector_id=doc.id
+                    )
+                    
+                    if event_id:
+                        added_count += 1
+                        print(f"   ✅ Document {doc.id} embedded and stored")
+                    else:
+                        errors.append(f"Failed to store vector for document {doc.id}")
+                        
+                except Exception as e:
+                    error_msg = f"Failed to process document {doc.id}: {str(e)}"
+                    print(f"   ❌ {error_msg}")
+                    errors.append(error_msg)
+            
+            total_vectors = await self.get_vector_count()
+            
+            result = {
+                "added_documents": added_count,
+                "total_documents": total_vectors,
+                "errors": errors,
+                "embedder_service": embedder_service_url,
+                "storage_backend": "BigQuery"
+            }
+            
+            print(f"🎯 BigQuery storage complete: {added_count} vectors added, {total_vectors} total")
+            return result
+            
+        except Exception as e:
+            print(f"❌ BigQuery add_documents failed: {e}")
+            return {
+                "added_documents": 0,
+                "total_documents": 0,
+                "errors": [str(e)],
+                "storage_backend": "BigQuery"
+            }
     
     async def search(
         self, 

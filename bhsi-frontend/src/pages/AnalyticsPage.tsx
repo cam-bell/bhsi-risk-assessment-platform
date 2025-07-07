@@ -385,6 +385,19 @@ const AnalyticsPage: React.FC = () => {
           sx={{ borderBottom: 1, borderColor: "divider" }}
         >
           <Tooltip
+            title="Intelligent risk analysis engine for natural language queries and insights"
+            arrow
+          >
+            <Tab
+              label={
+                <Box display="flex" alignItems="center" gap={1}>
+                  <Bot size={16} />
+                  Risk Intelligence Engine
+                </Box>
+              }
+            />
+          </Tooltip>
+          <Tooltip
             title="Comprehensive risk analysis and insights for individual companies"
             arrow
           >
@@ -397,23 +410,15 @@ const AnalyticsPage: React.FC = () => {
               }
             />
           </Tooltip>
-          <Tooltip
-            title="AI-powered chatbot for natural language risk analysis"
-            arrow
-          >
-            <Tab
-              label={
-                <Box display="flex" alignItems="center" gap={1}>
-                  <Bot size={16} />
-                  AI Assistant
-                </Box>
-              }
-            />
-          </Tooltip>
         </Tabs>
 
-        {/* Company Analytics Tab */}
+        {/* Risk Intelligence Engine Tab */}
         <TabPanel value={activeTab} index={0}>
+          <RAGChatbot />
+        </TabPanel>
+
+        {/* Company Analytics Tab */}
+        <TabPanel value={activeTab} index={1}>
           <Box p={2} borderRadius={2} bgcolor="background.paper" boxShadow={1}>
             {/* Company Analytics Content */}
             <Box display="flex" gap={2} mb={3}>
@@ -661,11 +666,6 @@ const AnalyticsPage: React.FC = () => {
               </Grid>
             )}
           </Box>
-        </TabPanel>
-
-        {/* AI Assistant Tab */}
-        <TabPanel value={activeTab} index={1}>
-          <RAGChatbot />
         </TabPanel>
       </Paper>
     </Container>
