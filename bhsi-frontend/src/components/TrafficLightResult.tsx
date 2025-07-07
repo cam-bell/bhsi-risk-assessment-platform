@@ -22,7 +22,6 @@ import {
   ListItem,
   ListItemIcon,
   ListItemText,
-  Divider,
   Link,
   LinearProgress,
   Button,
@@ -42,8 +41,6 @@ import {
   FileText,
   Scale,
   ExternalLink,
-  Calendar,
-  TrendingUp,
   Eye,
   Search,
   BarChart3,
@@ -56,16 +53,20 @@ import RiskAnalysisDetails, {
   convertSearchResultsToRiskAnalysis,
 } from "./RiskAnalysisDetails";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
+import ErrorIcon from "@mui/icons-material/Error";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { useGetManagementSummaryMutation } from "../store/api/analyticsApi";
 import StarsIcon from "@mui/icons-material/Stars";
+import { TrafficLightResponse } from "./TrafficLightQuery";
+import DOMPurify from "dompurify";
 
 interface TrafficLightResultProps {
   result: TrafficLightResponse;
 }
 
 // Map color strings to MUI color values
-const colorMap = {
+const colorMap: Record<string, "success" | "warning" | "error"> = {
   green: "success",
   orange: "warning",
   red: "error",
@@ -77,12 +78,17 @@ const riskLevelColorMap = {
   "Low-Regulatory": "success",
   "Low-Legal": "success",
   "Low-Financial": "success",
+  "Low-Operational": "success",
   "Medium-Economic": "warning",
   "Medium-Tax": "warning",
   "Medium-Legal": "warning",
   "Medium-Financial": "warning",
+  "Medium-Regulatory": "warning",
+  "Medium-Operational": "warning",
   "High-Legal": "error",
   "High-Financial": "error",
+  "High-Regulatory": "error",
+  "High-Operational": "error",
   Unknown: "default",
 } as const;
 
@@ -92,6 +98,10 @@ const parameterMap = {
   shareholding: "Shareholding Structure",
   bankruptcy: "Bankruptcy History",
   legal: "Legal Issues",
+  regulatory: "Regulatory Compliance",
+  dismissals: "Employee Dismissals",
+  environmental: "Environmental Issues",
+  operational: "Operational Changes",
 } as const;
 
 // Map parameters to their data sources
@@ -138,6 +148,84 @@ const dataSourcesMap = {
   },
 } as const;
 
+// Add animation for risk badge
+const riskBadgeAnimation = {
+  animation: "scaleIn 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
+  "@keyframes scaleIn": {
+    from: { transform: "scale(0.8)", opacity: 0 },
+    to: { transform: "scale(1)", opacity: 1 },
+  },
+};
+
+// Define type for search result items
+interface SearchResultItem {
+  risk_level: string;
+  date: string;
+  title: string;
+  summary?: string | null;
+  source: string;
+  confidence: number;
+  url: string;
+  [key: string]: any;
+}
+
+// Map parameter keys to risk_level substrings or other logic
+const parameterToRiskLevelMap: Record<string, string[]> = {
+  turnover: ["Financial"],
+  shareholding: ["Shareholding"],
+  bankruptcy: ["Bankruptcy"],
+  legal: ["Legal"],
+  regulatory: ["Regulatory"],
+  dismissals: ["Dismissal", "Employee"],
+  environmental: ["Environmental"],
+  operational: ["Operational"],
+};
+
+// Helper to extract article title and heading from HTML or fields
+const extractTitleAndHeading = (risk: any) => {
+  // Prefer explicit fields if present
+  let title = risk.title || "";
+  let heading = risk.heading || "";
+
+  // Try to extract <title> or first non-empty line
+  if (!title) {
+    const match = risk.description?.match(/<title>(.*?)<\/title>/i);
+    if (match) {
+      title = match[1];
+    }
+  }
+
+  // Try to extract first <h1>, <h2>, or <h3>
+  if (!heading) {
+    const match = risk.description?.match(/<(h1|h2|h3)[^>]*>(.*?)<\/\1>/i);
+    if (match) {
+      heading = match[2];
+    }
+  }
+
+  // Fallback: use first and second non-empty lines of text
+  if (!title || !heading) {
+    const tmp = document.createElement("div");
+    tmp.innerHTML = risk.description || "";
+    const lines = (tmp.textContent || tmp.innerText || "")
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (!title && lines.length > 0) {
+      title = lines[0];
+    }
+    if (!heading && lines.length > 1) {
+      heading = lines[1];
+    }
+  }
+
+  // Truncate for compactness
+  const truncate = (str: string, n = 120) =>
+    str && str.length > n ? str.slice(0, n) + "..." : str;
+
+  return { title: truncate(title), heading: truncate(heading) };
+};
+
 const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -150,6 +238,7 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
     { data: summary, isLoading: summaryLoading, error: summaryError },
   ] = useGetManagementSummaryMutation();
   const [showSummary, setShowSummary] = useState(false);
+  const [openRiskIdx, setOpenRiskIdx] = useState<number | null>(null);
 
   // Trigger animation after component mounts
   useEffect(() => {
@@ -176,9 +265,42 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
     ? convertSearchResultsToRiskAnalysis(result.searchResults)
     : null;
 
+  // --- Move getSourcesForParameter here so it can access searchResults ---
+  function getSourcesForParameter(param: string): string {
+    if (!searchResults.length) return "—";
+    const relevantResults = searchResults.filter((result: any) =>
+      parameterToRiskLevelMap[param]?.some((substr) =>
+        (result.risk_level || "").toLowerCase().includes(substr.toLowerCase())
+      )
+    );
+    const sources = [...new Set(relevantResults.map((r: any) => r.source))];
+    if (sources.length === 0) return "—";
+    if (sources.length <= 3) return sources.join(", ");
+    return sources.slice(0, 3).join(", ") + `, +${sources.length - 3} more`;
+  }
+
+  // Add these just before the return statement in TrafficLightResult
+  const highRiskCount = searchResults.filter(
+    (r: SearchResultItem) => r.risk_level && r.risk_level.startsWith("High")
+  ).length;
+  const mediumRiskCount = searchResults.filter(
+    (r: SearchResultItem) => r.risk_level && r.risk_level.startsWith("Medium")
+  ).length;
+  const lowRiskCount = searchResults.length - highRiskCount - mediumRiskCount;
+
+  // Helper to get a plain text preview from HTML, stripping <img> tags
+  const getTextPreview = (html: string, maxLength = 200) => {
+    const tmp = document.createElement("div");
+    tmp.innerHTML = html.replace(/<img[^>]*>/g, "");
+    const text = tmp.textContent || tmp.innerText || "";
+    return text.length > maxLength ? text.slice(0, maxLength) + "..." : text;
+  };
+
   if (!hasSearchResults) {
     return (
-      <Card sx={{ mt: 4, p: 4, textAlign: "center" }}>
+      <Card
+        sx={{ mt: 4, p: 4, textAlign: "center", boxShadow: 6, borderRadius: 3 }}
+      >
         <Typography variant="h6" color="text.secondary" gutterBottom>
           No results found for this company.
         </Typography>
@@ -192,7 +314,9 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
   return (
     <>
       <Grow in={visible} timeout={800}>
-        <Card sx={{ mt: 2, p: isMobile ? 1 : 3 }}>
+        <Card
+          sx={{ mt: 2, p: isMobile ? 1 : 3, boxShadow: 6, borderRadius: 3 }}
+        >
           {/* Summary Banner */}
           <Box
             sx={{
@@ -232,6 +356,7 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
                 flexDirection: "column",
                 alignItems: "center",
                 mb: 4,
+                gap: 2,
               }}
             >
               <Typography variant="h5" component="h3" gutterBottom>
@@ -254,6 +379,15 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
                 <Chip
                   label={result.overall.toUpperCase()}
                   color={colorMap[result.overall as keyof typeof colorMap]}
+                  icon={
+                    result.overall === "green" ? (
+                      <CheckCircleIcon />
+                    ) : result.overall === "orange" ? (
+                      <WarningAmberIcon />
+                    ) : (
+                      <ErrorIcon />
+                    )
+                  }
                   sx={{
                     mt: 3,
                     fontSize: isMobile ? "1.1rem" : "1.5rem",
@@ -264,9 +398,7 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
                     minHeight: isMobile ? "48px" : "64px",
                     boxShadow: 3,
                     letterSpacing: 2,
-                    "& .MuiChip-label": {
-                      px: 2,
-                    },
+                    ...riskBadgeAnimation,
                   }}
                 />
                 <Typography
@@ -318,96 +450,127 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
               </Box>
             </Box>
 
-            <Typography variant="h6" component="h4" gutterBottom sx={{ mb: 2 }}>
+            <Typography
+              variant="h6"
+              component="h4"
+              gutterBottom
+              sx={{ mb: 2, mt: 4 }}
+            >
               Detailed Parameters
             </Typography>
 
             {/* Parameter Table */}
-            <TableContainer component={Paper} sx={{ mt: 4, mb: 2 }}>
+            <TableContainer
+              component={Paper}
+              sx={{ mt: 4, mb: 2, boxShadow: 2, borderRadius: 2 }}
+            >
               <Table size={isMobile ? "small" : "medium"}>
                 <TableHead>
                   <TableRow>
                     <TableCell>Parameter</TableCell>
                     <TableCell>Risk Level</TableCell>
                     <TableCell>Data Source</TableCell>
-                    <TableCell>Last Updated</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {Object.keys(result.blocks).map((param) => (
-                    <TableRow key={param}>
-                      <TableCell>
-                        <Box
-                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                        >
-                          {
-                            dataSourcesMap[param as keyof typeof dataSourcesMap]
-                              ?.icon
-                          }
-                          {parameterMap[param as keyof typeof parameterMap]}
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={result.blocks[
-                            param as keyof typeof result.blocks
-                          ].toUpperCase()}
-                          color={
-                            colorMap[
-                              result.blocks[param as keyof typeof result.blocks]
-                            ]
-                          }
-                          sx={{ fontWeight: "bold", letterSpacing: 1 }}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Box
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 0.5,
-                          }}
-                        >
-                          <Typography variant="body2">
+                  {Object.keys(result.blocks).map((param) => {
+                    const risk =
+                      result.blocks[param as keyof typeof result.blocks];
+                    const isGreen = risk === "green";
+                    const riskIcon =
+                      risk === "green" ? (
+                        <CheckCircleIcon fontSize="small" color="success" />
+                      ) : risk === "orange" ? (
+                        <WarningAmberIcon fontSize="small" color="warning" />
+                      ) : (
+                        <ErrorIcon fontSize="small" color="error" />
+                      );
+                    return (
+                      <TableRow
+                        key={param}
+                        sx={{
+                          borderLeft: `6px solid ${
+                            isGreen
+                              ? theme.palette.success.main
+                              : risk === "orange"
+                              ? theme.palette.warning.main
+                              : theme.palette.error.main
+                          }`,
+                          backgroundColor: isGreen
+                            ? "#f9fff9"
+                            : risk === "orange"
+                            ? "#fffbe6"
+                            : "#fff5f5",
+                          transition: "background 0.2s",
+                          cursor: "pointer",
+                          "&:hover": { backgroundColor: "#f0f4ff" },
+                        }}
+                        // Optionally: onClick={() => setShowParamDetails(param)}
+                      >
+                        <TableCell>
+                          <Box display="flex" alignItems="center" gap={1}>
                             {
                               dataSourcesMap[
                                 param as keyof typeof dataSourcesMap
-                              ]?.primary
+                              ]?.icon
                             }
-                          </Typography>
-                          <InfoOutlinedIcon
-                            fontSize="small"
-                            color="action"
-                            titleAccess={
-                              dataSourcesMap[
-                                param as keyof typeof dataSourcesMap
-                              ]?.description
-                            }
+                            <b>
+                              {parameterMap[param as keyof typeof parameterMap]}
+                            </b>
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={risk.toUpperCase()}
+                            color={colorMap[risk]}
+                            icon={riskIcon}
+                            sx={{ fontWeight: "bold" }}
                           />
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Tooltip
-                          title={`Last updated: ${
-                            dataSourcesMap[param as keyof typeof dataSourcesMap]
-                              ?.lastUpdated
-                          }`}
-                          placement="top"
-                        >
-                          <span>
-                            {
-                              dataSourcesMap[
-                                param as keyof typeof dataSourcesMap
-                              ]?.lastUpdated
-                            }
-                          </span>
-                        </Tooltip>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        </TableCell>
+                        <TableCell>
+                          <Tooltip title={getSourcesForParameter(param)}>
+                            <span>{getSourcesForParameter(param)}</span>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </TableContainer>
+
+            {/* Add a summary bar above the table */}
+            {hasSearchResults && (
+              <Box
+                sx={{
+                  mt: 4,
+                  mb: 2,
+                  display: "flex",
+                  gap: 3,
+                  justifyContent: "center",
+                }}
+              >
+                <Chip
+                  label={`Total: ${searchResults.length}`}
+                  color="primary"
+                />
+                <Chip
+                  label={`High: ${highRiskCount}`}
+                  color="error"
+                  icon={<ErrorIcon fontSize="small" />}
+                />
+                <Chip
+                  label={`Medium: ${mediumRiskCount}`}
+                  color="warning"
+                  icon={<WarningAmberIcon fontSize="small" />}
+                />
+                <Chip
+                  label={`Low: ${lowRiskCount}`}
+                  color="success"
+                  icon={<CheckCircleIcon fontSize="small" />}
+                />
+              </Box>
+            )}
 
             {/* Search Results Summary Section */}
             {hasSearchResults && (
@@ -436,11 +599,7 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
                   <Grid item xs={12} sm={6} md={3}>
                     <Paper sx={{ p: 2, textAlign: "center" }}>
                       <Typography variant="h4" color="error">
-                        {
-                          searchResults.filter((r) =>
-                            r.risk_level.startsWith("High")
-                          ).length
-                        }
+                        {highRiskCount}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
                         High Risk
@@ -451,11 +610,7 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
                   <Grid item xs={12} sm={6} md={3}>
                     <Paper sx={{ p: 2, textAlign: "center" }}>
                       <Typography variant="h4" color="warning.main">
-                        {
-                          searchResults.filter((r) =>
-                            r.risk_level.startsWith("Medium")
-                          ).length
-                        }
+                        {mediumRiskCount}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
                         Medium Risk
@@ -466,11 +621,7 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
                   <Grid item xs={12} sm={6} md={3}>
                     <Paper sx={{ p: 2, textAlign: "center" }}>
                       <Typography variant="h4" color="success.main">
-                        {
-                          searchResults.filter((r) =>
-                            r.risk_level.startsWith("Low")
-                          ).length
-                        }
+                        {lowRiskCount}
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
                         Low Risk
@@ -527,7 +678,8 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
                   onClick={async () => {
                     await getManagementSummary({
                       company_name: result.company,
-                      classification_results: searchResults,
+                      classification_results:
+                        searchResults as SearchResultItem[],
                     });
                     setShowSummary(true);
                   }}
@@ -538,20 +690,58 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
                 {summaryLoading && <CircularProgress sx={{ mt: 2 }} />}
                 {summaryError && (
                   <Alert severity="error" sx={{ mt: 2 }}>
-                    Error loading management summary. Please try again.
+                    {String(summaryError)}
                   </Alert>
                 )}
                 {/* Management Summary display */}
                 {showSummary && summary ? (
-                  <Box sx={{ mt: 3, textAlign: "left" }}>
-                    {/* 1. Overall Risk Distribution */}
-                    <Card sx={{ mb: 3 }}>
-                      <CardContent>
-                        <Box display="flex" alignItems="center" gap={2} mb={2}>
-                          <DonutLargeIcon color="primary" />
-                          <Typography variant="h6">Overall Risk</Typography>
+                  <Box sx={{ mt: 4, textAlign: "left" }}>
+                    {/* 1. Overall Risk Distribution - Enhanced */}
+                    <Card
+                      sx={{
+                        mb: 4,
+                        boxShadow: 4,
+                        borderRadius: 3,
+                        background:
+                          "linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)",
+                        border: "1px solid #dee2e6",
+                      }}
+                    >
+                      <CardContent sx={{ p: 4 }}>
+                        <Box display="flex" alignItems="center" gap={2} mb={3}>
+                          <Box
+                            sx={{
+                              p: 2,
+                              borderRadius: 2,
+                              background:
+                                "linear-gradient(135deg, #1976d2 0%, #1565c0 100%)",
+                              color: "white",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              minWidth: 48,
+                              height: 48,
+                            }}
+                          >
+                            <DonutLargeIcon sx={{ fontSize: 28 }} />
+                          </Box>
+                          <Box sx={{ flex: 1 }}>
+                            <Typography
+                              variant="h5"
+                              fontWeight={700}
+                              gutterBottom
+                            >
+                              Overall Risk Assessment
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              Comprehensive analysis based on{" "}
+                              {searchResults.length} data points
+                            </Typography>
+                          </Box>
                           <Chip
-                            label={summary.overall_risk?.toUpperCase() || "-"}
+                            label={
+                              summary.overall_risk?.toUpperCase() || "UNKNOWN"
+                            }
                             color={
                               summary.overall_risk === "red"
                                 ? "error"
@@ -559,152 +749,366 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
                                 ? "warning"
                                 : "success"
                             }
-                            sx={{ fontWeight: "bold", ml: 2 }}
+                            sx={{
+                              fontWeight: "bold",
+                              fontSize: "1rem",
+                              py: 1,
+                              px: 2,
+                              minHeight: 40,
+                            }}
                           />
-                          <Typography
-                            variant="body2"
-                            color="text.secondary"
-                            ml={2}
-                          >
-                            Method: {summary.method}
-                          </Typography>
                         </Box>
-                        {/* Show risk distribution if available */}
+
+                        {/* Risk Distribution Grid - Enhanced */}
                         {summary.risk_breakdown && (
-                          <Grid container spacing={2}>
-                            {Object.entries(summary.risk_breakdown).map(
-                              ([category, breakdown]: [string, any]) => (
-                                <Grid item xs={12} sm={6} md={3} key={category}>
-                                  <Paper
-                                    variant="outlined"
-                                    sx={{ p: 2, textAlign: "center" }}
+                          <Box sx={{ mt: 3 }}>
+                            <Typography
+                              variant="h6"
+                              gutterBottom
+                              sx={{ mb: 2, fontWeight: 600 }}
+                            >
+                              Risk Breakdown by Category
+                            </Typography>
+                            <Grid container spacing={3}>
+                              {Object.entries(summary.risk_breakdown).map(
+                                ([category, breakdown]: [string, any]) => (
+                                  <Grid
+                                    item
+                                    xs={12}
+                                    sm={6}
+                                    md={4}
+                                    key={category}
                                   >
-                                    <Typography
-                                      variant="subtitle2"
-                                      gutterBottom
+                                    <Card
+                                      variant="outlined"
+                                      sx={{
+                                        p: 3,
+                                        textAlign: "center",
+                                        height: "100%",
+                                        transition: "all 0.3s ease",
+                                        cursor: "pointer",
+                                        "&:hover": {
+                                          transform: "translateY(-2px)",
+                                          boxShadow: 3,
+                                          borderColor: "primary.main",
+                                        },
+                                      }}
                                     >
-                                      {category.charAt(0).toUpperCase() +
-                                        category.slice(1)}
-                                    </Typography>
-                                    <Chip
-                                      label={breakdown.level?.toUpperCase()}
-                                      color={
-                                        breakdown.level === "red"
-                                          ? "error"
-                                          : breakdown.level === "orange"
-                                          ? "warning"
-                                          : "success"
-                                      }
-                                      sx={{ fontWeight: "bold", mb: 1 }}
-                                    />
-                                    <Typography
-                                      variant="body2"
-                                      color="text.secondary"
-                                      mb={1}
-                                    >
-                                      {breakdown.reasoning}
-                                    </Typography>
-                                    {Array.isArray(breakdown.evidence) &&
-                                      breakdown.evidence.length > 0 && (
-                                        <>
-                                          <Typography
-                                            variant="caption"
-                                            color="text.secondary"
+                                      <Box sx={{ mb: 2 }}>
+                                        <Typography
+                                          variant="subtitle1"
+                                          gutterBottom
+                                          sx={{
+                                            fontWeight: 600,
+                                            color: "primary.main",
+                                          }}
+                                        >
+                                          {category.charAt(0).toUpperCase() +
+                                            category.slice(1)}
+                                        </Typography>
+                                        <Chip
+                                          label={
+                                            breakdown.level?.toUpperCase() ||
+                                            "UNKNOWN"
+                                          }
+                                          color={
+                                            breakdown.level === "red"
+                                              ? "error"
+                                              : breakdown.level === "orange"
+                                              ? "warning"
+                                              : "success"
+                                          }
+                                          sx={{
+                                            fontWeight: "bold",
+                                            mb: 2,
+                                            minWidth: 80,
+                                          }}
+                                        />
+                                      </Box>
+
+                                      <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                        sx={{ mb: 2, minHeight: 40 }}
+                                      >
+                                        {breakdown.reasoning}
+                                      </Typography>
+
+                                      {/* Confidence Indicator */}
+                                      <Box sx={{ mb: 2 }}>
+                                        <Typography
+                                          variant="caption"
+                                          color="text.secondary"
+                                          display="block"
+                                        >
+                                          Confidence Level
+                                        </Typography>
+                                        <LinearProgress
+                                          variant="determinate"
+                                          value={
+                                            (breakdown.confidence || 0) * 100
+                                          }
+                                          sx={{
+                                            height: 8,
+                                            borderRadius: 4,
+                                            backgroundColor: "grey.200",
+                                            "& .MuiLinearProgress-bar": {
+                                              borderRadius: 4,
+                                            },
+                                          }}
+                                        />
+                                        <Typography
+                                          variant="caption"
+                                          color="text.secondary"
+                                        >
+                                          {Math.round(
+                                            (breakdown.confidence || 0) * 100
+                                          )}
+                                          %
+                                        </Typography>
+                                      </Box>
+
+                                      {/* Evidence Preview */}
+                                      {Array.isArray(breakdown.evidence) &&
+                                        breakdown.evidence.length > 0 && (
+                                          <Accordion
+                                            sx={{ boxShadow: "none", mt: 1 }}
                                           >
-                                            Evidence:
-                                          </Typography>
-                                          <ul
-                                            style={{
-                                              margin: 0,
-                                              paddingLeft: 16,
-                                            }}
-                                          >
-                                            {breakdown.evidence
-                                              .slice(0, 2)
-                                              .map(
-                                                (ev: string, idx: number) => (
-                                                  <li key={idx}>
-                                                    <Typography variant="caption">
-                                                      {ev}
-                                                    </Typography>
-                                                  </li>
-                                                )
-                                              )}
-                                          </ul>
-                                        </>
-                                      )}
-                                    <Typography
-                                      variant="caption"
-                                      color="text.secondary"
-                                    >
-                                      Confidence:{" "}
-                                      {Math.round(
-                                        (breakdown.confidence || 0) * 100
-                                      )}
-                                      %
-                                    </Typography>
-                                  </Paper>
-                                </Grid>
-                              )
-                            )}
-                          </Grid>
+                                            <AccordionSummary
+                                              expandIcon={
+                                                <ChevronDown size={16} />
+                                              }
+                                              sx={{
+                                                minHeight: 32,
+                                                "& .MuiAccordionSummary-content":
+                                                  {
+                                                    margin: 0,
+                                                  },
+                                              }}
+                                            >
+                                              <Typography
+                                                variant="caption"
+                                                color="primary"
+                                              >
+                                                View Evidence (
+                                                {breakdown.evidence.length})
+                                              </Typography>
+                                            </AccordionSummary>
+                                            <AccordionDetails sx={{ pt: 0 }}>
+                                              <Box
+                                                sx={{
+                                                  maxHeight: 120,
+                                                  overflow: "auto",
+                                                }}
+                                              >
+                                                {breakdown.evidence
+                                                  .slice(0, 3)
+                                                  .map(
+                                                    (
+                                                      ev: string,
+                                                      idx: number
+                                                    ) => (
+                                                      <Typography
+                                                        key={idx}
+                                                        variant="caption"
+                                                        display="block"
+                                                        sx={{
+                                                          mb: 1,
+                                                          p: 1,
+                                                          bgcolor: "grey.50",
+                                                          borderRadius: 1,
+                                                          fontSize: "0.75rem",
+                                                        }}
+                                                      >
+                                                        • {ev}
+                                                      </Typography>
+                                                    )
+                                                  )}
+                                              </Box>
+                                            </AccordionDetails>
+                                          </Accordion>
+                                        )}
+                                    </Card>
+                                  </Grid>
+                                )
+                              )}
+                            </Grid>
+                          </Box>
                         )}
                       </CardContent>
                     </Card>
 
-                    {/* 2. Executive Summary */}
-                    <Card sx={{ mb: 3 }}>
-                      <CardContent>
-                        <Typography variant="h6" gutterBottom>
-                          Executive Summary
-                        </Typography>
-                        <Typography variant="body1" sx={{ mb: 2 }}>
+                    {/* 2. Executive Summary - Enhanced */}
+                    <Card
+                      sx={{
+                        mb: 4,
+                        boxShadow: 4,
+                        borderRadius: 3,
+                        background:
+                          "linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%)",
+                        border: "1px solid #ffcc02",
+                      }}
+                    >
+                      <CardContent sx={{ p: 4 }}>
+                        <Box display="flex" alignItems="center" gap={2} mb={3}>
+                          <Box
+                            sx={{
+                              p: 2,
+                              borderRadius: 2,
+                              background:
+                                "linear-gradient(135deg, #ff9800 0%, #f57c00 100%)",
+                              color: "white",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              minWidth: 48,
+                              height: 48,
+                            }}
+                          >
+                            <StarsIcon sx={{ fontSize: 28 }} />
+                          </Box>
+                          <Typography variant="h5" fontWeight={700}>
+                            Executive Summary
+                          </Typography>
+                        </Box>
+
+                        <Typography
+                          variant="body1"
+                          sx={{
+                            mb: 2,
+                            lineHeight: 1.7,
+                            fontSize: "1.1rem",
+                            color: "text.primary",
+                          }}
+                        >
                           {summary.executive_summary}
                         </Typography>
                       </CardContent>
                     </Card>
 
-                    {/* 3. Key Risk Items */}
+                    {/* 3. Key Risk Items - Enhanced */}
                     {Array.isArray(summary.key_risks) &&
                       summary.key_risks.length > 0 && (
-                        <Card sx={{ mb: 3 }}>
-                          <CardContent>
-                            <Typography variant="h6" gutterBottom>
-                              Key Risk Items
-                            </Typography>
-                            <Accordion>
-                              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                                <Typography variant="subtitle2">
-                                  Show/Hide Key Risks
+                        <Card
+                          sx={{
+                            mb: 4,
+                            boxShadow: 4,
+                            borderRadius: 3,
+                            background:
+                              "linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%)",
+                            border: "1px solid #ef5350",
+                          }}
+                        >
+                          <CardContent sx={{ p: 4 }}>
+                            <Box
+                              display="flex"
+                              alignItems="center"
+                              gap={2}
+                              mb={3}
+                            >
+                              <Box
+                                sx={{
+                                  p: 2,
+                                  borderRadius: 2,
+                                  background:
+                                    "linear-gradient(135deg, #f44336 0%, #d32f2f 100%)",
+                                  color: "white",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  minWidth: 48,
+                                  height: 48,
+                                }}
+                              >
+                                <ErrorIcon sx={{ fontSize: 28 }} />
+                              </Box>
+                              <Typography variant="h5" fontWeight={700}>
+                                Key Risk Items
+                              </Typography>
+                            </Box>
+
+                            <Accordion sx={{ boxShadow: "none" }}>
+                              <AccordionSummary
+                                expandIcon={<ExpandMoreIcon />}
+                                sx={{
+                                  bgcolor: "rgba(255,255,255,0.7)",
+                                  borderRadius: 2,
+                                  mb: 2,
+                                }}
+                              >
+                                <Typography
+                                  variant="subtitle1"
+                                  fontWeight={600}
+                                >
+                                  View {summary.key_risks.length} Risk Items
                                 </Typography>
                               </AccordionSummary>
-                              <AccordionDetails>
+                              <AccordionDetails sx={{ p: 0 }}>
                                 <TableContainer
                                   component={Paper}
                                   variant="outlined"
+                                  sx={{ borderRadius: 2 }}
                                 >
                                   <Table size="small">
                                     <TableHead>
-                                      <TableRow>
-                                        <TableCell>Risk Type</TableCell>
-                                        <TableCell>Description</TableCell>
-                                        <TableCell>Severity</TableCell>
-                                        <TableCell>Recommendations</TableCell>
+                                      <TableRow sx={{ bgcolor: "grey.50" }}>
+                                        <TableCell sx={{ fontWeight: 600 }}>
+                                          Risk Type
+                                        </TableCell>
+                                        <TableCell sx={{ fontWeight: 600 }}>
+                                          Description
+                                        </TableCell>
+                                        <TableCell sx={{ fontWeight: 600 }}>
+                                          Severity
+                                        </TableCell>
+                                        <TableCell sx={{ fontWeight: 600 }}>
+                                          Recommendations
+                                        </TableCell>
                                       </TableRow>
                                     </TableHead>
                                     <TableBody>
                                       {summary.key_risks.map(
                                         (risk: any, idx: number) => (
-                                          <TableRow key={idx}>
+                                          <TableRow
+                                            key={idx}
+                                            sx={{
+                                              "&:nth-of-type(odd)": {
+                                                bgcolor:
+                                                  "rgba(255,255,255,0.5)",
+                                              },
+                                            }}
+                                          >
                                             <TableCell>
-                                              {risk.risk_type}
+                                              <Typography
+                                                variant="body2"
+                                                fontWeight={500}
+                                              >
+                                                {risk.risk_type}
+                                              </Typography>
                                             </TableCell>
                                             <TableCell>
-                                              {risk.description}
+                                              {(() => {
+                                                const { title, heading } =
+                                                  extractTitleAndHeading(risk);
+                                                return (
+                                                  <>
+                                                    <strong>Article:</strong>{" "}
+                                                    {title || "-"}
+                                                    <br />
+                                                    <strong>
+                                                      Heading:
+                                                    </strong>{" "}
+                                                    {heading || "-"}
+                                                  </>
+                                                );
+                                              })()}
                                             </TableCell>
                                             <TableCell>
                                               <Chip
-                                                label={risk.severity?.toUpperCase()}
+                                                label={
+                                                  risk.severity?.toUpperCase() ||
+                                                  "UNKNOWN"
+                                                }
                                                 color={
                                                   risk.severity === "high"
                                                     ? "error"
@@ -713,16 +1117,22 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
                                                     : "success"
                                                 }
                                                 size="small"
+                                                sx={{ fontWeight: 600 }}
                                               />
                                             </TableCell>
                                             <TableCell>
-                                              {Array.isArray(
-                                                risk.recommendations
-                                              )
-                                                ? risk.recommendations.join(
-                                                    ", "
-                                                  )
-                                                : "-"}
+                                              <Typography
+                                                variant="body2"
+                                                color="text.secondary"
+                                              >
+                                                {Array.isArray(
+                                                  risk.recommendations
+                                                )
+                                                  ? risk.recommendations.join(
+                                                      ", "
+                                                    )
+                                                  : "-"}
+                                              </Typography>
                                             </TableCell>
                                           </TableRow>
                                         )
@@ -736,17 +1146,57 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
                         </Card>
                       )}
 
-                    {/* 4. Financial Health */}
+                    {/* 4. Financial Health - Enhanced */}
                     {summary.financial_health && (
-                      <Card sx={{ mb: 3 }}>
-                        <CardContent>
-                          <Box display="flex" alignItems="center" mb={2}>
-                            <DollarSign size={20} style={{ marginRight: 8 }} />
-                            <Typography variant="h6">
-                              Financial Health
-                            </Typography>
+                      <Card
+                        sx={{
+                          mb: 4,
+                          boxShadow: 4,
+                          borderRadius: 3,
+                          background:
+                            "linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%)",
+                          border: "1px solid #4caf50",
+                        }}
+                      >
+                        <CardContent sx={{ p: 4 }}>
+                          <Box
+                            display="flex"
+                            alignItems="center"
+                            gap={2}
+                            mb={3}
+                          >
+                            <Box
+                              sx={{
+                                p: 2,
+                                borderRadius: 2,
+                                background:
+                                  "linear-gradient(135deg, #4caf50 0%, #388e3c 100%)",
+                                color: "white",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                minWidth: 48,
+                                height: 48,
+                              }}
+                            >
+                              <DollarSign size={24} />
+                            </Box>
+                            <Box sx={{ flex: 1 }}>
+                              <Typography variant="h5" fontWeight={700}>
+                                Financial Health
+                              </Typography>
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                              >
+                                Key financial indicators and performance metrics
+                              </Typography>
+                            </Box>
                             <Chip
-                              label={summary.financial_health.status?.toUpperCase()}
+                              label={
+                                summary.financial_health.status?.toUpperCase() ||
+                                "UNKNOWN"
+                              }
                               color={
                                 summary.financial_health.status === "critical"
                                   ? "error"
@@ -755,16 +1205,27 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
                                   ? "warning"
                                   : "success"
                               }
-                              sx={{ ml: 2 }}
+                              sx={{ fontWeight: "bold" }}
                             />
                           </Box>
-                          <TableContainer component={Paper} variant="outlined">
+
+                          <TableContainer
+                            component={Paper}
+                            variant="outlined"
+                            sx={{ borderRadius: 2 }}
+                          >
                             <Table size="small">
                               <TableHead>
-                                <TableRow>
-                                  <TableCell>Indicator</TableCell>
-                                  <TableCell>Value</TableCell>
-                                  <TableCell>Status</TableCell>
+                                <TableRow sx={{ bgcolor: "grey.50" }}>
+                                  <TableCell sx={{ fontWeight: 600 }}>
+                                    Indicator
+                                  </TableCell>
+                                  <TableCell sx={{ fontWeight: 600 }}>
+                                    Value
+                                  </TableCell>
+                                  <TableCell sx={{ fontWeight: 600 }}>
+                                    Status
+                                  </TableCell>
                                 </TableRow>
                               </TableHead>
                               <TableBody>
@@ -775,14 +1236,33 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
                                   0 ? (
                                   summary.financial_health.indicators.map(
                                     (indicator: any, idx: number) => (
-                                      <TableRow key={idx}>
+                                      <TableRow
+                                        key={idx}
+                                        sx={{
+                                          "&:nth-of-type(odd)": {
+                                            bgcolor: "rgba(255,255,255,0.5)",
+                                          },
+                                        }}
+                                      >
                                         <TableCell>
-                                          {indicator.indicator}
+                                          <Typography
+                                            variant="body2"
+                                            fontWeight={500}
+                                          >
+                                            {indicator.indicator}
+                                          </Typography>
                                         </TableCell>
-                                        <TableCell>{indicator.value}</TableCell>
+                                        <TableCell>
+                                          <Typography variant="body2">
+                                            {indicator.value}
+                                          </Typography>
+                                        </TableCell>
                                         <TableCell>
                                           <Chip
-                                            label={indicator.status?.toUpperCase()}
+                                            label={
+                                              indicator.status?.toUpperCase() ||
+                                              "UNKNOWN"
+                                            }
                                             color={
                                               indicator.status === "negative"
                                                 ? "error"
@@ -791,6 +1271,7 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
                                                 : "success"
                                             }
                                             size="small"
+                                            sx={{ fontWeight: 600 }}
                                           />
                                         </TableCell>
                                       </TableRow>
@@ -799,7 +1280,12 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
                                 ) : (
                                   <TableRow>
                                     <TableCell colSpan={3} align="center">
-                                      No indicators found.
+                                      <Typography
+                                        variant="body2"
+                                        color="text.secondary"
+                                      >
+                                        No financial indicators available
+                                      </Typography>
                                     </TableCell>
                                   </TableRow>
                                 )}
@@ -810,74 +1296,75 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
                       </Card>
                     )}
 
-                    {/* 5. Compliance Status */}
-                    {summary.compliance_status && (
-                      <Card sx={{ mb: 3 }}>
-                        <CardContent>
-                          <Box display="flex" alignItems="center" mb={2}>
-                            <Shield size={20} style={{ marginRight: 8 }} />
-                            <Typography variant="h6">
-                              Compliance Status
-                            </Typography>
-                            <Chip
-                              label={summary.compliance_status.overall?.toUpperCase()}
-                              color={
-                                summary.compliance_status.overall ===
-                                "compliant"
-                                  ? "default"
-                                  : summary.compliance_status.overall ===
-                                    "partial"
-                                  ? "warning"
-                                  : "error"
-                              }
-                              sx={{ ml: 2 }}
-                            />
-                            <Typography
-                              variant="body2"
-                              color="text.secondary"
-                              ml={2}
-                            >
-                              {summary.compliance_status.overall === "compliant"
-                                ? "Compliant (coming soon)"
-                                : summary.compliance_status.overall?.replace(
-                                    "_",
-                                    " "
-                                  )}
-                            </Typography>
-                          </Box>
-                        </CardContent>
-                      </Card>
-                    )}
-
-                    {/* Gemini Key Findings and Recommendations */}
+                    {/* 5. Gemini Key Findings - Enhanced */}
                     {Array.isArray(summary.key_findings) &&
                       summary.key_findings.length > 0 && (
                         <Card
                           sx={{
-                            mb: 3,
-                            borderLeft: "6px solid #673ab7",
-                            background: "#f8f6ff",
+                            mb: 4,
+                            boxShadow: 4,
+                            borderRadius: 3,
+                            background:
+                              "linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%)",
+                            border: "1px solid #9c27b0",
                           }}
                         >
-                          <CardContent>
-                            <Box display="flex" alignItems="center" mb={1}>
-                              <StarsIcon sx={{ color: "#673ab7", mr: 1 }} />
-                              <Typography
-                                variant="h6"
-                                color="primary"
-                                fontWeight={700}
+                          <CardContent sx={{ p: 4 }}>
+                            <Box
+                              display="flex"
+                              alignItems="center"
+                              gap={2}
+                              mb={3}
+                            >
+                              <Box
+                                sx={{
+                                  p: 2,
+                                  borderRadius: 2,
+                                  background:
+                                    "linear-gradient(135deg, #9c27b0 0%, #7b1fa2 100%)",
+                                  color: "white",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  minWidth: 48,
+                                  height: 48,
+                                }}
                               >
-                                Gemini Key Findings
+                                <StarsIcon sx={{ fontSize: 28 }} />
+                              </Box>
+                              <Typography
+                                variant="h5"
+                                fontWeight={700}
+                                color="primary"
+                              >
+                                Key Findings
                               </Typography>
                             </Box>
-                            <List>
+
+                            <List sx={{ p: 0 }}>
                               {summary.key_findings.map(
                                 (finding: string, idx: number) => (
-                                  <ListItem key={idx}>
+                                  <ListItem
+                                    key={idx}
+                                    sx={{
+                                      p: 2,
+                                      mb: 1,
+                                      bgcolor: "rgba(255,255,255,0.7)",
+                                      borderRadius: 2,
+                                      border:
+                                        "1px solid rgba(156, 39, 176, 0.2)",
+                                    }}
+                                  >
                                     <ListItemIcon>
-                                      <StarsIcon sx={{ color: "#9575cd" }} />
+                                      <StarsIcon sx={{ color: "#9c27b0" }} />
                                     </ListItemIcon>
-                                    <ListItemText primary={finding} />
+                                    <ListItemText
+                                      primary={finding}
+                                      primaryTypographyProps={{
+                                        variant: "body1",
+                                        fontWeight: 500,
+                                      }}
+                                    />
                                   </ListItem>
                                 )
                               )}
@@ -885,34 +1372,76 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
                           </CardContent>
                         </Card>
                       )}
+
+                    {/* 6. Gemini Recommendations - Enhanced */}
                     {Array.isArray(summary.recommendations) &&
                       summary.recommendations.length > 0 && (
                         <Card
                           sx={{
-                            mb: 3,
-                            borderLeft: "6px solid #1976d2",
-                            background: "#f3f8ff",
+                            mb: 4,
+                            boxShadow: 4,
+                            borderRadius: 3,
+                            background:
+                              "linear-gradient(135deg, #e8f4fd 0%, #bbdefb 100%)",
+                            border: "1px solid #1976d2",
                           }}
                         >
-                          <CardContent>
-                            <Box display="flex" alignItems="center" mb={1}>
-                              <StarsIcon sx={{ color: "#1976d2", mr: 1 }} />
-                              <Typography
-                                variant="h6"
-                                color="primary"
-                                fontWeight={700}
+                          <CardContent sx={{ p: 4 }}>
+                            <Box
+                              display="flex"
+                              alignItems="center"
+                              gap={2}
+                              mb={3}
+                            >
+                              <Box
+                                sx={{
+                                  p: 2,
+                                  borderRadius: 2,
+                                  background:
+                                    "linear-gradient(135deg, #1976d2 0%, #1565c0 100%)",
+                                  color: "white",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  minWidth: 48,
+                                  height: 48,
+                                }}
                               >
-                                Gemini Recommendations
+                                <StarsIcon sx={{ fontSize: 28 }} />
+                              </Box>
+                              <Typography
+                                variant="h5"
+                                fontWeight={700}
+                                color="primary"
+                              >
+                                Recommendations
                               </Typography>
                             </Box>
-                            <List>
+
+                            <List sx={{ p: 0 }}>
                               {summary.recommendations.map(
                                 (rec: string, idx: number) => (
-                                  <ListItem key={idx}>
+                                  <ListItem
+                                    key={idx}
+                                    sx={{
+                                      p: 2,
+                                      mb: 1,
+                                      bgcolor: "rgba(255,255,255,0.7)",
+                                      borderRadius: 2,
+                                      border:
+                                        "1px solid rgba(25, 118, 210, 0.2)",
+                                    }}
+                                  >
                                     <ListItemIcon>
-                                      <StarsIcon sx={{ color: "#64b5f6" }} />
+                                      <StarsIcon sx={{ color: "#1976d2" }} />
                                     </ListItemIcon>
-                                    <ListItemText primary={rec} />
+                                    <ListItemText
+                                      primary={rec}
+                                      primaryTypographyProps={{
+                                        variant: "body1",
+                                        fontWeight: 500,
+                                      }}
+                                    />
                                   </ListItem>
                                 )
                               )}
@@ -961,80 +1490,104 @@ const TrafficLightResult = ({ result }: TrafficLightResultProps) => {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {searchResults.map((item: any, index: number) => (
-                      <TableRow key={index}>
-                        <TableCell>
-                          <Chip
-                            label={item.source}
-                            color={
-                              item.source === "BOE" ? "primary" : "secondary"
-                            }
-                            size="small"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2">
-                            {new Date(item.date).toLocaleDateString()}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2" sx={{ maxWidth: 300 }}>
-                            {item.title}
-                          </Typography>
-                          {item.summary && (
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              display="block"
-                            >
-                              {item.summary.substring(0, 100)}...
-                            </Typography>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Chip
-                            label={item.risk_level}
-                            color={
-                              riskLevelColorMap[
-                                item.risk_level as keyof typeof riskLevelColorMap
-                              ] || "default"
-                            }
-                            size="small"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 1,
-                            }}
-                          >
-                            <LinearProgress
-                              variant="determinate"
-                              value={item.confidence * 100}
-                              sx={{ width: 60, height: 6, borderRadius: 3 }}
+                    {searchResults.map(
+                      (item: SearchResultItem, index: number) => (
+                        <TableRow key={index} hover>
+                          <TableCell>
+                            <Chip
+                              label={item.source}
+                              color={
+                                item.source === "BOE" ? "primary" : "secondary"
+                              }
+                              size="small"
                             />
-                            <Typography variant="caption">
-                              {Math.round(item.confidence * 100)}%
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2">
+                              {new Date(item.date).toLocaleDateString()}
                             </Typography>
-                          </Box>
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            component={Link}
-                            href={item.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            startIcon={<ExternalLink size={16} />}
-                            size="small"
-                            variant="outlined"
-                          >
-                            View
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2" sx={{ maxWidth: 300 }}>
+                              {item.title}
+                            </Typography>
+                            {item.summary && (
+                              <Accordion sx={{ boxShadow: "none", mt: 1 }}>
+                                <AccordionSummary expandIcon={<ChevronDown />}>
+                                  <Typography
+                                    variant="caption"
+                                    color="text.secondary"
+                                  >
+                                    Show snippet
+                                  </Typography>
+                                </AccordionSummary>
+                                <AccordionDetails>
+                                  <Typography
+                                    variant="caption"
+                                    color="text.secondary"
+                                  >
+                                    {item.summary}
+                                  </Typography>
+                                </AccordionDetails>
+                              </Accordion>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Chip
+                              label={item.risk_level}
+                              color={
+                                riskLevelColorMap[
+                                  item.risk_level as keyof typeof riskLevelColorMap
+                                ] || "default"
+                              }
+                              size="small"
+                              icon={
+                                item.risk_level.startsWith("High") ? (
+                                  <ErrorIcon fontSize="small" />
+                                ) : item.risk_level.startsWith("Medium") ? (
+                                  <WarningAmberIcon fontSize="small" />
+                                ) : item.risk_level.startsWith("Low") ? (
+                                  <CheckCircleIcon fontSize="small" />
+                                ) : (
+                                  <InfoOutlinedIcon fontSize="small" />
+                                )
+                              }
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                              }}
+                            >
+                              <LinearProgress
+                                variant="determinate"
+                                value={item.confidence * 100}
+                                sx={{ width: 60, height: 6, borderRadius: 3 }}
+                              />
+                              <Typography variant="caption">
+                                {Math.round(item.confidence * 100)}%
+                              </Typography>
+                            </Box>
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              component={Link}
+                              href={item.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              startIcon={<ExternalLink size={16} />}
+                              size="small"
+                              variant="outlined"
+                            >
+                              View
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    )}
                   </TableBody>
                 </Table>
               </TableContainer>

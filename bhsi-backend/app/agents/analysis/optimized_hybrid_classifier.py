@@ -6,8 +6,9 @@ No unnecessary fallbacks - keyword gate should handle 90%+ of cases
 
 import re
 import time
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
+from datetime import datetime
 
 logger = None
 
@@ -58,6 +59,22 @@ class OptimizedHybridClassifier:
             re.compile(r'\b(manipulación de mercado|abuso de mercado|uso de información privilegiada)\b', re.IGNORECASE)
         ]
         
+        # HIGH-FINANCIAL triggers
+        self.high_financial_patterns = [
+            # Financial distress
+            re.compile(r'\b(pérdidas|caída de beneficios|reducción de ingresos|problemas de liquidez|crisis financiera)\b', re.IGNORECASE),
+            # Debt issues
+            re.compile(r'\b(deuda|incumplimiento|moratoria|dificultad financiera)\b', re.IGNORECASE)
+        ]
+        
+        # HIGH-REGULATORY triggers
+        self.high_regulatory_patterns = [
+            # Regulatory sanctions
+            re.compile(r'\b(sanción|multa|expediente sancionador|infracción grave)\b', re.IGNORECASE),
+            # Regulatory bodies
+            re.compile(r'\b(cnmv|banco de españa|cnmc|aepd|dgsfp|sepblac)\b', re.IGNORECASE)
+        ]
+        
         # MEDIUM-LEGAL triggers
         self.medium_legal_patterns = [
             # Regulatory warnings
@@ -70,12 +87,28 @@ class OptimizedHybridClassifier:
             re.compile(r'\b(deficiencia|irregularidad|incumplimiento normativo)\b', re.IGNORECASE)
         ]
         
+        # MEDIUM-OPERATIONAL triggers
+        self.medium_operational_patterns = [
+            # Dismissals
+            re.compile(r'\b(despido colectivo|despido|regulación de empleo|reducción de plantilla|ere)\b', re.IGNORECASE),
+            # Environmental issues
+            re.compile(r'\b(contaminación|multa ambiental|sanción ecológica|daño ambiental|vertido)\b', re.IGNORECASE)
+        ]
+        
         # LOW-LEGAL triggers
         self.low_legal_patterns = [
             # Regulatory notices
             re.compile(r'\b(circular|normativa|regulación|supervisión)\b', re.IGNORECASE),
             # Administrative procedures
             re.compile(r'\b(autorización|licencia|registro|inscripción)\b', re.IGNORECASE)
+        ]
+        
+        # LOW-OPERATIONAL triggers
+        self.low_operational_patterns = [
+            # Routine operations
+            re.compile(r'\b(nombramiento|cese|dimisión|renuncia|junta general|consejo de administración)\b', re.IGNORECASE),
+            # Business changes
+            re.compile(r'\b(fusión|adquisición|venta|reestructuración|cambio de sede)\b', re.IGNORECASE)
         ]
         
         # NO-LEGAL triggers (immediate non-legal classification)
@@ -224,6 +257,30 @@ class OptimizedHybridClassifier:
                     processing_time_ms=0.15
                 )
         
+        # Check HIGH-FINANCIAL patterns
+        for pattern in self.high_financial_patterns:
+            if pattern.search(text):
+                match = pattern.search(text).group(0)
+                return ClassificationResult(
+                    label="High-Financial",
+                    confidence=0.90,
+                    method="keyword_high_financial",
+                    reason=f"High-financial keyword: {match}",
+                    processing_time_ms=0.15
+                )
+        
+        # Check HIGH-REGULATORY patterns
+        for pattern in self.high_regulatory_patterns:
+            if pattern.search(text):
+                match = pattern.search(text).group(0)
+                return ClassificationResult(
+                    label="High-Regulatory",
+                    confidence=0.90,
+                    method="keyword_high_regulatory",
+                    reason=f"High-regulatory keyword: {match}",
+                    processing_time_ms=0.15
+                )
+        
         # Check MEDIUM-LEGAL patterns
         for pattern in self.medium_legal_patterns:
             if pattern.search(text):
@@ -236,6 +293,18 @@ class OptimizedHybridClassifier:
                     processing_time_ms=0.15
                 )
         
+        # Check MEDIUM-OPERATIONAL patterns
+        for pattern in self.medium_operational_patterns:
+            if pattern.search(text):
+                match = pattern.search(text).group(0)
+                return ClassificationResult(
+                    label="Medium-Operational",
+                    confidence=0.85,
+                    method="keyword_medium_operational",
+                    reason=f"Medium-operational keyword: {match}",
+                    processing_time_ms=0.15
+                )
+        
         # Check LOW-LEGAL patterns
         for pattern in self.low_legal_patterns:
             if pattern.search(text):
@@ -245,6 +314,18 @@ class OptimizedHybridClassifier:
                     confidence=0.82,
                     method="keyword_low_legal",
                     reason=f"Low-risk keyword: {match}",
+                    processing_time_ms=0.15
+                )
+        
+        # Check LOW-OPERATIONAL patterns
+        for pattern in self.low_operational_patterns:
+            if pattern.search(text):
+                match = pattern.search(text).group(0)
+                return ClassificationResult(
+                    label="Low-Operational",
+                    confidence=0.80,
+                    method="keyword_low_operational",
+                    reason=f"Low-operational keyword: {match}",
                     processing_time_ms=0.15
                 )
         
@@ -281,6 +362,24 @@ class OptimizedHybridClassifier:
             return False
             
         return True
+    
+    def _infer_category_from_label(self, label: str) -> str:
+        """
+        Infer category from keyword classification label for consistency with LLM results
+        """
+        label_lower = label.lower()
+        
+        # Map keyword labels to categories
+        if "legal" in label_lower:
+            return "legal"
+        elif "financial" in label_lower or "concurso" in label_lower or "insolvencia" in label_lower:
+            return "financial"
+        elif "regulatory" in label_lower or "reg" in label_lower:
+            return "regulatory"
+        elif "no-legal" in label_lower:
+            return "operational"  # Default for non-legal content
+        else:
+            return "operational"  # Default fallback
     
     def get_performance_stats(self) -> Dict[str, Any]:
         """Get classification performance statistics"""
@@ -420,4 +519,86 @@ class OptimizedHybridClassifier:
             "keyword_result": keyword_result,
             "cloud_result": cloud_result,
             "combination_strategy": "weighted_cloud_preference"
-        } 
+        }
+
+    async def classify_documents_batch(self, docs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Batch classify documents using hybrid keyword + LLM (Gemini) with caching.
+        - Stage 1: Run keyword gate on all docs.
+        - Stage 2: For ambiguous docs, batch send to LLM (cloud_classifier).
+        - Stage 3: Blend/confidence logic, return all intermediate and final results.
+        - Always include cache_key and last_verified_at in results.
+        """
+        keyword_results = []
+        ambiguous_indices = []
+        ambiguous_docs = []
+        now_iso = datetime.utcnow().isoformat()
+        for i, doc in enumerate(docs):
+            text = doc.get('text', '')
+            title = doc.get('title', '')
+            section = doc.get('section', '')
+            source = doc.get('source', 'Unknown')
+            full_text = f"{title} {text}".strip()
+            kw_result = self._keyword_gate(full_text, section, source)
+            cache_key = None
+            if kw_result:
+                # Confident keyword result
+                cache_key = self._get_cloud_classifier().get_cache_key(doc)
+                # Infer category from keyword label for consistency
+                inferred_category = self._infer_category_from_label(kw_result.label)
+                keyword_results.append({
+                    "keyword_label": kw_result.label,
+                    "keyword_confidence": kw_result.confidence,
+                    "keyword_method": kw_result.method,
+                    "keyword_reason": kw_result.reason,
+                    "category": inferred_category,  # Add inferred category
+                    "label": kw_result.label,  # Use keyword label as final label
+                    "confidence": kw_result.confidence,  # Use keyword confidence as final confidence
+                    "reason": kw_result.reason,  # Use keyword reason as final reason
+                    "method": kw_result.method,  # Use keyword method as final method
+                    "final_label": kw_result.label,
+                    "final_score": kw_result.confidence,
+                    "source_used": "keyword",
+                    "processing_time_ms": kw_result.processing_time_ms,
+                    "cache_key": cache_key,
+                    "last_verified_at": now_iso,
+                })
+            else:
+                ambiguous_indices.append(i)
+                ambiguous_docs.append(doc)
+                keyword_results.append(None)
+        llm_results = []
+        if ambiguous_docs:
+            cloud_classifier = self._get_cloud_classifier()
+            llm_results = await cloud_classifier.classify_documents_batch(ambiguous_docs)
+        final_results = []
+        llm_idx = 0
+        for i, kw in enumerate(keyword_results):
+            if kw is not None:
+                final_results.append(kw)
+            else:
+                llm = llm_results[llm_idx]
+                llm_idx += 1
+                result = {
+                    "keyword_label": None,
+                    "keyword_confidence": None,
+                    "keyword_method": None,
+                    "keyword_reason": None,
+                    "llm_label": llm.get("label"),
+                    "llm_confidence": llm.get("confidence"),
+                    "llm_method": llm.get("method"),
+                    "llm_reason": llm.get("reason"),
+                    "category": llm.get("category"),
+                    "label": llm.get("label"),
+                    "confidence": llm.get("confidence"),
+                    "reason": llm.get("reason"),
+                    "method": llm.get("method"),
+                    "final_label": llm.get("label"),
+                    "final_score": llm.get("confidence"),
+                    "source_used": "llm",
+                    "processing_time_ms": None,
+                    "cache_key": llm.get("cache_key"),
+                    "last_verified_at": llm.get("last_verified_at"),
+                }
+                final_results.append(result)
+        return final_results 

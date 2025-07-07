@@ -47,8 +47,10 @@ class StreamlinedSearchRequest(BaseModel):
     include_boe: bool = True
     include_news: bool = True
     include_rss: bool = True  # Include RSS news sources
+    rss_feeds: Optional[list] = None  # List of RSS feeds to include
     force_refresh: bool = False  # Force new search even if cached results exist
     cache_age_hours: int = 24  # Maximum age of cached results in hours
+    
 
 class SemanticSearchRequest(BaseModel):
     query: str
@@ -104,33 +106,24 @@ async def streamlined_search(
             active_agents.append("boe")
         if request.include_news:
             active_agents.append("newsapi")
-        # RSS disabled for demo performance
-        # if request.include_rss:
-        #     # Only include El Pais and Expansion for demo speed
-        #     active_agents.extend([
-        #         "elpais", 
-        #         "expansion"
-        #         # "elmundo",  # Disabled for demo
-        #         # "abc",      # Disabled for demo
-        #         # "lavanguardia", # Disabled for demo
-        #         # "elconfidencial", # Disabled for demo
-        #         # "eldiario", # Disabled for demo
-        #         # "europapress" # Disabled for demo
-        #     ])
-        
-        # Enable RSS sources by default
+        # Enable RSS feeds if requested
         if request.include_rss:
-            active_agents.extend([
-                "elpais", 
-                "expansion",
-                "elmundo", 
-                "abc",      
-                "lavanguardia", 
-                "elconfidencial", 
-                "eldiario", 
-                "europapress"
-            ])
-            
+            # Use only selected RSS feeds if provided, else default to demo feeds
+            selected_rss_feeds = getattr(request, 'rss_feeds', None)
+            if selected_rss_feeds:
+                active_agents.extend(selected_rss_feeds)
+            else:
+                active_agents.extend([
+                    "elpais",
+                    "expansion",
+                    "elmundo",  # Disabled for demo
+                    "abc",      # Disabled for demo
+                    "lavanguardia", # Disabled for demo
+                    "elconfidencial", # Disabled for demo
+                    "eldiario", # Disabled for demo
+                    "europapress" # Disabled for demo
+                ])
+        
         if not active_agents:
             raise HTTPException(
                 status_code=400,
@@ -295,76 +288,87 @@ async def streamlined_search(
                     }
                     classified_results.append(classified_result)
         
-        # Process RSS results from cache or fresh search
-        rss_agents = ["elpais", "expansion", "elmundo", "abc", "lavanguardia", "elconfidencial", "eldiario", "europapress"]
-        for agent_name in rss_agents:
-            if agent_name in search_results and search_results[agent_name].get("articles"):
-                for article in search_results[agent_name]["articles"]:
-                    try:
-                        # Skip classification if already classified (cached results)
-                        if article.get("method") == "cached":
+        # Process RSS results (only selected feeds)
+        rss_agents = (
+            selected_rss_feeds if (request.include_rss and selected_rss_feeds)
+            else [
+                "elpais",
+                "expansion"
+                "elmundo",  # Disabled for demo
+                "abc",      # Disabled for demo
+                "lavanguardia", # Disabled for demo
+                "elconfidencial", # Disabled for demo
+                "eldiario", # Disabled for demo
+                "europapress" # Disabled for demo
+            ]
+        )
+        if request.include_rss:
+            for agent_name in rss_agents:
+                if agent_name in search_results and search_results[agent_name].get("articles"):
+                    for article in search_results[agent_name]["articles"]:
+                        try:
+                            # Optimized hybrid classification
+                            if article.get("method") == "cached":
+                                classified_result = {
+                                    "source": f"RSS-{agent_name.upper()}",
+                                    "date": article.get("publishedAt"),
+                                    "title": article.get("title", ""),
+                                    "summary": article.get("description"),
+                                    "risk_level": article.get("risk_level", "Unknown"),
+                                    "risk_color": map_risk_level_to_color(article.get("risk_level", "Unknown")),
+                                    "confidence": article.get("confidence", 0.5),
+                                    "method": "cached",
+                                    "processing_time_ms": 0,
+                                    "url": article.get("url", ""),
+                                    # RSS-specific fields
+                                    "author": article.get("author"),
+                                    "category": article.get("category"),
+                                    "source_name": article.get("source_name", f"RSS-{agent_name.upper()}")
+                                }
+                                classified_results.append(classified_result)
+                            else:
+                                # Optimized hybrid classification for fresh results
+                                classification = await classifier.classify_document(
+                                    text=article.get("content", article.get("description", "")),
+                                    title=article.get("title", ""),
+                                    source=f"RSS-{agent_name.upper()}"
+                                )
+                                classified_result = {
+                                    "source": f"RSS-{agent_name.upper()}",
+                                    "date": article.get("publishedAt"),
+                                    "title": article.get("title", ""),
+                                    "summary": article.get("description"),
+                                    "risk_level": classification.get("label", "Unknown"),
+                                    "risk_color": map_risk_level_to_color(classification.get("label", "Unknown")),
+                                    "confidence": classification.get("confidence", 0.5),
+                                    "method": classification.get("method", "unknown"),
+                                    "processing_time_ms": classification.get("processing_time_ms", 0),
+                                    "url": article.get("url", ""),
+                                    # RSS-specific fields
+                                    "author": article.get("author"),
+                                    "category": article.get("category"),
+                                    "source_name": article.get("source_name", f"RSS-{agent_name.upper()}")
+                                }
+                                classified_results.append(classified_result)
+                        except Exception as e:
+                            # Simple fallback
                             classified_result = {
                                 "source": f"RSS-{agent_name.upper()}",
                                 "date": article.get("publishedAt"),
                                 "title": article.get("title", ""),
                                 "summary": article.get("description"),
-                                "risk_level": article.get("risk_level", "Unknown"),
-                                "risk_color": map_risk_level_to_color(article.get("risk_level", "Unknown")),
-                                "confidence": article.get("confidence", 0.5),
-                                "method": "cached",
+                                "risk_level": "Unknown",
+                                "risk_color": map_risk_level_to_color("Unknown"),
+                                "confidence": 0.3,
+                                "method": "error_fallback",
                                 "processing_time_ms": 0,
                                 "url": article.get("url", ""),
-                                # RSS-specific fields
                                 "author": article.get("author"),
                                 "category": article.get("category"),
-                                "source_name": article.get("source_name", f"RSS-{agent_name.upper()}")
+                                "source_name": article.get("source_name", f"RSS-{agent_name.upper()}"),
+                                "error": str(e)
                             }
                             classified_results.append(classified_result)
-                        else:
-                            # Optimized hybrid classification for fresh results
-                            classification = await classifier.classify_document(
-                                text=article.get("content", article.get("description", "")),
-                                title=article.get("title", ""),
-                                source=f"RSS-{agent_name.upper()}"
-                            )
-                            
-                            classified_result = {
-                                "source": f"RSS-{agent_name.upper()}",
-                                "date": article.get("publishedAt"),
-                                "title": article.get("title", ""),
-                                "summary": article.get("description"),
-                                "risk_level": classification.get("label", "Unknown"),
-                                "risk_color": map_risk_level_to_color(classification.get("label", "Unknown")),
-                                "confidence": classification.get("confidence", 0.5),
-                                "method": classification.get("method", "unknown"),
-                                "processing_time_ms": classification.get("processing_time_ms", 0),
-                                "url": article.get("url", ""),
-                                # RSS-specific fields
-                                "author": article.get("author"),
-                                "category": article.get("category"),
-                                "source_name": article.get("source_name", f"RSS-{agent_name.upper()}")
-                            }
-                            classified_results.append(classified_result)
-                            
-                    except Exception as e:
-                        # Simple fallback
-                        classified_result = {
-                            "source": f"RSS-{agent_name.upper()}",
-                            "date": article.get("publishedAt"),
-                            "title": article.get("title", ""),
-                            "summary": article.get("description"),
-                            "risk_level": "Unknown",
-                            "risk_color": map_risk_level_to_color("Unknown"),
-                            "confidence": 0.3,
-                            "method": "error_fallback",
-                            "processing_time_ms": 0,
-                            "url": article.get("url", ""),
-                            "author": article.get("author"),
-                            "category": article.get("category"),
-                            "source_name": article.get("source_name", f"RSS-{agent_name.upper()}"),
-                            "error": str(e)
-                        }
-                        classified_results.append(classified_result)
         
         classification_time = time.time() - classification_start_time
         

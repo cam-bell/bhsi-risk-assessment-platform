@@ -62,10 +62,9 @@ class AnalyticsService:
             if include_trends:
                 trends = await self.bigquery_client.get_risk_trends()
             
-            # Get sector analysis if requested
-            sectors = None
-            if include_sectors:
-                sectors = await self.bigquery_client.get_sector_analysis()
+            # Note: Sector analysis and alert summary are not available in 
+            # BigQueryClient - they would need to be implemented or called via 
+            # HTTP to the BigQuery service
             
             # Combine all analytics
             comprehensive_analytics = {
@@ -77,8 +76,13 @@ class AnalyticsService:
             if trends:
                 comprehensive_analytics["trends"] = trends
                 
-            if sectors:
-                comprehensive_analytics["sectors"] = sectors
+            # Add placeholder for sectors if requested
+            if include_sectors:
+                comprehensive_analytics["sectors"] = {
+                    "message": ("Sector analysis not yet implemented in "
+                               "BigQueryClient"),
+                    "fallback": True
+                }
             
             # Cache the result
             if use_cache:
@@ -120,8 +124,20 @@ class AnalyticsService:
         try:
             # Get all system analytics in parallel
             trends = await self.bigquery_client.get_risk_trends()
-            alerts = await self.bigquery_client.get_alert_summary()
-            sectors = await self.bigquery_client.get_sector_analysis()
+            
+            # Note: Alert summary and sector analysis are not available in 
+            # BigQueryClient - they would need to be implemented or called via 
+            # HTTP to the BigQuery service
+            alerts = {
+                "message": ("Alert summary not yet implemented in "
+                           "BigQueryClient"),
+                "fallback": True
+            }
+            sectors = {
+                "message": ("Sector analysis not yet implemented in "
+                           "BigQueryClient"), 
+                "fallback": True
+            }
             
             system_analytics = {
                 "system_analytics": {

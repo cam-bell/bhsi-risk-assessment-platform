@@ -114,23 +114,6 @@ const LandingPage = () => {
         </Box>
       </Container>
 
-      {/* After risk result */}
-      {executiveSummary && (
-        <Box mt={4}>
-          <ExecutiveSummaryCard summary={executiveSummary} />
-          <Button
-            variant="contained"
-            color="primary"
-            sx={{ mt: 2 }}
-            onClick={() =>
-              navigate(`/analytics?company=${encodeURIComponent(companyName)}`)
-            }
-          >
-            View Full Summary in Analytics
-          </Button>
-        </Box>
-      )}
-
       {/* Footer */}
       <Box
         component="footer"

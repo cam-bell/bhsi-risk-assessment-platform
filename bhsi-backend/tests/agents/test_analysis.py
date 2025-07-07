@@ -173,3 +173,53 @@ async def test_management_summary_language_templates():
             include_evidence=True,
             language="fr"
         ) 
+
+@pytest.mark.asyncio
+def test_hybrid_classifier_batch_flow(hybrid_classifier, monkeypatch):
+    """Test batch/cached hybrid classifier logic with a mix of cases."""
+    import asyncio
+    # Patch cloud_classifier to count LLM calls
+    llm_call_count = {"count": 0}
+    async def fake_batch_llm(docs):
+        llm_call_count["count"] += 1
+        # Return dummy LLM results
+        return [
+            {"label": "legal", "confidence": 0.91, "reason": "Ambiguous legal text", "method": "cloud_gemini_analysis"}
+            for _ in docs
+        ]
+    # Patch _get_cloud_classifier to return a mock with classify_documents_batch
+    class FakeCloud:
+        def get_cache_key(self, doc):
+            # Simple hash for testing
+            return f"fake_key_{hash(str(doc))}"
+        
+        async def classify_documents_batch(self, docs):
+            return await fake_batch_llm(docs)
+    monkeypatch.setattr(hybrid_classifier, "_get_cloud_classifier", lambda: FakeCloud())
+
+    docs = [
+        {"text": "Concurso de acreedores", "title": "Test"},  # Obvious keyword
+        {"text": "El consejo discutió una sentencia relevante pero no concluyente.", "title": "Test"},  # Ambiguous, contains 'sentencia', should trigger LLM
+        {"text": "Noticias deportivas", "title": "Test"},    # No-Legal
+    ]
+    # Fallback Hierarchy (see image):
+    # 1. Cloud Gemini (default for ambiguous)
+    # 2. Local LLaMA (if Gemini fails)
+    # 3. Keyword Regex (if both fail or match high-confidence regex)
+    # 4. No-Legal default (avoid if possible)
+
+    # First call: should trigger LLM for ambiguous only
+    results = asyncio.run(hybrid_classifier.classify_documents_batch(docs))
+    print("Cache after first call:", getattr(getattr(hybrid_classifier._get_cloud_classifier(), 'classifier', None), 'classification_cache', None))
+    assert len(results) == 3
+    assert results[0]["final_label"] == "High-Legal" or results[0]["keyword_label"] == "High-Legal"
+    assert results[1]["final_label"] == "legal" and results[1]["source_used"] == "llm"
+    assert results[2]["final_label"] == "No-Legal" or results[2]["keyword_label"] == "No-Legal"
+    # All fields present
+    for res in results:
+        assert "final_label" in res and "final_score" in res and "source_used" in res
+    # Second call: should use cache, no extra LLM calls
+    print("Cache before second call:", getattr(getattr(hybrid_classifier._get_cloud_classifier(), 'classifier', None), 'classification_cache', None))
+    results2 = asyncio.run(hybrid_classifier.classify_documents_batch(docs))
+    print("Cache after second call:", getattr(getattr(hybrid_classifier._get_cloud_classifier(), 'classifier', None), 'classification_cache', None))
+    assert llm_call_count["count"] == 1  # Only first call triggers LLM 
