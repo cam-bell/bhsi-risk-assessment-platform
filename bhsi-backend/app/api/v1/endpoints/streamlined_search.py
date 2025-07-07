@@ -11,6 +11,7 @@ import json
 import datetime
 import time
 import logging
+from fastapi.responses import JSONResponse
 
 from app.agents.search.streamlined_orchestrator import get_search_orchestrator
 from app.agents.analysis.optimized_hybrid_classifier import OptimizedHybridClassifier
@@ -808,3 +809,62 @@ async def migrate_vectors_to_bigquery(
             "status": "error",
             "error": str(e)
         } 
+
+@router.get("/search/merged/{company_name}")
+async def get_merged_search_results(company_name: str):
+    """
+    Retrieve and merge all search results for a company from BigQuery.
+    """
+    client = bigquery.Client()
+    table_id = "solid-topic-443216-b2.risk_monitoring.risk_assessment"
+
+    # 1. Query all rows for the company
+    query = f"""
+        SELECT `search result`
+        FROM `{table_id}`
+        WHERE `company name` = @company_name
+    """
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("company_name", "STRING", company_name)
+        ]
+    )
+    merged_results = []
+    meta = None
+    search_date = None
+    for row in client.query(query, job_config=job_config):
+        try:
+            result_json = json.loads(row['search result'])
+            docs = result_json.get("results", [])
+            merged_results.extend(docs)
+            # Optionally, grab meta fields from the first row
+            if not meta:
+                meta = result_json.get("metadata")
+            if not search_date:
+                search_date = result_json.get("search_date")
+        except Exception as e:
+            continue
+
+    # Remove duplicates by URL
+    seen_urls = set()
+    unique_results = []
+    for doc in merged_results:
+        url = doc.get("url")
+        if url and url not in seen_urls:
+            unique_results.append(doc)
+            seen_urls.add(url)
+
+    # Build merged JSON
+    merged_json = {
+        "company_name": company_name,
+        "search_date": search_date,
+        "results": unique_results,
+        "metadata": meta,
+        "total_results": len(unique_results)
+    }
+
+    # Print to console (for debugging)
+    print(json.dumps(merged_json, indent=2, ensure_ascii=False))
+
+    # Return as API response
+    return JSONResponse(content=merged_json) 
