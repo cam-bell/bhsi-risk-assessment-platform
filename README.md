@@ -261,7 +261,6 @@ The risk classification system implements a sophisticated multi-stage approach d
 **Data Services**
 - **BigQuery**: Data warehouse for analytics and vector storage
 - **Cloud Storage**: Object storage for documents and artifacts
-- **Cloud SQL**: Managed PostgreSQL for transactional data
 
 **AI/ML Services**
 - **Vertex AI**: Machine learning platform and model hosting
@@ -370,7 +369,6 @@ The risk classification system implements a sophisticated multi-stage approach d
 
 - Python 3.11 or higher
 - Node.js 18 or higher
-- PostgreSQL 14 or higher
 - Google Cloud Platform account
 - NewsAPI account (optional)
 
