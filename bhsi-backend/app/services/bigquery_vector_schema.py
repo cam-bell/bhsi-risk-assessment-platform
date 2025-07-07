@@ -6,6 +6,7 @@ BigQuery Vector Schema - Schema for storing vector embeddings in BigQuery
 from google.cloud import bigquery
 from typing import List, Dict, Any
 import json
+import logging
 
 # BigQuery Vector Table Schema
 VECTOR_TABLE_SCHEMA = [
@@ -43,11 +44,13 @@ class BigQueryVectorSchema:
     def __init__(self, client: bigquery.Client, dataset_id: str = "bhsi_dataset"):
         self.client = client
         self.dataset_id = dataset_id
-        self.vector_table_id = f"{dataset_id}.vectors"
-        self.search_cache_table_id = f"{dataset_id}.search_cache"
+        self.vector_table_id = f"solid-topic-443216-b2.{dataset_id}.vectors"
+        self.search_cache_table_id = f"solid-topic-443216-b2.{dataset_id}.search_cache"
     
     def create_vector_table(self) -> bool:
         """Create the vectors table in BigQuery"""
+        logger = logging.getLogger(__name__)
+        
         try:
             # Create dataset if it doesn't exist
             dataset_ref = self.client.dataset(self.dataset_id)
@@ -68,15 +71,17 @@ class BigQueryVectorSchema:
             # Create the table
             self.client.create_table(table, exists_ok=True)
             
-            print(f"✅ Created vectors table: {self.vector_table_id}")
+            logger.info(f"✅ Created vectors table: {self.vector_table_id}")
             return True
             
         except Exception as e:
-            print(f"❌ Failed to create vectors table: {e}")
+            logger.error(f"❌ Failed to create vectors table: {e}")
             return False
     
     def create_search_cache_table(self) -> bool:
         """Create the search cache table in BigQuery"""
+        logger = logging.getLogger(__name__)
+        
         try:
             # Create search cache table
             table_ref = self.client.dataset(self.dataset_id).table("search_cache")
@@ -88,11 +93,11 @@ class BigQueryVectorSchema:
             # Create the table
             self.client.create_table(table, exists_ok=True)
             
-            print(f"✅ Created search cache table: {self.search_cache_table_id}")
+            logger.info(f"✅ Created search cache table: {self.search_cache_table_id}")
             return True
             
         except Exception as e:
-            print(f"❌ Failed to create search cache table: {e}")
+            logger.error(f"❌ Failed to create search cache table: {e}")
             return False
     
     def get_vector_search_query(self, query_vector: List[float], k: int = 5) -> str:
@@ -143,7 +148,12 @@ class BigQueryVectorSchema:
     
     def insert_vector_data(self, vector_data: Dict[str, Any]) -> bool:
         """Insert vector data into BigQuery"""
+        logger = logging.getLogger(__name__)
+        
         try:
+            # Log the table we're inserting to
+            logger.info(f"🎯 Inserting vector data to table: {self.vector_table_id}")
+            
             # Prepare the row data
             row = {
                 "event_id": vector_data["event_id"],
@@ -161,21 +171,31 @@ class BigQueryVectorSchema:
                 "text_summary": vector_data.get("text_summary"),
             }
             
+            # Log the data being inserted (first few fields for debugging)
+            logger.info(f"📝 Row data: event_id={row['event_id']}, company={row['company_name']}, dimension={row['vector_dimension']}")
+            
             # Insert into BigQuery
             errors = self.client.insert_rows_json(self.vector_table_id, [row])
             
             if errors:
-                print(f"❌ Failed to insert vector data: {errors}")
+                logger.error(f"❌ BigQuery insert errors: {errors}")
+                for error in errors:
+                    logger.error(f"   Error details: {error}")
                 return False
             
+            logger.info(f"✅ Successfully inserted vector to BigQuery: {row['event_id']}")
             return True
             
         except Exception as e:
-            print(f"❌ Failed to insert vector data: {e}")
+            logger.error(f"❌ Exception during BigQuery insert: {e}")
+            logger.error(f"   Table ID: {self.vector_table_id}")
+            logger.error(f"   Vector data keys: {list(vector_data.keys())}")
             return False
     
     def get_table_stats(self) -> Dict[str, Any]:
         """Get statistics about the vector tables"""
+        logger = logging.getLogger(__name__)
+        
         try:
             # Get vectors table stats
             vectors_query = f"SELECT COUNT(*) as vector_count FROM `{self.vector_table_id}` WHERE is_active = TRUE"
@@ -198,5 +218,5 @@ class BigQueryVectorSchema:
             }
             
         except Exception as e:
-            print(f"❌ Failed to get table stats: {e}")
+            logger.error(f"❌ Failed to get table stats: {e}")
             return {"error": str(e)} 
