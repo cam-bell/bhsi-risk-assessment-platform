@@ -108,7 +108,6 @@ The BHSI system implements a hybrid cloud-native architecture combining microser
 ### Database Technologies
 
 **Primary Database**
-- **PostgreSQL**: Advanced open-source relational database
 - **BigQuery**: Google Cloud's serverless data warehouse
 - **ChromaDB**: Vector database for semantic search capabilities
 
@@ -559,36 +558,11 @@ print(f"Confidence: {analysis['confidence']}%")
 - User activity monitoring
 - System performance metrics
 
-## Monitoring and Analytics
-
-### System Metrics
-
-**Performance Indicators:**
-- Request latency and throughput
-- Classification accuracy rates
-- API success/failure ratios
-- Resource utilization metrics
-
-**Business Metrics:**
-- Risk assessment volumes
-- User engagement analytics
-- Data source reliability
-- Cost per analysis calculation
-
-### Alerting System
-
-**Automated Alerts:**
-- System health monitoring
-- Data quality issues
-- Security incident detection
-- Performance degradation warnings
-
 ## Development Guidelines
 
 ### Code Quality Standards
 
 **Python Backend:**
-- PEP 8 style compliance
 - Type hints for all functions
 - Comprehensive docstring documentation
 - Unit test coverage >80%
