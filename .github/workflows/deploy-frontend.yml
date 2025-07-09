@@ -46,8 +46,8 @@ jobs:
             --memory 512Mi \
             --cpu 1 \
             --max-instances 10 \
-            --set-env-vars VITE_API_BASE_URL="${{ secrets.VITE_API_BASE_URL }}" \
-            --set-env-vars VITE_API_TIMEOUT="${{ secrets.VITE_API_TIMEOUT }}"
+            --set-env-vars VITE_API_BASE_URL="https://bhsi-backend-485249399569.europe-west1.run.app/api/v1" \
+            --set-env-vars VITE_API_TIMEOUT="30000"
 
       # Step 6: Get service URL
       - name: Get service URL
