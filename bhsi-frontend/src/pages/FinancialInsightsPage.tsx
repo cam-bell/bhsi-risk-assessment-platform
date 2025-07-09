@@ -34,8 +34,8 @@ import {
   Select,
   FormControl,
   InputLabel,
-  Stack,
 } from "@mui/material";
+import { Stack } from "@mui/material";
 import {
   BarChart3,
   FileText,
@@ -333,19 +333,36 @@ const RiskTab: React.FC<{ risk: any; loading: boolean }> = ({
             </Paper>
           )}
 
-          <Stack direction="row" spacing={2} alignItems="center" mb={2}>
-            <Typography variant="h5">Risk Report</Typography>
-            <Chip
-              label={risk.riskLevel || risk.risk_level || "Unknown"}
-              color={riskLevelColor(risk.riskLevel || risk.risk_level)}
-              sx={{
-                fontWeight: 600,
-                fontSize: "1rem",
-                textTransform: "capitalize",
-              }}
-              aria-label={`Risk level: ${risk.riskLevel}`}
-            />
-          </Stack>
+          {Stack && (
+            <Stack direction="row" spacing={2} alignItems="center" mb={2}>
+              <Typography variant="h5">Risk Report</Typography>
+              <Chip
+                label={risk.riskLevel || risk.risk_level || "Unknown"}
+                color={riskLevelColor(risk.riskLevel || risk.risk_level)}
+                sx={{
+                  fontWeight: 600,
+                  fontSize: "1rem",
+                  textTransform: "capitalize",
+                }}
+                aria-label={`Risk level: ${risk.riskLevel}`}
+              />
+            </Stack>
+          )}
+          {!Stack && (
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2 }}>
+              <Typography variant="h5">Risk Report</Typography>
+              <Chip
+                label={risk.riskLevel || risk.risk_level || "Unknown"}
+                color={riskLevelColor(risk.riskLevel || risk.risk_level)}
+                sx={{
+                  fontWeight: 600,
+                  fontSize: "1rem",
+                  textTransform: "capitalize",
+                }}
+                aria-label={`Risk level: ${risk.riskLevel}`}
+              />
+            </Box>
+          )}
 
           {/* Data availability indicator */}
           {risk.data_availability && (
@@ -411,38 +428,73 @@ const RiskTab: React.FC<{ risk: any; loading: boolean }> = ({
               Recent News
             </Typography>
             {risk.news && Array.isArray(risk.news) && risk.news.length > 0 ? (
-              <Stack spacing={1}>
-                {risk.news.map((item: any, idx: number) => (
-                  <Alert
-                    key={idx}
-                    severity={riskLevelColor(item.sentiment)}
-                    icon={false}
-                    sx={{ fontWeight: 500 }}
-                  >
-                    <a
-                      href={item.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        fontWeight: 600,
-                        color: "inherit",
-                        textDecoration: "underline",
-                      }}
+              Stack ? (
+                <Stack spacing={1}>
+                  {risk.news.map((item: any, idx: number) => (
+                    <Alert
+                      key={idx}
+                      severity={riskLevelColor(item.sentiment)}
+                      icon={false}
+                      sx={{ fontWeight: 500 }}
                     >
-                      {item.headline}
-                    </a>
-                    {item.date && (
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ ml: 1 }}
+                      <a
+                        href={item.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          fontWeight: 600,
+                          color: "inherit",
+                          textDecoration: "underline",
+                        }}
                       >
-                        {formatDate(item.date)}
-                      </Typography>
-                    )}
-                  </Alert>
-                ))}
-              </Stack>
+                        {item.headline}
+                      </a>
+                      {item.date && (
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ ml: 1 }}
+                        >
+                          {formatDate(item.date)}
+                        </Typography>
+                      )}
+                    </Alert>
+                  ))}
+                </Stack>
+              ) : (
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                  {risk.news.map((item: any, idx: number) => (
+                    <Alert
+                      key={idx}
+                      severity={riskLevelColor(item.sentiment)}
+                      icon={false}
+                      sx={{ fontWeight: 500 }}
+                    >
+                      <a
+                        href={item.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          fontWeight: 600,
+                          color: "inherit",
+                          textDecoration: "underline",
+                        }}
+                      >
+                        {item.headline}
+                      </a>
+                      {item.date && (
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ ml: 1 }}
+                        >
+                          {formatDate(item.date)}
+                        </Typography>
+                      )}
+                    </Alert>
+                  ))}
+                </Box>
+              )
             ) : (
               <Typography color="text.secondary">
                 No recent news available.
