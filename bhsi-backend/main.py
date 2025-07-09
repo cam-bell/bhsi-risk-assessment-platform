@@ -4,6 +4,7 @@ BHSI Corporate Risk Assessment API
 Main application entry point combining search and analysis capabilities
 """
 
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -65,10 +66,11 @@ async def health_check():
 # Development server
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
+    port = int(os.getenv("PORT", 8000))
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8000,
+        port=port,
         reload=True,
         log_level="info"
     )

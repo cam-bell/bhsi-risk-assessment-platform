@@ -53,5 +53,5 @@ except Exception as e:
 
 # Start the application
 echo "Starting uvicorn..."
-exec uvicorn main:app --host 0.0.0.0 --port 8000 --proxy-headers 
+uvicorn main:app --host 0.0.0.0 --port 8000 --proxy-headers 
 
