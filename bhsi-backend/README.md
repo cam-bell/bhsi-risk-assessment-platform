@@ -398,3 +398,4 @@ To use BigQuery and other Google Cloud services locally, you must authenticate w
 **Architecture:** Streamlined microservices with optimized hybrid AI classification
 
 **Performance:** 90%+ improvement through intelligent keyword filtering and cloud optimization
+# Trigger deployment
