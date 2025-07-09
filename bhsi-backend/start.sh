@@ -1,32 +1,57 @@
 #!/bin/bash
 
-echo "🚀 Starting BHSI Corporate Risk Assessment API..."
+echo "Starting BHSI Backend..."
 
-# Check if virtual environment exists
-if [ ! -d "venv" ]; then
-    echo "📦 Creating virtual environment..."
-    python3 -m venv venv
+# Check if we're in the right directory
+echo "Current directory: $(pwd)"
+echo "Contents:"
+ls -la
+
+# Check Python version
+echo "Python version:"
+python --version
+
+# Check if main.py exists
+if [ ! -f "main.py" ]; then
+    echo "ERROR: main.py not found!"
+    exit 1
 fi
 
-# Activate virtual environment
-echo "🔌 Activating virtual environment..."
-source venv/bin/activate
+# Check if app directory exists
+if [ ! -d "app" ]; then
+    echo "ERROR: app directory not found!"
+    exit 1
+fi
 
-# Install dependencies
-echo "📚 Installing dependencies..."
-pip install -r requirements.txt
+# Create necessary directories
+mkdir -p app/db
 
-# Start the application with main.py
-=======
-# Start the application with uvicorn
+# Test imports
+echo "Testing imports..."
+python -c "
+try:
+    from app.core.config import settings
+    print('✅ Config imported successfully')
+except Exception as e:
+    print(f'❌ Config import failed: {e}')
+    exit(1)
 
-echo "🎯 Starting application on http://localhost:8000"
-echo "📖 API Documentation available at http://localhost:8000/docs"
-echo "🔍 Main search endpoint: POST http://localhost:8000/api/v1/search"
-echo ""
+try:
+    from app.api.v1.router import api_router
+    print('✅ API router imported successfully')
+except Exception as e:
+    print(f'❌ API router import failed: {e}')
+    exit(1)
 
+try:
+    from main import app
+    print('✅ Main app imported successfully')
+except Exception as e:
+    print(f'❌ Main app import failed: {e}')
+    exit(1)
+"
 
-python main.py 
-=======
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload 
+# Start the application
+echo "Starting uvicorn..."
+exec uvicorn main:app --host 0.0.0.0 --port 8000 --proxy-headers 
 
