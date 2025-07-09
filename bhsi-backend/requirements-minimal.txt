@@ -191,4 +191,9 @@ yarl==1.20.1
 yfinance==0.2.64
 zipp==3.23.0
 zopfli==0.2.3.post1
-zstandard==0.23.0 
+zstandard==0.23.0
+
+# Essential ML dependencies for RAG features
+sentence-transformers==5.0.0
+transformers==4.53.1
+torch==2.2.2 

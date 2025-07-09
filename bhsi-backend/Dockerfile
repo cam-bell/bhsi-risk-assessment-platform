@@ -1,43 +1,48 @@
 # Use Python 3.11 slim image
 FROM python:3.11-slim
 
-# Set working directory
-WORKDIR /app
+# Set environment variables for memory optimization
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV TRANSFORMERS_CACHE=/tmp/transformers_cache
+ENV TORCH_HOME=/tmp/torch_cache
+ENV HF_HOME=/tmp/hf_cache
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
-    build-essential \
     curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first to leverage Docker cache
+# Create app directory
+WORKDIR /app
+
+# Copy requirements first for better caching
 COPY requirements-minimal.txt .
 
-# Install Python dependencies with optimizations
-RUN pip install --no-cache-dir --no-deps -r requirements-minimal.txt \
-    && pip cache purge
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements-minimal.txt
 
-# Copy the rest of the application
+# Copy application code
 COPY . .
 
 # Create necessary directories
-RUN mkdir -p /app/app/db
+RUN mkdir -p /tmp/transformers_cache /tmp/torch_cache /tmp/hf_cache
 
-# Set environment variables to reduce memory usage
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONPATH=/app
-ENV PYTHONMALLOC=malloc
-ENV PYTHONDEVMODE=0
-ENV PYTHONHASHSEED=0
+# Create startup script
+RUN echo '#!/bin/bash\n\
+echo "Validating imports..."\n\
+python -c "import uvicorn; print(\"✓ uvicorn imported successfully\")"\n\
+python -c "import fastapi; print(\"✓ fastapi imported successfully\")"\n\
+echo "Starting application..."\n\
+exec uvicorn main:app --host 0.0.0.0 --port 8080 --workers 1\n\
+' > /app/start.sh && chmod +x /app/start.sh
 
-# Expose the port
-EXPOSE 8000
+# Expose port
+EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+    CMD curl -f http://localhost:8080/health || exit 1
 
-# Use startup script
-CMD ["./startup.sh"] 
+# Start the application
+CMD ["/app/start.sh"] 
