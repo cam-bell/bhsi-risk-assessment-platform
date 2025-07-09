@@ -1,4 +1,4 @@
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import React, { Component, ErrorInfo, ReactNode } from "react";
 import {
   Box,
   Card,
@@ -9,9 +9,14 @@ import {
   AlertTitle,
   Collapse,
   IconButton,
-  Stack,
-} from '@mui/material';
-import { AlertTriangle, RefreshCw, Bug, ChevronDown, ChevronUp } from 'lucide-react';
+} from "@mui/material";
+import {
+  AlertTriangle,
+  RefreshCw,
+  Bug,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
 
 interface Props {
   children: ReactNode;
@@ -35,16 +40,16 @@ export class ErrorBoundary extends Component<Props, State> {
   };
 
   public static getDerivedStateFromError(error: Error): State {
-    return { 
-      hasError: true, 
-      error, 
-      errorInfo: null, 
-      showDetails: false 
+    return {
+      hasError: true,
+      error,
+      errorInfo: null,
+      showDetails: false,
     };
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    console.error("ErrorBoundary caught an error:", error, errorInfo);
     this.setState({
       error,
       errorInfo,
@@ -52,7 +57,12 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   private handleReset = () => {
-    this.setState({ hasError: false, error: null, errorInfo: null, showDetails: false });
+    this.setState({
+      hasError: false,
+      error: null,
+      errorInfo: null,
+      showDetails: false,
+    });
   };
 
   private toggleDetails = () => {
@@ -68,28 +78,33 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <Box
           sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: '50vh',
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            minHeight: "50vh",
             p: 3,
           }}
         >
-          <Card sx={{ maxWidth: 600, width: '100%' }}>
+          <Card sx={{ maxWidth: 600, width: "100%" }}>
             <CardContent sx={{ p: 4 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-                <AlertTriangle size={32} color="#d32f2f" style={{ marginRight: 16 }} />
+              <Box sx={{ display: "flex", alignItems: "center", mb: 3 }}>
+                <AlertTriangle
+                  size={32}
+                  color="#d32f2f"
+                  style={{ marginRight: 16 }}
+                />
                 <Typography variant="h5" color="error">
                   Something went wrong
                 </Typography>
               </Box>
 
               <Typography variant="body1" paragraph>
-                We apologize for the inconvenience. An unexpected error has occurred.
-                Our development team has been notified and is working to resolve this issue.
+                We apologize for the inconvenience. An unexpected error has
+                occurred. Our development team has been notified and is working
+                to resolve this issue.
               </Typography>
 
-              <Stack direction="row" spacing={2} sx={{ mb: 3 }}>
+              <Box sx={{ display: "flex", gap: 2, mb: 3 }}>
                 <Button
                   variant="contained"
                   startIcon={<RefreshCw size={16} />}
@@ -99,27 +114,36 @@ export class ErrorBoundary extends Component<Props, State> {
                 </Button>
                 <Button
                   variant="outlined"
-                  startIcon={this.state.showDetails ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  startIcon={
+                    this.state.showDetails ? (
+                      <ChevronUp size={16} />
+                    ) : (
+                      <ChevronDown size={16} />
+                    )
+                  }
                   onClick={this.toggleDetails}
                 >
-                  {this.state.showDetails ? 'Hide' : 'Show'} Details
+                  {this.state.showDetails ? "Hide" : "Show"} Details
                 </Button>
-              </Stack>
+              </Box>
 
               <Collapse in={this.state.showDetails}>
-                <Alert severity="error" sx={{ textAlign: 'left' }}>
+                <Alert severity="error" sx={{ textAlign: "left" }}>
                   <AlertTitle>Error Details</AlertTitle>
-                  <Typography variant="body2" sx={{ fontFamily: 'monospace', mt: 1 }}>
+                  <Typography
+                    variant="body2"
+                    sx={{ fontFamily: "monospace", mt: 1 }}
+                  >
                     <strong>Error:</strong> {this.state.error?.message}
                   </Typography>
                   {this.state.errorInfo && (
-                    <Typography 
-                      variant="body2" 
-                      sx={{ 
-                        fontFamily: 'monospace', 
-                        mt: 1, 
-                        whiteSpace: 'pre-wrap',
-                        fontSize: '0.75rem' 
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        fontFamily: "monospace",
+                        mt: 1,
+                        whiteSpace: "pre-wrap",
+                        fontSize: "0.75rem",
                       }}
                     >
                       <strong>Stack Trace:</strong>
@@ -139,19 +163,19 @@ export class ErrorBoundary extends Component<Props, State> {
 }
 
 // API Error Display Component
-export const ApiErrorAlert = ({ 
-  error, 
-  onRetry, 
-  onDismiss 
-}: { 
-  error: string; 
-  onRetry?: () => void; 
-  onDismiss?: () => void; 
+export const ApiErrorAlert = ({
+  error,
+  onRetry,
+  onDismiss,
+}: {
+  error: string;
+  onRetry?: () => void;
+  onDismiss?: () => void;
 }) => (
-  <Alert 
-    severity="error" 
+  <Alert
+    severity="error"
     action={
-      <Stack direction="row" spacing={1}>
+      <Box sx={{ display: "flex", gap: 1 }}>
         {onRetry && (
           <Button color="inherit" size="small" onClick={onRetry}>
             Retry
@@ -162,7 +186,7 @@ export const ApiErrorAlert = ({
             Dismiss
           </Button>
         )}
-      </Stack>
+      </Box>
     }
     sx={{ mb: 2 }}
   >
@@ -173,14 +197,15 @@ export const ApiErrorAlert = ({
 
 // Network Error Component
 export const NetworkErrorCard = ({ onRetry }: { onRetry?: () => void }) => (
-  <Card sx={{ textAlign: 'center', p: 4, maxWidth: 400, mx: 'auto' }}>
+  <Card sx={{ textAlign: "center", p: 4, maxWidth: 400, mx: "auto" }}>
     <CardContent>
       <AlertTriangle size={48} color="#d32f2f" style={{ marginBottom: 16 }} />
       <Typography variant="h6" gutterBottom>
         Connection Error
       </Typography>
       <Typography variant="body2" color="text.secondary" paragraph>
-        Unable to connect to the server. Please check your internet connection and try again.
+        Unable to connect to the server. Please check your internet connection
+        and try again.
       </Typography>
       {onRetry && (
         <Button
@@ -199,15 +224,18 @@ export const NetworkErrorCard = ({ onRetry }: { onRetry?: () => void }) => (
 export const NotFoundError = () => (
   <Box
     sx={{
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      minHeight: '50vh',
-      textAlign: 'center',
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      minHeight: "50vh",
+      textAlign: "center",
     }}
   >
-    <Typography variant="h1" sx={{ fontSize: '6rem', fontWeight: 'bold', color: 'primary.main' }}>
+    <Typography
+      variant="h1"
+      sx={{ fontSize: "6rem", fontWeight: "bold", color: "primary.main" }}
+    >
       404
     </Typography>
     <Typography variant="h4" gutterBottom>
@@ -216,20 +244,17 @@ export const NotFoundError = () => (
     <Typography variant="body1" color="text.secondary" paragraph>
       The page you're looking for doesn't exist or has been moved.
     </Typography>
-    <Button
-      variant="contained"
-      onClick={() => window.location.href = '/'}
-    >
+    <Button variant="contained" onClick={() => (window.location.href = "/")}>
       Go Home
     </Button>
   </Box>
 );
 
 // Validation Error Component
-export const ValidationErrorAlert = ({ 
-  errors 
-}: { 
-  errors: Array<{ field: string; message: string }> 
+export const ValidationErrorAlert = ({
+  errors,
+}: {
+  errors: Array<{ field: string; message: string }>;
 }) => (
   <Alert severity="warning" sx={{ mb: 2 }}>
     <AlertTitle>Validation Errors</AlertTitle>
@@ -255,7 +280,7 @@ export const ErrorDisplay = ({
   onRetry?: () => void;
   showReportButton?: boolean;
 }) => (
-  <Box sx={{ textAlign: 'center', p: 4 }}>
+  <Box sx={{ textAlign: "center", p: 4 }}>
     <AlertTriangle size={48} color="#d32f2f" style={{ marginBottom: 16 }} />
     <Typography variant="h6" gutterBottom>
       {title}
@@ -263,9 +288,13 @@ export const ErrorDisplay = ({
     <Typography variant="body2" color="text.secondary" paragraph>
       {message}
     </Typography>
-    <Stack direction="row" spacing={2} justifyContent="center">
+    <Box sx={{ display: "flex", gap: 2, justifyContent: "center" }}>
       {onRetry && (
-        <Button variant="contained" onClick={onRetry} startIcon={<RefreshCw size={16} />}>
+        <Button
+          variant="contained"
+          onClick={onRetry}
+          startIcon={<RefreshCw size={16} />}
+        >
           Try Again
         </Button>
       )}
@@ -274,6 +303,6 @@ export const ErrorDisplay = ({
           Report Issue
         </Button>
       )}
-    </Stack>
+    </Box>
   </Box>
-); 
+);
