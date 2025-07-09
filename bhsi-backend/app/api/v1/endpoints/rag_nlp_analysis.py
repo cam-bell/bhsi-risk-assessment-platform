@@ -24,7 +24,15 @@ from app.dependencies.auth import get_current_active_user
 
 # 🔗 NEW IMPORT: Use BigQuery vector store for accurate searches
 from app.services.vector_search.bigquery_vector_store import VectorSearchService
-from sentence_transformers import SentenceTransformer
+
+# ML imports with error handling
+try:
+    from sentence_transformers import SentenceTransformer
+    SENTENCE_TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    print("Warning: sentence-transformers not installed. RAG features will be disabled.")
+    print("To enable: pip install sentence-transformers")
+    SENTENCE_TRANSFORMERS_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
