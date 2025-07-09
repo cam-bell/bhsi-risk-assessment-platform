@@ -60,7 +60,7 @@ import axios from "axios";
 import RAGChatbot from "../components/RAGChatbot";
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1";
+  "https://bhsi-backend-485249399569.europe-west1.run.app/api/v1";
 
 const riskLevelColor = (level: string) => {
   switch (level?.toLowerCase()) {
