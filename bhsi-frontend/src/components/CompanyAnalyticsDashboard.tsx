@@ -46,6 +46,9 @@ const RISK_ICONS: Record<string, React.ReactNode> = {
   LOW: <CheckCircle size={18} color="#4caf50" />, // green
 };
 
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1";
+
 interface CompanyAnalyticsDashboardProps {
   companyName: string;
 }
@@ -67,7 +70,9 @@ const CompanyAnalyticsDashboard: React.FC<CompanyAnalyticsDashboardProps> = ({
     setLoading(true);
     setError(null);
     setData(null);
-    fetch(`/api/v1/companies/${encodeURIComponent(companyName)}/analytics`)
+    fetch(
+      `${API_BASE_URL}/companies/${encodeURIComponent(companyName)}/analytics`
+    )
       .then(async (res) => {
         if (!res.ok) throw new Error(await res.text());
         return res.json();

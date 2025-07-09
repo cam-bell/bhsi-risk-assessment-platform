@@ -142,7 +142,7 @@ const convertSearchResultsToTrafficLight = (
 
   return {
     company: searchResponse.company_name,
-    
+
     overall,
     blocks: {
       turnover: getCategoryRisk(financialResults),
@@ -200,13 +200,13 @@ const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
   // Enhanced embedding state
   const [embeddingEnabled, setEmbeddingEnabled] = useState(true);
   const [embeddingStatus, setEmbeddingStatus] = useState({
-    stage: 'idle',
+    stage: "idle",
     progress: 0,
-    message: 'Ready to search',
+    message: "Ready to search",
     documentsFound: 0,
     documentsFiltered: 0,
     vectorsCreated: 0,
-    error: ''
+    error: "",
   });
 
   // RTK Query hook for API calls
@@ -269,7 +269,8 @@ const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
   };
 
   // Enhanced embedding functionality via backend
-  const baseUrl = "http://localhost:8000/api/v1";
+  const baseUrl =
+    import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1";
 
   const processEmbedding = async (searchResponse: SearchResponse) => {
     if (!embeddingEnabled) {
@@ -279,69 +280,73 @@ const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
 
     try {
       setEmbeddingStatus({
-        stage: 'filtering',
+        stage: "filtering",
         progress: 20,
-        message: 'Preparing documents for embedding...',
+        message: "Preparing documents for embedding...",
         documentsFound: searchResponse.results.length,
         documentsFiltered: 0,
         vectorsCreated: 0,
-        error: ''
+        error: "",
       });
 
       // Call the backend embedding endpoint (solves CORS issue)
       const embeddingRequest = {
         documents: searchResponse.results,
-        company_name: searchResponse.company_name
+        company_name: searchResponse.company_name,
       };
 
       console.log("🤖 Calling backend embedding endpoint...");
-      
+
       const response = await fetch(`${baseUrl}/streamlined/embed-documents`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(embeddingRequest),
       });
 
       if (response.ok) {
         const result = await response.json();
-        
-        if (result.status === 'success') {
+
+        if (result.status === "success") {
           setEmbeddingStatus({
-            stage: 'complete',
+            stage: "complete",
             progress: 100,
             message: `✅ Successfully created ${result.summary.vectors_created} vectors for RAG`,
             documentsFound: result.summary.total_documents,
             documentsFiltered: result.summary.filtered_documents,
             vectorsCreated: result.summary.vectors_created,
-            error: ''
+            error: "",
           });
 
           console.log("✅ Embedding completed:", result.summary);
-          
+
           // Auto-hide success message after 3 seconds
           setTimeout(() => {
-            setEmbeddingStatus(prev => ({ ...prev, stage: 'idle', progress: 0, message: 'Ready to search' }));
+            setEmbeddingStatus((prev) => ({
+              ...prev,
+              stage: "idle",
+              progress: 0,
+              message: "Ready to search",
+            }));
           }, 3000);
         } else {
-          throw new Error(result.error || 'Embedding failed');
+          throw new Error(result.error || "Embedding failed");
         }
       } else {
         throw new Error(`Backend embedding failed: ${response.status}`);
       }
-
     } catch (error: any) {
       console.error("❌ Embedding process failed:", error);
       setEmbeddingStatus({
-        stage: 'error',
+        stage: "error",
         progress: 0,
-        message: 'Embedding failed',
+        message: "Embedding failed",
         documentsFound: searchResponse.results.length,
         documentsFiltered: 0,
         vectorsCreated: 0,
-        error: error.message || 'Unknown error'
+        error: error.message || "Unknown error",
       });
     }
   };
@@ -350,7 +355,7 @@ const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
     e.preventDefault();
 
     if (!query.trim()) {
-              setError("Please enter a company name");
+      setError("Please enter a company name");
       return;
     }
 
@@ -376,13 +381,13 @@ const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
 
     // Reset embedding status
     setEmbeddingStatus({
-      stage: 'searching',
+      stage: "searching",
       progress: 10,
-      message: 'Searching for documents...',
+      message: "Searching for documents...",
       documentsFound: 0,
       documentsFiltered: 0,
       vectorsCreated: 0,
-      error: ''
+      error: "",
     });
 
     try {
@@ -449,18 +454,23 @@ const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
           console.log("📊 No documents found, skipping embedding");
           // Reset embedding status when no documents to process
           setEmbeddingStatus({
-            stage: 'complete',
+            stage: "complete",
             progress: 100,
-            message: 'No documents to embed',
+            message: "No documents to embed",
             documentsFound: 0,
             documentsFiltered: 0,
             vectorsCreated: 0,
-            error: ''
+            error: "",
           });
-          
+
           // Auto-hide message after 2 seconds
           setTimeout(() => {
-            setEmbeddingStatus(prev => ({ ...prev, stage: 'idle', progress: 0, message: 'Ready to search' }));
+            setEmbeddingStatus((prev) => ({
+              ...prev,
+              stage: "idle",
+              progress: 0,
+              message: "Ready to search",
+            }));
           }, 2000);
         }
       }
@@ -496,13 +506,13 @@ const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
       );
       setResult(null);
       setEmbeddingStatus({
-        stage: 'error',
+        stage: "error",
         progress: 0,
-        message: 'Search failed',
+        message: "Search failed",
         documentsFound: 0,
         documentsFiltered: 0,
         vectorsCreated: 0,
-        error: err?.message || 'Unknown error'
+        error: err?.message || "Unknown error",
       });
     }
   };
@@ -574,7 +584,8 @@ const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
                 Enhanced Risk Assessment Search
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                Search for company risk information with automatic vector embedding for RAG analysis
+                Search for company risk information with automatic vector
+                embedding for RAG analysis
               </Typography>
 
               <form onSubmit={handleSubmit}>
@@ -658,7 +669,7 @@ const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
                         official announcements
                       </Typography>
                     </Card>
-                    
+
                     {/* NewsAPI Source */}
                     <Card
                       variant="outlined"
@@ -829,7 +840,9 @@ const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
                       />
                     }
                     label={
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                      >
                         <Brain size={16} />
                         <Typography variant="body2">
                           Enable Vector Embedding for RAG Analysis
@@ -837,57 +850,80 @@ const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
                       </Box>
                     }
                   />
-                  <Typography variant="caption" color="text.secondary" sx={{ ml: 4, display: 'block' }}>
-                    Automatically create vector embeddings for improved semantic search and AI analysis
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ ml: 4, display: "block" }}
+                  >
+                    Automatically create vector embeddings for improved semantic
+                    search and AI analysis
                   </Typography>
                 </Card>
 
                 {/* Enhanced Progress Section */}
-                {embeddingEnabled && (embeddingStatus.stage !== 'idle' || isLoading) && (
-                  <Card variant="outlined" sx={{ mb: 3, p: 2 }}>
-                    <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 600 }}>
-                      Enhanced Processing Pipeline
-                    </Typography>
-                    
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                      <Upload size={20} color="#1976d2" />
-                      <Typography variant="body2">{embeddingStatus.message}</Typography>
-                    </Box>
-                    
-                    <LinearProgress 
-                      variant="determinate" 
-                      value={embeddingStatus.progress} 
-                      sx={{ mb: 2, height: 8, borderRadius: 4 }}
-                      color={embeddingStatus.stage === 'error' ? 'error' : 'primary'}
-                    />
-                    
-                    <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                      <Chip 
-                        label={`Documents: ${embeddingStatus.documentsFound}`} 
-                        size="small" 
-                        variant="outlined" 
+                {embeddingEnabled &&
+                  (embeddingStatus.stage !== "idle" || isLoading) && (
+                    <Card variant="outlined" sx={{ mb: 3, p: 2 }}>
+                      <Typography
+                        variant="subtitle1"
+                        gutterBottom
+                        sx={{ fontWeight: 600 }}
+                      >
+                        Enhanced Processing Pipeline
+                      </Typography>
+
+                      <Box
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 2,
+                          mb: 2,
+                        }}
+                      >
+                        <Upload size={20} color="#1976d2" />
+                        <Typography variant="body2">
+                          {embeddingStatus.message}
+                        </Typography>
+                      </Box>
+
+                      <LinearProgress
+                        variant="determinate"
+                        value={embeddingStatus.progress}
+                        sx={{ mb: 2, height: 8, borderRadius: 4 }}
+                        color={
+                          embeddingStatus.stage === "error"
+                            ? "error"
+                            : "primary"
+                        }
                       />
-                      <Chip 
-                        label={`Filtered: ${embeddingStatus.documentsFiltered}`} 
-                        size="small" 
-                        variant="outlined" 
-                        color="primary"
-                      />
-                      <Chip 
-                        label={`Vectors: ${embeddingStatus.vectorsCreated}`} 
-                        size="small" 
-                        variant="outlined" 
-                        color="success"
-                      />
-                    </Box>
-                    
-                    {embeddingStatus.error && (
-                      <Alert severity="error" sx={{ mt: 2 }}>
-                        {embeddingStatus.error}
-                      </Alert>
-                    )}
-                  </Card>
-                )}
+
+                      <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+                        <Chip
+                          label={`Documents: ${embeddingStatus.documentsFound}`}
+                          size="small"
+                          variant="outlined"
+                        />
+                        <Chip
+                          label={`Filtered: ${embeddingStatus.documentsFiltered}`}
+                          size="small"
+                          variant="outlined"
+                          color="primary"
+                        />
+                        <Chip
+                          label={`Vectors: ${embeddingStatus.vectorsCreated}`}
+                          size="small"
+                          variant="outlined"
+                          color="success"
+                        />
+                      </Box>
+
+                      {embeddingStatus.error && (
+                        <Alert severity="error" sx={{ mt: 2 }}>
+                          {embeddingStatus.error}
+                        </Alert>
+                      )}
+                    </Card>
+                  )}
 
                 {/* Search Button */}
                 <Box sx={{ display: "flex", justifyContent: "center", mt: 3 }}>
@@ -906,12 +942,11 @@ const TrafficLightQuery: React.FC<TrafficLightQueryProps> = ({
                       px: 4,
                     }}
                   >
-                      {isLoading 
-                        ? "Processing..." 
-                        : embeddingEnabled 
-                          ? "Enhanced Search + Embed" 
-                          : "Search for Risk Assessment"
-                      }
+                    {isLoading
+                      ? "Processing..."
+                      : embeddingEnabled
+                      ? "Enhanced Search + Embed"
+                      : "Search for Risk Assessment"}
                   </Button>
                 </Box>
               </form>

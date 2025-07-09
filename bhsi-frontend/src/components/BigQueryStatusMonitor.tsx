@@ -4,8 +4,11 @@ import {
   Card,
   CardContent,
   Typography,
-  Alert,
   Chip,
+  Alert,
+  CircularProgress,
+  Collapse,
+  IconButton,
   Table,
   TableBody,
   TableCell,
@@ -13,23 +16,18 @@ import {
   TableHead,
   TableRow,
   Paper,
-  Button,
-  CircularProgress,
-  Collapse,
-  IconButton,
-  Tooltip,
 } from "@mui/material";
 import {
   CheckCircle,
-  Error,
   Warning,
-  Refresh,
+  Error,
   ExpandMore,
   ExpandLess,
-  Storage,
-  Timeline,
-  Queue,
+  Refresh,
 } from "@mui/icons-material";
+
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1";
 
 interface BigQueryHealth {
   status: "healthy" | "degraded" | "unhealthy";
@@ -76,7 +74,7 @@ const BigQueryStatusMonitor: React.FC<BigQueryStatusMonitorProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch("/api/v1/bigquery/health");
+      const response = await fetch(`${API_BASE_URL}/bigquery/health`);
       const data = await response.json();
 
       if (data.status === "success" && data.bigquery_health) {
@@ -156,9 +154,9 @@ const BigQueryStatusMonitor: React.FC<BigQueryStatusMonitorProps> = ({
       <Alert
         severity="error"
         action={
-          <Button color="inherit" size="small" onClick={fetchHealthStatus}>
+          <IconButton color="inherit" size="small" onClick={fetchHealthStatus}>
             Retry
-          </Button>
+          </IconButton>
         }
       >
         {error}
