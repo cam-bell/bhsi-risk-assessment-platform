@@ -1,23 +1,66 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
+  Card,
+  CardContent,
   Typography,
-  Paper,
-  Divider,
-  TextField,
+  Grid,
   Button,
-  CircularProgress,
-  Alert,
-  Chip,
-  Stack,
   Tabs,
   Tab,
+  Paper,
+  Alert,
+  Tooltip,
+  Avatar,
+  CircularProgress,
+  TextField,
+  Container,
+  Chip,
   Table,
   TableBody,
   TableCell,
-  TableRow,
   TableContainer,
+  TableHead,
+  TableRow,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemIcon,
+  Divider,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  MenuItem,
+  Select,
+  FormControl,
+  InputLabel,
 } from "@mui/material";
+import {
+  BarChart3,
+  FileText,
+  TrendingUp,
+  GitCompare,
+  Building2,
+  AlertTriangle,
+  Users,
+  Calendar,
+  Globe,
+  Activity,
+  PieChart,
+  Target,
+  Shield,
+  TrendingDown,
+  TrendingUp as TrendingUpIcon,
+  Bot,
+} from "lucide-react";
+import ManagementSummary from "../components/ManagementSummary";
+import { useLocation } from "react-router-dom";
+import { useAuth } from "../auth/useAuth";
+import axios from "axios";
+import RAGChatbot from "../components/RAGChatbot";
+
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1";
 
 const riskLevelColor = (level: string) => {
   switch (level?.toLowerCase()) {
@@ -144,7 +187,7 @@ const SummaryTab: React.FC<{ summary: any; loading: boolean }> = ({
             </Typography>
           </Alert>
         )}
-        
+
         {/* Show suggestions if available */}
         {summary.suggestions && (
           <Paper sx={{ p: 2, mb: 2 }}>
@@ -160,31 +203,37 @@ const SummaryTab: React.FC<{ summary: any; loading: boolean }> = ({
             </ul>
           </Paper>
         )}
-        
+
         <Typography variant="h5" gutterBottom>
           Executive Summary
         </Typography>
-        
+
         {/* Data availability indicator */}
         {summary.data_availability && (
-          <Alert 
-            severity={summary.data_availability.data_completeness > 70 ? "success" : 
-                     summary.data_availability.data_completeness > 30 ? "warning" : "info"} 
+          <Alert
+            severity={
+              summary.data_availability.data_completeness > 70
+                ? "success"
+                : summary.data_availability.data_completeness > 30
+                ? "warning"
+                : "info"
+            }
             sx={{ mb: 2 }}
           >
             <Typography variant="body2">
-              Summary based on {summary.data_availability.data_completeness}% data completeness
+              Summary based on {summary.data_availability.data_completeness}%
+              data completeness
               {summary.data_note && ` - ${summary.data_note}`}
             </Typography>
           </Alert>
         )}
-        
+
         <Paper sx={{ p: 3, mb: 2, background: "#f9f9f9" }}>
           <Typography variant="body1" sx={{ whiteSpace: "pre-line" }}>
             {summary.summary || summary.ai_summary || summary}
           </Typography>
         </Paper>
-        
+
         <Typography variant="subtitle2" color="text.secondary">
           Company: {summary.company} ({summary.ticker})
         </Typography>
@@ -209,7 +258,7 @@ const RiskTab: React.FC<{ risk: any; loading: boolean }> = ({
     { key: "red_news_count", label: "Red News Count" },
     { key: "freeCashFlow", label: "Free Cash Flow" },
   ];
-  
+
   // Try to extract these from risk.scoreFactors or risk.financials
   const getScoreFactor = (key: string) => {
     if (!risk) return undefined;
@@ -236,7 +285,7 @@ const RiskTab: React.FC<{ risk: any; loading: boolean }> = ({
     }
     return undefined;
   };
-  
+
   return (
     <Box>
       {loading ? (
@@ -250,13 +299,11 @@ const RiskTab: React.FC<{ risk: any; loading: boolean }> = ({
                 {risk.error}
               </Typography>
               {risk.data_note && (
-                <Typography variant="body2">
-                  {risk.data_note}
-                </Typography>
+                <Typography variant="body2">{risk.data_note}</Typography>
               )}
             </Alert>
           )}
-          
+
           {/* Show suggestions if available */}
           {risk.suggestions && (
             <Paper sx={{ p: 2, mb: 2 }}>
@@ -272,7 +319,7 @@ const RiskTab: React.FC<{ risk: any; loading: boolean }> = ({
               </ul>
             </Paper>
           )}
-          
+
           <Stack direction="row" spacing={2} alignItems="center" mb={2}>
             <Typography variant="h5">Risk Report</Typography>
             <Chip
@@ -286,21 +333,27 @@ const RiskTab: React.FC<{ risk: any; loading: boolean }> = ({
               aria-label={`Risk level: ${risk.riskLevel}`}
             />
           </Stack>
-          
+
           {/* Data availability indicator */}
           {risk.data_availability && (
-            <Alert 
-              severity={risk.data_availability.data_completeness > 70 ? "success" : 
-                       risk.data_availability.data_completeness > 30 ? "warning" : "info"} 
+            <Alert
+              severity={
+                risk.data_availability.data_completeness > 70
+                  ? "success"
+                  : risk.data_availability.data_completeness > 30
+                  ? "warning"
+                  : "info"
+              }
               sx={{ mb: 2 }}
             >
               <Typography variant="body2">
-                Risk assessment based on {risk.data_availability.data_completeness}% data completeness
+                Risk assessment based on{" "}
+                {risk.data_availability.data_completeness}% data completeness
                 {risk.data_note && ` - ${risk.data_note}`}
               </Typography>
             </Alert>
           )}
-          
+
           <Paper sx={{ p: 2, mb: 3 }}>
             <Typography variant="subtitle1" gutterBottom>
               Score Factors
@@ -321,7 +374,7 @@ const RiskTab: React.FC<{ risk: any; loading: boolean }> = ({
               </TableBody>
             </Table>
           </Paper>
-          
+
           {risk.ai_risk_summary && (
             <Paper
               sx={{
@@ -339,7 +392,7 @@ const RiskTab: React.FC<{ risk: any; loading: boolean }> = ({
               </Typography>
             </Paper>
           )}
-          
+
           <Paper sx={{ p: 2, mb: 2 }}>
             <Typography variant="subtitle1" gutterBottom>
               Recent News
@@ -399,7 +452,7 @@ const FinancialsTab: React.FC<{ financials: any; loading: boolean }> = ({
 }) => {
   // Show only high-level metrics in summary, and expandable panels for details
   if (loading) return <CircularProgress />;
-  
+
   if (!financials) {
     return (
       <Typography color="text.secondary">
@@ -417,27 +470,27 @@ const FinancialsTab: React.FC<{ financials: any; loading: boolean }> = ({
             {financials.error}
           </Typography>
           {financials.data_note && (
-            <Typography variant="body2">
-              {financials.data_note}
-            </Typography>
+            <Typography variant="body2">{financials.data_note}</Typography>
           )}
         </Alert>
-        
+
         {financials.suggestions && (
           <Paper sx={{ p: 2, mb: 2 }}>
             <Typography variant="subtitle2" gutterBottom>
               Suggestions:
             </Typography>
             <ul>
-              {financials.suggestions.map((suggestion: string, index: number) => (
-                <li key={index}>
-                  <Typography variant="body2">{suggestion}</Typography>
-                </li>
-              ))}
+              {financials.suggestions.map(
+                (suggestion: string, index: number) => (
+                  <li key={index}>
+                    <Typography variant="body2">{suggestion}</Typography>
+                  </li>
+                )
+              )}
             </ul>
           </Paper>
         )}
-        
+
         <Typography variant="h5" gutterBottom>
           Financial Data - Limited Information
         </Typography>
@@ -446,7 +499,9 @@ const FinancialsTab: React.FC<{ financials: any; loading: boolean }> = ({
             <TableBody>
               <TableRow>
                 <TableCell sx={{ fontWeight: 600 }}>Company</TableCell>
-                <TableCell>{financials.longName || financials.ticker || "Unknown"}</TableCell>
+                <TableCell>
+                  {financials.longName || financials.ticker || "Unknown"}
+                </TableCell>
               </TableRow>
               <TableRow>
                 <TableCell sx={{ fontWeight: 600 }}>Ticker</TableCell>
@@ -462,7 +517,7 @@ const FinancialsTab: React.FC<{ financials: any; loading: boolean }> = ({
       </Box>
     );
   }
-  
+
   // Extract high-level fields
   const summaryFields = [
     "longName",
@@ -482,11 +537,11 @@ const FinancialsTab: React.FC<{ financials: any; loading: boolean }> = ({
     "currentPrice",
     "currency",
   ];
-  
+
   const summaryData = summaryFields
     .map((k) => [k, financials[k]])
     .filter(([_, v]) => v !== undefined && v !== null);
-  
+
   // Find nested objects for details
   const details = [
     ["Financials", financials.financials],
@@ -494,18 +549,23 @@ const FinancialsTab: React.FC<{ financials: any; loading: boolean }> = ({
     ["Cash Flow", financials.cashflow],
     ["Recommendations", financials.recommendations],
   ];
-  
+
   return (
     <Box>
       <Typography variant="h5" gutterBottom>
         Financial Data
       </Typography>
-      
+
       {/* Data availability indicator */}
       {financials.data_availability && (
-        <Alert 
-          severity={financials.data_availability.data_completeness > 70 ? "success" : 
-                   financials.data_availability.data_completeness > 30 ? "warning" : "info"} 
+        <Alert
+          severity={
+            financials.data_availability.data_completeness > 70
+              ? "success"
+              : financials.data_availability.data_completeness > 30
+              ? "warning"
+              : "info"
+          }
           sx={{ mb: 2 }}
         >
           <Typography variant="body2">
@@ -514,7 +574,7 @@ const FinancialsTab: React.FC<{ financials: any; loading: boolean }> = ({
           </Typography>
         </Alert>
       )}
-      
+
       <Paper sx={{ p: 2, mb: 2 }}>
         <Table size="small">
           <TableBody>
@@ -543,7 +603,7 @@ const FinancialsTab: React.FC<{ financials: any; loading: boolean }> = ({
           </TableBody>
         </Table>
       </Paper>
-      
+
       {details.map(([title, data]) => (
         <ExpandablePanel
           key={title as string}
@@ -551,7 +611,7 @@ const FinancialsTab: React.FC<{ financials: any; loading: boolean }> = ({
           data={data}
         />
       ))}
-      
+
       {financials.ai_insights && (
         <Paper sx={{ p: 2, background: "#f9f9f9" }}>
           <Typography variant="subtitle1">AI Financial Insights</Typography>
@@ -560,13 +620,11 @@ const FinancialsTab: React.FC<{ financials: any; loading: boolean }> = ({
           </Typography>
         </Paper>
       )}
-      
+
       {financials.business_summary && (
         <Paper sx={{ p: 2, mt: 2, background: "#f9f9f9" }}>
           <Typography variant="subtitle1">Business Summary</Typography>
-          <Typography variant="body2">
-            {financials.business_summary}
-          </Typography>
+          <Typography variant="body2">{financials.business_summary}</Typography>
         </Paper>
       )}
     </Box>
@@ -591,13 +649,15 @@ const FinancialInsightsPage: React.FC = () => {
     try {
       const [finRes, riskRes, sumRes] = await Promise.all([
         fetch(
-          `/api/v1/finance/financials?query=${encodeURIComponent(query)}`
+          `${API_BASE_URL}/finance/financials?query=${encodeURIComponent(
+            query
+          )}`
         ).then((r) => r.json()),
-        fetch(`/api/v1/finance/risk?query=${encodeURIComponent(query)}`).then(
-          (r) => r.json()
-        ),
         fetch(
-          `/api/v1/finance/summary?query=${encodeURIComponent(query)}`
+          `${API_BASE_URL}/finance/risk?query=${encodeURIComponent(query)}`
+        ).then((r) => r.json()),
+        fetch(
+          `${API_BASE_URL}/finance/summary?query=${encodeURIComponent(query)}`
         ).then((r) => r.json()),
       ]);
       setFinancials(finRes);
