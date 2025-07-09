@@ -27,7 +27,8 @@ interface AuthContextType {
 
 // API base URL
 const API_BASE_URL =
-  "https://bhsi-backend-485249399569.europe-west1.run.app/api/v1";
+  import.meta.env.VITE_API_BASE_URL ||
+  "https://bhsi-backend-iee4puj5na-ew.a.run.app/api/v1";
 
 // Helper function to transform user data from backend to frontend format
 const transformUserData = (userData: any): User => {

@@ -15,7 +15,7 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "http://localhost:8000",
+        target: "https://bhsi-backend-iee4puj5na-ew.a.run.app",
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, "/api"),
       },

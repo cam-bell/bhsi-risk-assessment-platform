@@ -198,7 +198,9 @@ export interface RAGHealthResponse {
 export const analyticsApi = createApi({
   reducerPath: "analyticsApi",
   baseQuery: axiosBaseQuery({
-    baseUrl: "https://bhsi-backend-485249399569.europe-west1.run.app/api/v1",
+    baseUrl:
+      import.meta.env.VITE_API_BASE_URL ||
+      "https://bhsi-backend-iee4puj5na-ew.a.run.app/api/v1",
   }),
   tagTypes: [
     "Analytics",
