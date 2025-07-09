@@ -20,15 +20,19 @@ from app.crud.events import events
 # ML/AI imports with error handling
 try:
     from sentence_transformers import SentenceTransformer
+    SENTENCE_TRANSFORMERS_AVAILABLE = True
 except ImportError:
-    print("Error: sentence-transformers not installed. Run: pip install sentence-transformers")
-    sys.exit(1)
+    print("Warning: sentence-transformers not installed. Embedding features will be disabled.")
+    print("To enable: pip install sentence-transformers")
+    SENTENCE_TRANSFORMERS_AVAILABLE = False
 
 try:
     import chromadb
+    CHROMADB_AVAILABLE = True
 except ImportError:
-    print("Error: chromadb not installed. Run: pip install chromadb")
-    sys.exit(1)
+    print("Warning: chromadb not installed. Vector storage features will be disabled.")
+    print("To enable: pip install chromadb")
+    CHROMADB_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +43,15 @@ class BOEEmbeddingAgent:
     def __init__(self, chroma_path: str = "./boe_chroma"):
         """Initialize the embedding agent"""
         
+        # Check if ML dependencies are available
+        if not SENTENCE_TRANSFORMERS_AVAILABLE or not CHROMADB_AVAILABLE:
+            logger.warning("⚠️ ML dependencies not available. Running in minimal mode.")
+            self.embedder = None
+            self.client = None
+            self.collection = None
+            self.embedding_model = None
+            return
+        
         # Load multilingual embedder (supports Spanish)
         logger.info("🤖 Loading sentence transformer model...")
         try:
@@ -46,7 +59,8 @@ class BOEEmbeddingAgent:
             logger.info("✅ Sentence transformer loaded successfully")
         except Exception as e:
             logger.error(f"❌ Failed to load sentence transformer: {e}")
-            raise RuntimeError(f"Critical: Cannot load ML model: {e}")
+            self.embedder = None
+            self.embedding_model = None
         
         # Setup ChromaDB with error handling
         logger.info(f"🗄️ Initializing ChromaDB at {chroma_path}")
@@ -59,7 +73,8 @@ class BOEEmbeddingAgent:
             logger.info("✅ ChromaDB initialized successfully")
         except Exception as e:
             logger.error(f"❌ Failed to initialize ChromaDB: {e}")
-            raise RuntimeError(f"Critical: Cannot initialize vector database: {e}")
+            self.client = None
+            self.collection = None
         
         self.embedding_model = 'paraphrase-multilingual-MiniLM-L12-v2'
     
@@ -67,7 +82,17 @@ class BOEEmbeddingAgent:
         """
         Process unembedded events and create vector embeddings
         """
-        logger.info(f"🔄 Starting embedding processing (batch size: {batch_size})")
+        if not self.embedder or not self.collection:
+            logger.warning("⚠️ Embedding features disabled - ML dependencies not available")
+            return {
+                "processed": 0,
+                "embedded": 0,
+                "errors": 0,
+                "skipped": 0,
+                "status": "disabled"
+            }
+        
+        logger.info(f"🔄 Starting embedding processing (batch_size: {batch_size})")
         
         stats = {
             "processed": 0,
@@ -108,6 +133,9 @@ class BOEEmbeddingAgent:
     
     def _embed_single_event(self, db, event) -> bool:
         """Create embedding for a single event"""
+        if not self.embedder or not self.collection:
+            return False
+            
         try:
             # Prepare text for embedding (title + first part of content)
             text_for_embedding = f"{event.title} {event.text[:1000]}"
@@ -152,6 +180,10 @@ class BOEEmbeddingAgent:
     
     def semantic_search(self, query: str, k: int = 5, risk_filter: Optional[str] = None) -> List[Dict[str, Any]]:
         """Semantic search across embedded events"""
+        if not self.embedder or not self.collection:
+            logger.warning("⚠️ Semantic search disabled - ML dependencies not available")
+            return []
+            
         try:
             # Generate query embedding
             query_embedding = self.embedder.encode(query).tolist()
@@ -197,14 +229,15 @@ class BOEEmbeddingAgent:
             total_events = db.query(Event).count()
             
             # ChromaDB stats
-            chroma_count = self.collection.count()
+            chroma_count = self.collection.count() if self.collection else 0
             
             return {
                 "total_events": total_events,
                 "embedded_events": total_events - unembedded_count,
                 "unembedded_events": unembedded_count,
                 "chromadb_documents": chroma_count,
-                "embedding_model": self.embedding_model,
+                "embedding_model": self.embedding_model or "disabled",
+                "ml_available": SENTENCE_TRANSFORMERS_AVAILABLE and CHROMADB_AVAILABLE,
                 "timestamp": datetime.utcnow().isoformat()
             }
             
