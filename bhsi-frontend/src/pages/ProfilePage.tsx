@@ -99,7 +99,15 @@ const ProfilePage = () => {
         </Typography>
         <Card sx={{ mb: 4 }}>
           <CardContent>
-            <Stack direction="row" spacing={3} alignItems="center" mb={2}>
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "row",
+                gap: 3,
+                alignItems: "center",
+                mb: 2,
+              }}
+            >
               <Box sx={{ position: "relative" }}>
                 <Avatar
                   src={profilePhoto || undefined}
@@ -155,7 +163,7 @@ const ProfilePage = () => {
                   Role: {user?.role || "Underwriter"}
                 </Typography>
               </Box>
-            </Stack>
+            </Box>
             <TextField
               label="Short Bio"
               value={bio}
@@ -166,14 +174,16 @@ const ProfilePage = () => {
               minRows={2}
               sx={{ mb: 2 }}
             />
-            <Stack spacing={2} direction="column" sx={{ mb: 2 }}>
+            <Box
+              sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2 }}
+            >
               <TextField
                 label="Phone Number"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 fullWidth
               />
-            </Stack>
+            </Box>
             <Divider sx={{ my: 2 }} />
             <Typography variant="subtitle1" gutterBottom>
               Recent Activity
@@ -198,12 +208,20 @@ const ProfilePage = () => {
         {/* Change Password Section */}
         <Card sx={{ mb: 4 }}>
           <CardContent>
-            <Stack direction="row" alignItems="center" spacing={2} mb={2}>
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 2,
+                mb: 2,
+              }}
+            >
               <Lock size={24} />
               <Typography variant="h6">Change Password</Typography>
-            </Stack>
+            </Box>
             <form onSubmit={handlePasswordChange}>
-              <Stack spacing={2}>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <TextField
                   label="Old Password"
                   type="password"
@@ -244,7 +262,7 @@ const ProfilePage = () => {
                 >
                   Change Password
                 </Button>
-              </Stack>
+              </Box>
             </form>
           </CardContent>
         </Card>

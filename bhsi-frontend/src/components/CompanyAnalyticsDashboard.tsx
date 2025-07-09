@@ -156,7 +156,7 @@ const CompanyAnalyticsDashboard: React.FC<CompanyAnalyticsDashboardProps> = ({
                 display="flex"
                 justifyContent={{ xs: "flex-start", md: "flex-end" }}
               >
-                <Stack direction="row" spacing={2}>
+                <Box sx={{ display: "flex", flexDirection: "row", gap: 2 }}>
                   <Chip
                     icon={<AlertTriangle color="#f44336" />}
                     label={`Total Alerts: ${alertSummary?.total_alerts ?? 0}`}
@@ -167,7 +167,7 @@ const CompanyAnalyticsDashboard: React.FC<CompanyAnalyticsDashboardProps> = ({
                     label={`High-Risk: ${alertSummary?.high_risk_alerts ?? 0}`}
                     color="error"
                   />
-                </Stack>
+                </Box>
               </Box>
             </Grid>
           </Grid>
@@ -216,7 +216,7 @@ const CompanyAnalyticsDashboard: React.FC<CompanyAnalyticsDashboardProps> = ({
               <Typography variant="h6" gutterBottom>
                 Alert Summary
               </Typography>
-              <Stack spacing={1}>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
                 <Box display="flex" alignItems="center">
                   <AlertTriangle color="#f44336" style={{ marginRight: 8 }} />
                   <Typography>
@@ -239,7 +239,7 @@ const CompanyAnalyticsDashboard: React.FC<CompanyAnalyticsDashboardProps> = ({
                       : "N/A"}
                   </Typography>
                 </Box>
-              </Stack>
+              </Box>
             </CardContent>
           </Card>
         </Grid>

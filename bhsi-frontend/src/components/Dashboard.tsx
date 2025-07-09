@@ -158,7 +158,7 @@ const RiskDistributionCard = ({ stats }: { stats: DashboardStats }) => {
           Risk Distribution
         </Typography>
 
-        <Stack spacing={2}>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
           <Box>
             <Box
               sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}
@@ -227,7 +227,7 @@ const RiskDistributionCard = ({ stats }: { stats: DashboardStats }) => {
               }}
             />
           </Box>
-        </Stack>
+        </Box>
       </CardContent>
     </Card>
   );
@@ -267,7 +267,7 @@ const RecentActivityCard = ({
           Recent Activity
         </Typography>
 
-        <Stack spacing={2}>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
           {activities.map((activity) => (
             <Box
               key={activity.id}
@@ -308,7 +308,7 @@ const RecentActivityCard = ({
               </Box>
             </Box>
           ))}
-        </Stack>
+        </Box>
       </CardContent>
     </Card>
   );
@@ -553,7 +553,7 @@ const Dashboard = () => {
         <Grid container spacing={3}>
           {/* Companies by Risk Level */}
           <Grid item xs={12} lg={8}>
-            <Stack spacing={3}>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
               {/* Low Risk Companies */}
               <Accordion
                 expanded={expandedSections.green}
@@ -715,7 +715,7 @@ const Dashboard = () => {
                   )}
                 </AccordionDetails>
               </Accordion>
-            </Stack>
+            </Box>
           </Grid>
 
           {/* Recent Activity Sidebar */}

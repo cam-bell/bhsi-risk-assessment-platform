@@ -79,7 +79,7 @@ const SettingsPage = () => {
                   </Avatar>
                   <Typography variant="h6">User Profile</Typography>
                 </Box>
-                <Stack spacing={2}>
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
                   <TextField
                     label="Name"
                     name="name"
@@ -95,7 +95,7 @@ const SettingsPage = () => {
                     fullWidth
                     disabled
                   />
-                </Stack>
+                </Box>
               </CardContent>
             </Card>
           </Grid>
@@ -114,7 +114,7 @@ const SettingsPage = () => {
                   />
                   <Typography variant="h6">Notification Preferences</Typography>
                 </Box>
-                <Stack spacing={1}>
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
                   <FormControlLabel
                     control={
                       <Switch
@@ -145,7 +145,7 @@ const SettingsPage = () => {
                     }
                     label="Push Notifications"
                   />
-                </Stack>
+                </Box>
               </CardContent>
             </Card>
           </Grid>
@@ -164,7 +164,7 @@ const SettingsPage = () => {
                   />
                   <Typography variant="h6">Company Preferences</Typography>
                 </Box>
-                <Stack spacing={1}>
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
                   <FormControlLabel
                     control={
                       <Switch
@@ -176,7 +176,7 @@ const SettingsPage = () => {
                     label="Show Legal Notices by Default"
                   />
                   {/* Add more company-specific settings as needed */}
-                </Stack>
+                </Box>
               </CardContent>
             </Card>
           </Grid>

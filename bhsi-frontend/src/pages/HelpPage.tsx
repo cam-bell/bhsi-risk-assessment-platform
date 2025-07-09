@@ -88,7 +88,7 @@ const HelpPage = () => {
 
           {/* Contact & Troubleshooting */}
           <Grid item xs={12} md={5}>
-            <Stack spacing={3}>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
               {/* Contact Support */}
               <Card>
                 <CardContent>
@@ -149,7 +149,7 @@ const HelpPage = () => {
                   </List>
                 </CardContent>
               </Card>
-            </Stack>
+            </Box>
           </Grid>
         </Grid>
         <Divider sx={{ my: 4 }} />

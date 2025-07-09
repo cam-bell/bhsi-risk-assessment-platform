@@ -374,7 +374,7 @@ const RiskTrendsChart: React.FC = () => {
                 <BarChart3 size={20} style={{ marginRight: 8 }} />
                 <Typography variant="h6">Sector Insights</Typography>
               </Box>
-              <Stack spacing={2}>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 {data.sector_insights.map((sector, index) => (
                   <Box key={index}>
                     <Box
@@ -404,7 +404,7 @@ const RiskTrendsChart: React.FC = () => {
                     />
                   </Box>
                 ))}
-              </Stack>
+              </Box>
             </CardContent>
           </Card>
         </Grid>

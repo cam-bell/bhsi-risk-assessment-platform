@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Box,
   Container,
@@ -12,7 +12,7 @@ import {
   Chip,
   Alert,
   AlertTitle,
-} from '@mui/material';
+} from "@mui/material";
 import {
   Sparkles,
   Zap,
@@ -22,72 +22,95 @@ import {
   Bell,
   Search,
   Download,
-} from 'lucide-react';
-import { useToast } from '../components/NotificationSystem';
-import { SearchLoading, DashboardLoading, BatchProcessingLoading } from '../components/LoadingStates';
-import { ApiErrorAlert, NetworkErrorCard, ValidationErrorAlert } from '../components/ErrorBoundary';
+} from "lucide-react";
+import { useToast } from "../components/NotificationSystem";
+import {
+  SearchLoading,
+  DashboardLoading,
+  BatchProcessingLoading,
+} from "../components/LoadingStates";
+import {
+  ApiErrorAlert,
+  NetworkErrorCard,
+  ValidationErrorAlert,
+} from "../components/ErrorBoundary";
 
 const DemoPage = () => {
   const toast = useToast();
   const [showSearchLoading, setShowSearchLoading] = useState(false);
   const [showDashboardLoading, setShowDashboardLoading] = useState(false);
   const [showBatchLoading, setShowBatchLoading] = useState(false);
-  const [batchProgress, setBatchProgress] = useState({ processed: 0, total: 10 });
+  const [batchProgress, setBatchProgress] = useState({
+    processed: 0,
+    total: 10,
+  });
   const [showApiError, setShowApiError] = useState(false);
   const [showNetworkError, setShowNetworkError] = useState(false);
 
   const features = [
     {
       icon: <Search size={24} />,
-      title: 'Smart Search',
-      description: 'Autocomplete suggestions with company history',
-      color: 'primary',
+      title: "Smart Search",
+      description: "Autocomplete suggestions with company history",
+      color: "primary",
     },
     {
       icon: <BarChart size={24} />,
-      title: 'Analytics Dashboard',
-      description: 'Real-time risk assessment metrics',
-      color: 'secondary',
+      title: "Analytics Dashboard",
+      description: "Real-time risk assessment metrics",
+      color: "secondary",
     },
     {
       icon: <Bell size={24} />,
-      title: 'Notification System',
-      description: 'Toast notifications and activity center',
-      color: 'success',
+      title: "Notification System",
+      description: "Toast notifications and activity center",
+      color: "success",
     },
     {
       icon: <Shield size={24} />,
-      title: 'Error Handling',
-      description: 'Comprehensive error boundaries and recovery',
-      color: 'error',
+      title: "Error Handling",
+      description: "Comprehensive error boundaries and recovery",
+      color: "error",
     },
     {
       icon: <Smartphone size={24} />,
-      title: 'Mobile Responsive',
-      description: 'Perfect experience on all devices',
-      color: 'warning',
+      title: "Mobile Responsive",
+      description: "Perfect experience on all devices",
+      color: "warning",
     },
     {
       icon: <Zap size={24} />,
-      title: 'Performance',
-      description: 'Optimized loading states and animations',
-      color: 'info',
+      title: "Performance",
+      description: "Optimized loading states and animations",
+      color: "info",
     },
   ];
 
   const handleToastDemo = (type: string) => {
     switch (type) {
-      case 'success':
-        toast.success('Analysis Complete', 'Risk assessment completed successfully!');
+      case "success":
+        toast.success(
+          "Analysis Complete",
+          "Risk assessment completed successfully!"
+        );
         break;
-      case 'error':
-        toast.error('API Error', 'Failed to connect to the risk assessment service');
+      case "error":
+        toast.error(
+          "API Error",
+          "Failed to connect to the risk assessment service"
+        );
         break;
-      case 'warning':
-        toast.warning('Validation Warning', 'Some company data may be incomplete');
+      case "warning":
+        toast.warning(
+          "Validation Warning",
+          "Some company data may be incomplete"
+        );
         break;
-      case 'info':
-        toast.info('System Update', 'New risk assessment features are now available');
+      case "info":
+        toast.info(
+          "System Update",
+          "New risk assessment features are now available"
+        );
         break;
     }
   };
@@ -105,13 +128,16 @@ const DemoPage = () => {
   const simulateBatchProcessing = () => {
     setShowBatchLoading(true);
     setBatchProgress({ processed: 0, total: 10 });
-    
+
     const interval = setInterval(() => {
-      setBatchProgress(prev => {
+      setBatchProgress((prev) => {
         if (prev.processed >= prev.total) {
           clearInterval(interval);
           setShowBatchLoading(false);
-          toast.success('Batch Complete', 'All 10 companies have been analyzed');
+          toast.success(
+            "Batch Complete",
+            "All 10 companies have been analyzed"
+          );
           return prev;
         }
         return { ...prev, processed: prev.processed + 1 };
@@ -121,7 +147,7 @@ const DemoPage = () => {
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Box sx={{ textAlign: 'center', mb: 6 }}>
+      <Box sx={{ textAlign: "center", mb: 6 }}>
         <Typography variant="h3" gutterBottom>
           🚀 BHSI Frontend Showcase
         </Typography>
@@ -141,13 +167,19 @@ const DemoPage = () => {
       <Grid container spacing={3} sx={{ mb: 6 }}>
         {features.map((feature, index) => (
           <Grid item xs={12} md={6} lg={4} key={index}>
-            <Card sx={{ height: '100%', transition: 'transform 0.2s', '&:hover': { transform: 'translateY(-4px)' } }}>
-              <CardContent sx={{ textAlign: 'center', p: 3 }}>
+            <Card
+              sx={{
+                height: "100%",
+                transition: "transform 0.2s",
+                "&:hover": { transform: "translateY(-4px)" },
+              }}
+            >
+              <CardContent sx={{ textAlign: "center", p: 3 }}>
                 <Box
                   sx={{
-                    display: 'inline-flex',
+                    display: "inline-flex",
                     p: 2,
-                    borderRadius: '50%',
+                    borderRadius: "50%",
                     bgcolor: `${feature.color}.light`,
                     color: `${feature.color}.main`,
                     mb: 2,
@@ -179,22 +211,46 @@ const DemoPage = () => {
             Notification System
           </Typography>
           <Typography variant="body2" color="text.secondary" paragraph>
-            Test our comprehensive notification system with different message types.
+            Test our comprehensive notification system with different message
+            types.
           </Typography>
-          <Stack direction="row" spacing={2} flexWrap="wrap" gap={1}>
-            <Button variant="outlined" color="success" onClick={() => handleToastDemo('success')}>
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "row",
+              gap: 2,
+              flexWrap: "wrap",
+            }}
+          >
+            <Button
+              variant="outlined"
+              color="success"
+              onClick={() => handleToastDemo("success")}
+            >
               Success Toast
             </Button>
-            <Button variant="outlined" color="error" onClick={() => handleToastDemo('error')}>
+            <Button
+              variant="outlined"
+              color="error"
+              onClick={() => handleToastDemo("error")}
+            >
               Error Toast
             </Button>
-            <Button variant="outlined" color="warning" onClick={() => handleToastDemo('warning')}>
+            <Button
+              variant="outlined"
+              color="warning"
+              onClick={() => handleToastDemo("warning")}
+            >
               Warning Toast
             </Button>
-            <Button variant="outlined" color="info" onClick={() => handleToastDemo('info')}>
+            <Button
+              variant="outlined"
+              color="info"
+              onClick={() => handleToastDemo("info")}
+            >
               Info Toast
             </Button>
-          </Stack>
+          </Box>
         </CardContent>
       </Card>
 
@@ -207,7 +263,14 @@ const DemoPage = () => {
           <Typography variant="body2" color="text.secondary" paragraph>
             Professional loading indicators for different scenarios.
           </Typography>
-          <Stack direction="row" spacing={2} flexWrap="wrap" gap={1}>
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "row",
+              gap: 2,
+              flexWrap: "wrap",
+            }}
+          >
             <Button variant="outlined" onClick={simulateSearchLoading}>
               Search Loading
             </Button>
@@ -217,7 +280,7 @@ const DemoPage = () => {
             <Button variant="outlined" onClick={simulateBatchProcessing}>
               Batch Processing
             </Button>
-          </Stack>
+          </Box>
 
           {showSearchLoading && (
             <Box sx={{ mt: 3 }}>
@@ -250,23 +313,38 @@ const DemoPage = () => {
             Error Handling
           </Typography>
           <Typography variant="body2" color="text.secondary" paragraph>
-            Robust error handling with user-friendly messages and recovery options.
+            Robust error handling with user-friendly messages and recovery
+            options.
           </Typography>
-          <Stack direction="row" spacing={2} flexWrap="wrap" gap={1} sx={{ mb: 3 }}>
-            <Button variant="outlined" onClick={() => setShowApiError(!showApiError)}>
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "row",
+              gap: 2,
+              flexWrap: "wrap",
+            }}
+            sx={{ mb: 3 }}
+          >
+            <Button
+              variant="outlined"
+              onClick={() => setShowApiError(!showApiError)}
+            >
               API Error
             </Button>
-            <Button variant="outlined" onClick={() => setShowNetworkError(!showNetworkError)}>
+            <Button
+              variant="outlined"
+              onClick={() => setShowNetworkError(!showNetworkError)}
+            >
               Network Error
             </Button>
-          </Stack>
+          </Box>
 
           {showApiError && (
             <ApiErrorAlert
               error="Failed to analyze company: Invalid VAT number format"
               onRetry={() => {
                 setShowApiError(false);
-                toast.info('Retrying', 'Attempting to reconnect...');
+                toast.info("Retrying", "Attempting to reconnect...");
               }}
               onDismiss={() => setShowApiError(false)}
             />
@@ -280,8 +358,14 @@ const DemoPage = () => {
 
           <ValidationErrorAlert
             errors={[
-              { field: 'Company Name', message: 'Required field cannot be empty' },
-              { field: 'VAT Number', message: 'Must follow Spanish VAT format (ESX12345678)' },
+              {
+                field: "Company Name",
+                message: "Required field cannot be empty",
+              },
+              {
+                field: "VAT Number",
+                message: "Must follow Spanish VAT format (ESX12345678)",
+              },
             ]}
           />
         </CardContent>
@@ -298,41 +382,69 @@ const DemoPage = () => {
               <Typography variant="subtitle2" gutterBottom>
                 Frontend Framework
               </Typography>
-              <Stack direction="row" spacing={1} flexWrap="wrap" gap={1}>
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "row",
+                  gap: 1,
+                  flexWrap: "wrap",
+                }}
+              >
                 <Chip label="React 18" color="primary" size="small" />
                 <Chip label="TypeScript" color="primary" size="small" />
                 <Chip label="Vite" color="secondary" size="small" />
-              </Stack>
+              </Box>
             </Grid>
             <Grid item xs={12} md={6}>
               <Typography variant="subtitle2" gutterBottom>
                 UI Library
               </Typography>
-              <Stack direction="row" spacing={1} flexWrap="wrap" gap={1}>
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "row",
+                  gap: 1,
+                  flexWrap: "wrap",
+                }}
+              >
                 <Chip label="Material-UI v5" color="success" size="small" />
                 <Chip label="Tailwind CSS" color="success" size="small" />
                 <Chip label="Lucide Icons" color="info" size="small" />
-              </Stack>
+              </Box>
             </Grid>
             <Grid item xs={12} md={6}>
               <Typography variant="subtitle2" gutterBottom>
                 State Management
               </Typography>
-              <Stack direction="row" spacing={1} flexWrap="wrap" gap={1}>
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "row",
+                  gap: 1,
+                  flexWrap: "wrap",
+                }}
+              >
                 <Chip label="React Hooks" color="warning" size="small" />
                 <Chip label="Context API" color="warning" size="small" />
                 <Chip label="Local Storage" color="warning" size="small" />
-              </Stack>
+              </Box>
             </Grid>
             <Grid item xs={12} md={6}>
               <Typography variant="subtitle2" gutterBottom>
                 Development Tools
               </Typography>
-              <Stack direction="row" spacing={1} flexWrap="wrap" gap={1}>
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "row",
+                  gap: 1,
+                  flexWrap: "wrap",
+                }}
+              >
                 <Chip label="ESLint" color="error" size="small" />
                 <Chip label="Zod Validation" color="error" size="small" />
                 <Chip label="Hot Reload" color="error" size="small" />
-              </Stack>
+              </Box>
             </Grid>
           </Grid>
         </CardContent>
@@ -362,18 +474,24 @@ const DemoPage = () => {
       </Alert>
 
       {/* Call to Action */}
-      <Box sx={{ textAlign: 'center', py: 4 }}>
+      <Box sx={{ textAlign: "center", py: 4 }}>
         <Typography variant="h5" gutterBottom>
           Ready to Deploy! 🚀
         </Typography>
         <Typography variant="body1" color="text.secondary" paragraph>
-          The BHSI Risk Assessment frontend is production-ready with all modern features implemented.
+          The BHSI Risk Assessment frontend is production-ready with all modern
+          features implemented.
         </Typography>
         <Button
           variant="contained"
           size="large"
           startIcon={<Download size={20} />}
-          onClick={() => toast.success('Export Ready', 'Application package prepared for deployment')}
+          onClick={() =>
+            toast.success(
+              "Export Ready",
+              "Application package prepared for deployment"
+            )
+          }
         >
           Export for Production
         </Button>
@@ -382,4 +500,4 @@ const DemoPage = () => {
   );
 };
 
-export default DemoPage; 
+export default DemoPage;
