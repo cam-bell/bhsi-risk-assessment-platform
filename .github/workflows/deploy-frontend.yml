@@ -1,0 +1,101 @@
+name: Deploy Frontend to Google Cloud Run
+
+on:
+  push:
+    branches:
+      - backend-deploy
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout code
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      # Step 2: Set up Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: bhsi-frontend/package-lock.json
+
+      # Step 3: Install Dependencies
+      - name: Install Dependencies
+        run: |
+          cd bhsi-frontend
+          npm ci
+
+      # Step 4: Build the application
+      - name: Build Application
+        run: |
+          cd bhsi-frontend
+          npm run build
+        env:
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+
+      # Step 5: Create Dockerfile for frontend
+      - name: Create Frontend Dockerfile
+        run: |
+          cd bhsi-frontend
+          cat > Dockerfile << 'EOF'
+          FROM nginx:alpine
+          COPY dist /usr/share/nginx/html
+          COPY nginx.conf /etc/nginx/nginx.conf
+          EXPOSE 80
+          CMD ["nginx", "-g", "daemon off;"]
+          EOF
+
+      # Step 6: Create nginx configuration
+      - name: Create nginx configuration
+        run: |
+          cd bhsi-frontend
+          cat > nginx.conf << 'EOF'
+          events {
+              worker_connections 1024;
+          }
+          http {
+              include /etc/nginx/mime.types;
+              default_type application/octet-stream;
+              sendfile on;
+              keepalive_timeout 65;
+              server {
+                  listen 80;
+                  server_name localhost;
+                  root /usr/share/nginx/html;
+                  index index.html;
+                  location / {
+                      try_files $uri $uri/ /index.html;
+                  }
+              }
+          }
+          EOF
+
+      # Step 7: Authenticate with Google Cloud
+      - name: Authenticate with Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: "${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}"
+
+      # Step 8: Set up Google Cloud SDK
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+
+      # Step 9: Build and Push Docker Image to Google Cloud Artifact Registry
+      - name: Build and Push Docker Image
+        run: |
+          gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev
+          docker build -t ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/bhsi/bhsi-frontend:latest ./bhsi-frontend
+          docker push ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/bhsi/bhsi-frontend:latest
+
+      # Step 10: Deploy to Cloud Run
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy bhsi-frontend \
+            --image ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/bhsi/bhsi-frontend:latest \
+            --platform managed \
+            --region "${{ secrets.GCP_REGION }}" \
+            --allow-unauthenticated \
+            --port 80

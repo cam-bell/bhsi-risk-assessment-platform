@@ -1,0 +1,70 @@
+name: Deploy Backend to Google Cloud Run
+
+on:
+  push:
+    branches:
+      - backend-deploy
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout code
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      # Step 2: Set up Python
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      # Step 3: Install Dependencies
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r bhsi-backend/requirements.txt
+
+      # Step 4: Authenticate with Google Cloud
+      - name: Authenticate with Google Cloud
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: "${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}"
+
+      # Step 5: Set up Google Cloud SDK
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v1
+
+      # Step 6: Build and Push Docker Image to Google Cloud Artifact Registry
+      - name: Build and Push Docker Image
+        run: |
+          gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev
+          docker build -t ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/bhsi/bhsi-backend:latest ./bhsi-backend
+          docker push ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/bhsi/bhsi-backend:latest
+
+      # Step 7: Deploy to Cloud Run
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy bhsi-backend \
+            --image ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/bhsi/bhsi-backend:latest \
+            --platform managed \
+            --region "${{ secrets.GCP_REGION }}" \
+            --allow-unauthenticated \
+            --set-env-vars OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
+            --set-env-vars OPENAI_MODEL="${{ secrets.OPENAI_MODEL }}" \
+            --set-env-vars GOOGLE_API_KEY="${{ secrets.GOOGLE_API_KEY }}" \
+            --set-env-vars GOOGLE_CX="${{ secrets.GOOGLE_CX }}" \
+            --set-env-vars ALLOWED_DOMAINS="${{ secrets.ALLOWED_DOMAINS }}" \
+            --set-env-vars MAX_SCRAPE_PAGES="${{ secrets.MAX_SCRAPE_PAGES }}" \
+            --set-env-vars API_KEY_HEADER="${{ secrets.API_KEY_HEADER }}" \
+            --set-env-vars RATE_LIMIT_PER_MINUTE="${{ secrets.RATE_LIMIT_PER_MINUTE }}" \
+            --set-env-vars GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}" \
+            --set-env-vars BIGQUERY_PROJECT_ID="${{ secrets.BIGQUERY_PROJECT_ID }}" \
+            --set-env-vars BIGQUERY_DATASET="${{ secrets.BIGQUERY_DATASET }}" \
+            --set-env-vars BIGQUERY_LOCATION="${{ secrets.BIGQUERY_LOCATION }}" \
+            --set-env-vars DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+            --set-env-vars SECRET_KEY="${{ secrets.SECRET_KEY }}" \
+            --set-env-vars ALGORITHM="${{ secrets.ALGORITHM }}" \
+            --set-env-vars ACCESS_TOKEN_EXPIRE_MINUTES="${{ secrets.ACCESS_TOKEN_EXPIRE_MINUTES }}" \
+            --port 8000
