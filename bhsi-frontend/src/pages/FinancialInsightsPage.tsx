@@ -179,7 +179,7 @@ const SummaryTab: React.FC<{ summary: any; loading: boolean }> = ({
   <Box>
     {loading ? (
       <CircularProgress />
-    ) : summary ? (
+    ) : summary && typeof summary === "object" ? (
       <>
         {/* Handle error cases */}
         {summary.error && (
@@ -191,7 +191,7 @@ const SummaryTab: React.FC<{ summary: any; loading: boolean }> = ({
         )}
 
         {/* Show suggestions if available */}
-        {summary.suggestions && (
+        {summary.suggestions && Array.isArray(summary.suggestions) && (
           <Paper sx={{ p: 2, mb: 2 }}>
             <Typography variant="subtitle2" gutterBottom>
               Suggestions:
@@ -250,6 +250,17 @@ const RiskTab: React.FC<{ risk: any; loading: boolean }> = ({
   risk,
   loading,
 }) => {
+  // Add defensive check for risk data
+  if (!risk || typeof risk !== "object") {
+    return (
+      <Box>
+        <Typography color="text.secondary">
+          No risk report available.
+        </Typography>
+      </Box>
+    );
+  }
+
   // Fixed list of key score factors for underwriters
   const scoreFactorFields: { key: string; label: string }[] = [
     { key: "debtToEquity", label: "Debt to Equity" },
@@ -292,7 +303,7 @@ const RiskTab: React.FC<{ risk: any; loading: boolean }> = ({
     <Box>
       {loading ? (
         <CircularProgress />
-      ) : risk ? (
+      ) : (
         <>
           {/* Handle error cases */}
           {risk.error && (
@@ -307,7 +318,7 @@ const RiskTab: React.FC<{ risk: any; loading: boolean }> = ({
           )}
 
           {/* Show suggestions if available */}
-          {risk.suggestions && (
+          {risk.suggestions && Array.isArray(risk.suggestions) && (
             <Paper sx={{ p: 2, mb: 2 }}>
               <Typography variant="subtitle2" gutterBottom>
                 Suggestions:
@@ -399,7 +410,7 @@ const RiskTab: React.FC<{ risk: any; loading: boolean }> = ({
             <Typography variant="subtitle1" gutterBottom>
               Recent News
             </Typography>
-            {risk.news && risk.news.length > 0 ? (
+            {risk.news && Array.isArray(risk.news) && risk.news.length > 0 ? (
               <Stack spacing={1}>
                 {risk.news.map((item: any, idx: number) => (
                   <Alert
@@ -439,10 +450,6 @@ const RiskTab: React.FC<{ risk: any; loading: boolean }> = ({
             )}
           </Paper>
         </>
-      ) : (
-        <Typography color="text.secondary">
-          No risk report available.
-        </Typography>
       )}
     </Box>
   );
@@ -455,7 +462,7 @@ const FinancialsTab: React.FC<{ financials: any; loading: boolean }> = ({
   // Show only high-level metrics in summary, and expandable panels for details
   if (loading) return <CircularProgress />;
 
-  if (!financials) {
+  if (!financials || typeof financials !== "object") {
     return (
       <Typography color="text.secondary">
         No financial data available.
@@ -476,7 +483,7 @@ const FinancialsTab: React.FC<{ financials: any; loading: boolean }> = ({
           )}
         </Alert>
 
-        {financials.suggestions && (
+        {financials.suggestions && Array.isArray(financials.suggestions) && (
           <Paper sx={{ p: 2, mb: 2 }}>
             <Typography variant="subtitle2" gutterBottom>
               Suggestions:
