@@ -11,6 +11,7 @@ from datetime import datetime
 
 from app.services.auth_service import AuthService
 from app.dependencies.auth import get_current_active_user, get_current_admin_user
+from app.crud.bigquery_users_crud import BigQueryUsersCRUD
 
 logger = logging.getLogger(__name__)
 
@@ -312,6 +313,55 @@ async def deactivate_user(
         raise
     except Exception as e:
         logger.error(f"Deactivate user failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error"
+        ) 
+
+
+@router.post("/init-admin", response_model=UserResponse)
+async def create_initial_admin(request: CreateUserRequest):
+    """
+    Create initial admin user (temporary endpoint for setup)
+    """
+    try:
+        # Check if any admin users already exist
+        bigquery_users = BigQueryUsersCRUD()
+        existing_admins = await bigquery_users.get_all_users("system")
+        
+        # If admin users exist, don't allow creation
+        if existing_admins:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Admin users already exist. Use regular admin endpoints."
+            )
+        
+        # Create the admin user
+        user_data = {
+            "email": request.email,
+            "first_name": request.first_name,
+            "last_name": request.last_name,
+            "password": request.password,
+            "user_type": "admin"  # Force admin type
+        }
+        
+        user = await auth_service.create_user(user_data, None)  # No creator required for initial admin
+        
+        return UserResponse(
+            user_id=user["user_id"],
+            email=user["email"],
+            first_name=user["first_name"],
+            last_name=user["last_name"],
+            user_type=user["user_type"],
+            is_active=user["is_active"],
+            created_at=format_datetime(user["created_at"]),
+            last_login=format_datetime(user.get("last_login"))
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Create initial admin failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
