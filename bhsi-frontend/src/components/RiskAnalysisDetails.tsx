@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   Box,
   Card,
@@ -32,11 +32,12 @@ import {
   Users,
   Scale,
   Download,
-  Share,
 } from "lucide-react";
 import { SearchResponse } from "../store/api/riskAssessmentApi";
 import CircularProgress from "@mui/material/CircularProgress";
 import axios from "axios";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 interface RiskFactor {
   category: string;
@@ -303,7 +304,7 @@ const mockCompanies: Company[] = [
   {
     id: "1",
     name: "Banco de España",
-    industry: "Banking & Finance", 
+    industry: "Banking & Finance",
     location: "Madrid, Spain",
     employees: 3200,
     revenue: "€2.1B",
@@ -313,7 +314,7 @@ const mockCompanies: Company[] = [
     id: "2",
     name: "Repsol S.A.",
     industry: "Energy & Petroleum",
-    location: "Madrid, Spain", 
+    location: "Madrid, Spain",
     employees: 25000,
     revenue: "€48.7B",
     founded: 1987,
@@ -413,6 +414,7 @@ const RiskAnalysisDetails = ({
   searchResults,
 }: RiskAnalysisDetailsProps = mockData) => {
   const riskColors = getRiskColor(overallRisk);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   // Wikidata integration
   const [wikidata, setWikidata] = useState<WikidataCompanyInfo | null>(null);
@@ -434,8 +436,48 @@ const RiskAnalysisDetails = ({
     };
   }, [company?.name]);
 
+  const downloadPDF = async () => {
+    if (!contentRef.current) return;
+
+    try {
+      const canvas = await html2canvas(contentRef.current, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: "#ffffff",
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "mm", "a4");
+      const imgWidth = 210;
+      const pageHeight = 295;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+
+      let position = 0;
+
+      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save(
+        `${company.name}_Risk_Analysis_${
+          new Date().toISOString().split("T")[0]
+        }.pdf`
+      );
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+    }
+  };
+
   return (
-    <Box sx={{ maxWidth: "100%", mx: "auto", p: 3 }}>
+    <Box sx={{ maxWidth: "100%", mx: "auto", p: 3 }} ref={contentRef}>
       {/* Header Card */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
@@ -467,13 +509,8 @@ const RiskAnalysisDetails = ({
 
             <Box sx={{ display: "flex", gap: 1 }}>
               <Tooltip title="Download Report">
-                <IconButton>
+                <IconButton onClick={downloadPDF}>
                   <Download size={20} />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Share Analysis">
-                <IconButton>
-                  <Share size={20} />
                 </IconButton>
               </Tooltip>
             </Box>
@@ -580,9 +617,7 @@ const RiskAnalysisDetails = ({
                 {loadingWikidata ? (
                   <CircularProgress size={16} />
                 ) : (
-                  wikidata?.headquarters ||
-                  company.location ||
-                  "Not available"
+                  wikidata?.headquarters || company.location || "Not available"
                 )}
               </Typography>
             </Grid>
