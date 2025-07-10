@@ -219,12 +219,15 @@ class ManagementSummarizer:
         overall_risk = self._compute_overall_risk_from_breakdown(risk_breakdown)
         # Compose system-level prompt
         system_prompt = (
-            f"Actúa como un analista de riesgos D&O para la empresa {company_name}. "
-            f"Analiza los siguientes documentos clasificados y genera: "
-            f"1. Un resumen ejecutivo claro y conciso sobre el riesgo global de la empresa. "
+            f"Actúa como un analista de riesgos D&O para una aseguradora que está "
+            f"evaluando la renovación de pólizas. Analiza los siguientes documentos "
+            f"clasificados para la empresa {company_name} y genera: "
+            f"1. Un resumen ejecutivo claro y conciso sobre el riesgo global de la "
+            f"empresa para fines de suscripción D&O. "
             f"2. Una lista de hallazgos clave (key_findings) sobre riesgos legales, "
-            f"financieros, regulatorios u operativos. "
-            f"3. Una lista de recomendaciones para la dirección o aseguradores. "
+            f"financieros, regulatorios u operativos que afectan la suscripción. "
+            f"3. Una lista de recomendaciones para la aseguradora sobre términos, "
+            f"condiciones, exclusiones o límites de cobertura. "
             f"Incluye evidencia si se solicita. "
             f"Responde SOLO en JSON estricto con los campos: executive_summary, "
             f"key_findings, recommendations. "
