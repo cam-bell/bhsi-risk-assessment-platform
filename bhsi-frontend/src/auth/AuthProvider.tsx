@@ -1,6 +1,16 @@
 import { createContext, useState, useEffect, ReactNode } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
+import {
+  Box,
+  Container,
+  Card,
+  CardContent,
+  Typography,
+  Avatar,
+  CircularProgress,
+} from "@mui/material";
+import { Shield } from "lucide-react";
 
 interface User {
   user_id: string;
@@ -179,7 +189,68 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   if (isLoading) {
-    return null;
+    return (
+      <Box
+        sx={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundImage: "linear-gradient(to bottom right, #003366, #00508F)",
+        }}
+      >
+        <Container maxWidth="sm">
+          <Card
+            sx={{
+              py: 3,
+              px: { xs: 2, sm: 4 },
+              borderRadius: 3,
+              boxShadow: "0 8px 32px rgba(0, 0, 0, 0.12)",
+              textAlign: "center",
+            }}
+          >
+            <CardContent>
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  mb: 4,
+                }}
+              >
+                <Avatar
+                  sx={{
+                    bgcolor: "primary.main",
+                    width: 56,
+                    height: 56,
+                    mb: 2,
+                  }}
+                >
+                  <Shield size={32} />
+                </Avatar>
+                <Typography
+                  variant="h4"
+                  component="h1"
+                  gutterBottom
+                  textAlign="center"
+                >
+                  BHSI Underwriter Portal
+                </Typography>
+                <CircularProgress size={40} sx={{ mt: 2 }} />
+                <Typography
+                  variant="body1"
+                  color="text.secondary"
+                  textAlign="center"
+                  sx={{ mt: 2 }}
+                >
+                  Initializing...
+                </Typography>
+              </Box>
+            </CardContent>
+          </Card>
+        </Container>
+      </Box>
+    );
   }
 
   return (

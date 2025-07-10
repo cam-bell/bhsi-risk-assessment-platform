@@ -164,13 +164,13 @@ const LoginPage = () => {
                   color="primary"
                   fullWidth
                   size="large"
-                  sx={{ mt: 3, mb: 2 }}
+                  sx={{ mt: 3, mb: 2, minHeight: 48 }}
                   disabled={isSubmitting || isLoading}
                 >
                   {isSubmitting ? (
-                    <Box sx={{ display: "flex", alignItems: "center" }}>
-                      <CircularProgress size={20} sx={{ mr: 1 }} />
-                      Signing in...
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <CircularProgress size={20} color="inherit" />
+                      <span>Signing in...</span>
                     </Box>
                   ) : (
                     "Sign in"
