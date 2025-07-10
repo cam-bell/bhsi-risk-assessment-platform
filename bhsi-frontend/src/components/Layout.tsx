@@ -62,7 +62,6 @@ const navigationItems = [
     icon: DollarSign,
     path: "/financial-insights",
   },
-  { id: "batch", label: "Batch Upload", icon: FileUp, path: "/batch" },
   {
     id: "history",
     label: "Assessment History",
@@ -139,7 +138,6 @@ const Layout = ({ children, currentPage = "search" }: LayoutProps) => {
       return "dashboard";
     if (location.pathname === "/risk-assessment") return "search";
     if (location.pathname === "/analytics") return "analytics";
-    if (location.pathname === "/batch") return "batch";
     if (location.pathname === "/history") return "history";
     if (location.pathname === "/settings") return "settings";
     if (location.pathname === "/help") return "help";

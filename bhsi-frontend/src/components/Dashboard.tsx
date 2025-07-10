@@ -43,6 +43,7 @@ import {
 } from "lucide-react";
 import { useCompanies, AssessedCompany } from "../context/CompaniesContext";
 import { useAuth } from "../auth/useAuth";
+import { useNavigate } from "react-router-dom";
 
 interface DashboardStats {
   totalAssessments: number;
@@ -413,6 +414,7 @@ const CompanyCard = ({
 };
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const {
     getCompaniesByRisk,
     getTotalCompanies,
@@ -544,7 +546,10 @@ const Dashboard = () => {
               Start by searching and assessing companies on the Risk Assessment
               page. They will appear here organized by risk level.
             </Typography>
-            <Button variant="contained" href="/">
+            <Button
+              variant="contained"
+              onClick={() => navigate("/risk-assessment")}
+            >
               Go to Risk Assessment
             </Button>
           </CardContent>
