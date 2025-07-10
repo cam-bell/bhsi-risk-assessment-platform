@@ -33,8 +33,8 @@ export const RouterConfig = () => {
         path="/"
         element={
           <ProtectedRoute>
-            <Layout currentPage="search">
-              <LandingPage />
+            <Layout currentPage="dashboard">
+              <Dashboard />
             </Layout>
           </ProtectedRoute>
         }
@@ -45,6 +45,16 @@ export const RouterConfig = () => {
           <ProtectedRoute>
             <Layout currentPage="dashboard">
               <Dashboard />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/risk-assessment"
+        element={
+          <ProtectedRoute>
+            <Layout currentPage="search">
+              <LandingPage />
             </Layout>
           </ProtectedRoute>
         }

@@ -43,8 +43,13 @@ interface LayoutProps {
 }
 
 const navigationItems = [
-  { id: "dashboard", label: "Dashboard", icon: Dashboard, path: "/dashboard" },
-  { id: "search", label: "Risk Assessment", icon: Search, path: "/" },
+  { id: "dashboard", label: "Dashboard", icon: Dashboard, path: "/" },
+  {
+    id: "search",
+    label: "Risk Assessment",
+    icon: Search,
+    path: "/risk-assessment",
+  },
   {
     id: "analytics",
     label: "Intelligent Analytics",
@@ -130,8 +135,9 @@ const Layout = ({ children, currentPage = "search" }: LayoutProps) => {
 
   // Determine current page from location
   const getCurrentPage = () => {
-    if (location.pathname === "/dashboard") return "dashboard";
-    if (location.pathname === "/") return "search";
+    if (location.pathname === "/" || location.pathname === "/dashboard")
+      return "dashboard";
+    if (location.pathname === "/risk-assessment") return "search";
     if (location.pathname === "/analytics") return "analytics";
     if (location.pathname === "/batch") return "batch";
     if (location.pathname === "/history") return "history";
