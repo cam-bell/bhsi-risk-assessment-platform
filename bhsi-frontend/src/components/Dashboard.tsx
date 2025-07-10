@@ -384,7 +384,7 @@ const CompanyCard = ({
               </Typography>
             </Box>
             <Typography variant="body2" color="text.secondary">
-              {company.sector}
+              {company.industry}
             </Typography>
             <Typography
               variant="caption"
@@ -406,6 +406,14 @@ const CompanyCard = ({
                 fontSize: "0.7rem",
               }}
             />
+            <Box
+              sx={{ display: "flex", alignItems: "center", gap: 0.5, ml: 1 }}
+            >
+              <Eye size={14} color="#666" />
+              <Typography variant="caption" color="text.secondary">
+                View Analytics
+              </Typography>
+            </Box>
           </Box>
         </Box>
       </CardContent>
@@ -445,7 +453,8 @@ const Dashboard = () => {
   };
 
   const handleViewCompany = (company: AssessedCompany) => {
-    setSelectedCompany(company);
+    // Navigate to analytics page with company name as parameter
+    navigate(`/analytics?company=${encodeURIComponent(company.name)}`);
   };
 
   return (

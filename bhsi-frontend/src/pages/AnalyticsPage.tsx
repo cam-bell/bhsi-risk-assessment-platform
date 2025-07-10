@@ -151,6 +151,7 @@ function TabPanel(props: {
 
 const AnalyticsPage: React.FC = () => {
   const { token } = useAuth();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState(0);
   const [selectedCompany, setSelectedCompany] = useState("");
   const [companyAnalytics, setCompanyAnalytics] =
@@ -185,10 +186,30 @@ const AnalyticsPage: React.FC = () => {
     { value: "HIGH", label: "High" },
   ];
 
+  // Check for company parameter in URL on mount
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const companyParam = urlParams.get("company");
+    if (companyParam) {
+      setSelectedCompany(decodeURIComponent(companyParam));
+      // Switch to Company Analytics tab
+      setActiveTab(1);
+    }
+  }, [location.search]);
+
   // Fetch system analytics on mount
   useEffect(() => {
     fetchSystemAnalytics();
   }, []);
+
+  // Auto-trigger analysis when company is set from URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const companyParam = urlParams.get("company");
+    if (companyParam && selectedCompany === decodeURIComponent(companyParam)) {
+      fetchCompanyAnalytics(selectedCompany);
+    }
+  }, [selectedCompany, location.search]);
 
   const fetchCompanyAnalytics = async (company: string) => {
     setLoading(true);
