@@ -45,7 +45,12 @@ interface LayoutProps {
 const navigationItems = [
   { id: "dashboard", label: "Dashboard", icon: Dashboard, path: "/dashboard" },
   { id: "search", label: "Risk Assessment", icon: Search, path: "/" },
-  { id: "analytics", label: "Intelligent Analytics", icon: BarChart3, path: "/analytics" },
+  {
+    id: "analytics",
+    label: "Intelligent Analytics",
+    icon: BarChart3,
+    path: "/analytics",
+  },
   {
     id: "financial-insights",
     label: "Financial Insights",
@@ -63,8 +68,18 @@ const navigationItems = [
   { id: "help", label: "Help & Support", icon: HelpCircle, path: "/help" },
 ];
 
-const adminNavigationItems: Array<{ id: string; label: string; icon: any; path: string; }> = [
-  // User Management tab removed per user request
+const adminNavigationItems: Array<{
+  id: string;
+  label: string;
+  icon: any;
+  path: string;
+}> = [
+  {
+    id: "user-management",
+    label: "User Management",
+    icon: Users,
+    path: "/user-management",
+  },
 ];
 
 const Layout = ({ children, currentPage = "search" }: LayoutProps) => {
@@ -123,6 +138,7 @@ const Layout = ({ children, currentPage = "search" }: LayoutProps) => {
     if (location.pathname === "/settings") return "settings";
     if (location.pathname === "/help") return "help";
     if (location.pathname === "/profile") return "profile";
+    if (location.pathname === "/user-management") return "user-management";
     return currentPage;
   };
 

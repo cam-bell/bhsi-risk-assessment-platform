@@ -14,6 +14,7 @@ import ProfilePage from "./pages/ProfilePage";
 
 import CompanyAnalyticsDashboardWrapper from "./components/CompanyAnalyticsDashboardWrapper";
 import FinancialInsightsPage from "./pages/FinancialInsightsPage";
+import UserManagementPage from "./pages/UserManagementPage";
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated } = useAuth();
@@ -114,6 +115,16 @@ export const RouterConfig = () => {
           <ProtectedRoute>
             <Layout currentPage="profile">
               <ProfilePage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/user-management"
+        element={
+          <ProtectedRoute>
+            <Layout currentPage="user-management">
+              <UserManagementPage />
             </Layout>
           </ProtectedRoute>
         }
