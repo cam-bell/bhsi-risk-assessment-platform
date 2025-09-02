@@ -10,7 +10,7 @@ The BHSI (Banking, Healthcare, and Strategic Investments) Corporate Risk Assessm
 
 ### **Team Context & Role**
 - **Team Size**: 4 developers (including myself)
-- **My Role**: **Lead Backend Developer & AI Integration Specialist**
+- **My Role**: **Senior Backend Developer & AI Integration Specialist**
 - **Project Duration**: 6 months (July 2024 - January 2025)
 - **Reporting To**: Technical Lead & Product Manager
 
@@ -22,22 +22,22 @@ The BHSI (Banking, Healthcare, and Strategic Investments) Corporate Risk Assessm
 - **Architected intelligent caching system** reducing API calls by 90% and improving response times from 5s to <200ms
 - **Files**: `app/agents/search/streamlined_orchestrator.py`, `app/agents/search/BOE.py`, `app/agents/search/yahoo_finance.py`
 
-#### 🤖 **AI-Powered Risk Classification Engine** *(Sole Developer)*
-- **Implemented hybrid classification system** combining rule-based filtering with Google Gemini Pro 1.5 LLM
-- **Achieved 92%+ accuracy** in legal risk detection while reducing LLM costs by 90%
+#### 🤖 **AI-Powered Risk Classification Engine** *(Co-Developer with Henry Aschke)*
+- **Enhanced hybrid classification system** combining rule-based filtering with Google Gemini Pro 1.5 LLM
+- **Improved classification accuracy** from 75% to 92%+ in legal risk detection
 - **Built confidence scoring algorithm** with multi-factor risk assessment
 - **Files**: `app/agents/analysis/optimized_hybrid_classifier.py`, `app/agents/analysis/gemini_agent.py`
 
-#### 🧠 **Vector Search & RAG System** *(Primary Developer)*
-- **Designed BigQuery-based vector database** using Google Text Embedding 004 for semantic search
-- **Implemented RAG pipeline** enabling natural language queries over corporate risk data
+#### 🧠 **Vector Search & RAG System** *(Enhanced & Optimized)*
+- **Enhanced BigQuery-based vector database** using Google Text Embedding 004 for semantic search
+- **Optimized RAG pipeline** (originally built by Henry Aschke) for natural language queries
 - **Built management summarizer** generating executive-level risk insights
 - **Files**: `app/agents/analysis/management_summarizer.py`, `services/vector_search/main.py`
 
-#### ☁️ **Cloud Infrastructure & Deployment** *(Lead Developer)*
-- **Architected microservices** on Google Cloud Run with automatic scaling
-- **Implemented BigQuery analytics service** for enterprise data warehousing
-- **Designed containerized services** with Docker and Kubernetes deployment
+#### ☁️ **Cloud Infrastructure & Deployment** *(Enhanced & Optimized)*
+- **Enhanced microservices** on Google Cloud Run with automatic scaling
+- **Optimized BigQuery analytics service** for enterprise data warehousing
+- **Improved containerized services** with Docker and Kubernetes deployment
 - **Files**: `services/bigquery/main.py`, `services/gemini/main.py`, `services/embedder/main.py`
 
 #### 🎨 **Frontend Development** *(Contributor)*
@@ -55,16 +55,28 @@ The BHSI (Banking, Healthcare, and Strategic Investments) Corporate Risk Assessm
 - **Daily Document Processing**: 1,000-5,000 documents with 99.9% uptime
 
 #### 🏗️ **Architecture Decisions**
-- **Microservices Design**: Split monolithic backend into 4 specialized services
-- **Hybrid AI Approach**: Rule-based + LLM for cost-effective accuracy
-- **Multi-Level Caching**: Application + Database + CDN for optimal performance
-- **Event-Driven Processing**: Asynchronous document processing pipeline
+- **Microservices Design**: Collaborated on splitting monolithic backend into 4 specialized services
+- **Hybrid AI Approach**: Enhanced rule-based + LLM system for cost-effective accuracy
+- **Multi-Level Caching**: Designed and implemented intelligent caching strategy for optimal performance
+- **Event-Driven Processing**: Built asynchronous document processing pipeline
 
 #### 🔧 **Technical Challenges Solved**
 - **Real-time Data Integration**: Coordinated 6+ external APIs with rate limiting
 - **Spanish Language Processing**: Built multilingual support for regulatory documents
 - **Scalable Vector Search**: Implemented BigQuery-based semantic search
 - **Cost Optimization**: Balanced AI accuracy with operational costs
+
+### **Team Collaboration & Acknowledgment**
+
+#### **Key Team Members & Their Contributions:**
+- **Henry Aschke** (11 commits): Built the core RAG pipeline, vector search infrastructure, and cloud deployment architecture
+- **kollie** (53 commits): Project lead, DevOps, deployment workflows, and infrastructure management
+- **sophiaecl** (14 commits): Additional feature development and system enhancements
+
+#### **What I Built vs. What I Enhanced:**
+- **✅ Built from scratch**: Search orchestration, multi-source data pipeline, intelligent caching system
+- **🔄 Enhanced & optimized**: RAG pipeline (Henry's foundation), cloud infrastructure (Henry's foundation), classification engine (collaborative)
+- **🤝 Collaborated on**: AI classification system, frontend dashboard, overall system architecture
 
 ### **Code Quality & Best Practices**
 - **Test Coverage**: 80%+ unit test coverage across backend services
