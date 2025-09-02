@@ -4,7 +4,7 @@
 
 ## Executive Summary
 
-The BHSI (Banking, Healthcare, and Strategic Investments) Corporate Risk Assessment System is a comprehensive enterprise-grade platform designed for automated assessment of Directors and Officers (D&O) liability risks across Spanish corporations. The system leverages advanced AI technologies, cloud-native microservices architecture, and multi-source data integration to provide real-time risk intelligence for insurance underwriting and corporate governance decisions.
+The BHSI (Berkshire Hathaway Specialty Insurance) Corporate Risk Assessment System is a comprehensive enterprise-grade platform designed for automated assessment of Directors and Officers (D&O) liability risks across Spanish corporations. The system leverages advanced AI technologies, cloud-native microservices architecture, and multi-source data integration to provide real-time risk intelligence for insurance underwriting and corporate governance decisions.
 
 ## 🎯 My Contributions
 
