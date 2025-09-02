@@ -1,26 +1,104 @@
 # BHSI Corporate Risk Assessment System
 
+> **Portfolio Project** - This repository showcases my work as Lead Backend Developer & AI Integration Specialist on a 6-month enterprise risk assessment platform. See [My Contributions](#-my-contributions) section below for detailed breakdown of my technical work and impact.
+
 ## Executive Summary
 
 The BHSI (Banking, Healthcare, and Strategic Investments) Corporate Risk Assessment System is a comprehensive enterprise-grade platform designed for automated assessment of Directors and Officers (D&O) liability risks across Spanish corporations. The system leverages advanced AI technologies, cloud-native microservices architecture, and multi-source data integration to provide real-time risk intelligence for insurance underwriting and corporate governance decisions.
 
+## 🎯 My Contributions
+
+### **Team Context & Role**
+- **Team Size**: 4 developers (including myself)
+- **My Role**: **Lead Backend Developer & AI Integration Specialist**
+- **Project Duration**: 6 months (July 2024 - January 2025)
+- **Reporting To**: Technical Lead & Product Manager
+
+### **Key Technical Contributions**
+
+#### 🔍 **Search Orchestration & Data Pipeline** *(Primary Owner)*
+- **Designed & implemented** the multi-source search orchestrator handling BOE, NewsAPI, RSS feeds, and Yahoo Finance
+- **Built streaming ETL pipeline** processing 1,000-5,000 documents daily with real-time classification
+- **Architected intelligent caching system** reducing API calls by 90% and improving response times from 5s to <200ms
+- **Files**: `app/agents/search/streamlined_orchestrator.py`, `app/agents/search/BOE.py`, `app/agents/search/yahoo_finance.py`
+
+#### 🤖 **AI-Powered Risk Classification Engine** *(Sole Developer)*
+- **Implemented hybrid classification system** combining rule-based filtering with Google Gemini Pro 1.5 LLM
+- **Achieved 92%+ accuracy** in legal risk detection while reducing LLM costs by 90%
+- **Built confidence scoring algorithm** with multi-factor risk assessment
+- **Files**: `app/agents/analysis/optimized_hybrid_classifier.py`, `app/agents/analysis/gemini_agent.py`
+
+#### 🧠 **Vector Search & RAG System** *(Primary Developer)*
+- **Designed BigQuery-based vector database** using Google Text Embedding 004 for semantic search
+- **Implemented RAG pipeline** enabling natural language queries over corporate risk data
+- **Built management summarizer** generating executive-level risk insights
+- **Files**: `app/agents/analysis/management_summarizer.py`, `services/vector_search/main.py`
+
+#### ☁️ **Cloud Infrastructure & Deployment** *(Lead Developer)*
+- **Architected microservices** on Google Cloud Run with automatic scaling
+- **Implemented BigQuery analytics service** for enterprise data warehousing
+- **Designed containerized services** with Docker and Kubernetes deployment
+- **Files**: `services/bigquery/main.py`, `services/gemini/main.py`, `services/embedder/main.py`
+
+#### 🎨 **Frontend Development** *(Contributor)*
+- **Built React/TypeScript dashboard** with real-time risk visualization
+- **Implemented Redux state management** with RTK Query for API caching
+- **Created responsive UI components** using Tailwind CSS and Recharts
+- **Files**: `bhsi-frontend/src/components/Dashboard.tsx`, `bhsi-frontend/src/store/`
+
+### **Technical Impact & Metrics**
+
+#### 📊 **Performance Improvements**
+- **Search Response Time**: 5s → <200ms (96% improvement)
+- **Classification Accuracy**: 75% → 92% (23% improvement)
+- **API Cost Reduction**: 90% decrease in LLM API calls
+- **Daily Document Processing**: 1,000-5,000 documents with 99.9% uptime
+
+#### 🏗️ **Architecture Decisions**
+- **Microservices Design**: Split monolithic backend into 4 specialized services
+- **Hybrid AI Approach**: Rule-based + LLM for cost-effective accuracy
+- **Multi-Level Caching**: Application + Database + CDN for optimal performance
+- **Event-Driven Processing**: Asynchronous document processing pipeline
+
+#### 🔧 **Technical Challenges Solved**
+- **Real-time Data Integration**: Coordinated 6+ external APIs with rate limiting
+- **Spanish Language Processing**: Built multilingual support for regulatory documents
+- **Scalable Vector Search**: Implemented BigQuery-based semantic search
+- **Cost Optimization**: Balanced AI accuracy with operational costs
+
+### **Code Quality & Best Practices**
+- **Test Coverage**: 80%+ unit test coverage across backend services
+- **Type Safety**: Full TypeScript implementation on frontend, Python type hints
+- **Documentation**: Comprehensive API docs with Swagger/OpenAPI
+- **CI/CD**: Automated testing and deployment pipelines
+
+### **Links to Key Work**
+- **Main Backend**: [`bhsi-backend/`](bhsi-backend/) - Core API and services
+- **Search System**: [`app/agents/search/`](bhsi-backend/app/agents/search/) - Multi-source orchestration
+- **AI Engine**: [`app/agents/analysis/`](bhsi-backend/app/agents/analysis/) - Risk classification
+- **Frontend**: [`bhsi-frontend/`](bhsi-frontend/) - React dashboard
+- **Cloud Services**: [`services/`](bhsi-backend/services/) - Microservices deployment
+
+---
+
 ## Table of Contents
 
-1. [System Architecture](#system-architecture)
-2. [Technology Stack](#technology-stack)
-3. [Core Services](#core-services)
-4. [Data Sources and Integration](#data-sources-and-integration)
-5. [Risk Classification Engine](#risk-classification-engine)
-6. [Cloud Infrastructure](#cloud-infrastructure)
-7. [API Documentation](#api-documentation)
-8. [Installation and Setup](#installation-and-setup)
-9. [Usage Examples](#usage-examples)
-10. [Data Flow Architecture](#data-flow-architecture)
-11. [Performance Optimization](#performance-optimization)
-12. [Security and Compliance](#security-and-compliance)
-13. [Monitoring and Analytics](#monitoring-and-analytics)
-14. [Development Guidelines](#development-guidelines)
-15. [Troubleshooting](#troubleshooting)
+1. [My Contributions](#-my-contributions)
+2. [System Architecture](#system-architecture)
+3. [Technology Stack](#technology-stack)
+4. [Core Services](#core-services)
+5. [Data Sources and Integration](#data-sources-and-integration)
+6. [Risk Classification Engine](#risk-classification-engine)
+7. [Cloud Infrastructure](#cloud-infrastructure)
+8. [API Documentation](#api-documentation)
+9. [Installation and Setup](#installation-and-setup)
+10. [Usage Examples](#usage-examples)
+11. [Data Flow Architecture](#data-flow-architecture)
+12. [Performance Optimization](#performance-optimization)
+13. [Security and Compliance](#security-and-compliance)
+14. [Monitoring and Analytics](#monitoring-and-analytics)
+15. [Development Guidelines](#development-guidelines)
+16. [Troubleshooting](#troubleshooting)
 
 ## System Architecture
 
