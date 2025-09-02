@@ -9,10 +9,9 @@ The BHSI (Banking, Healthcare, and Strategic Investments) Corporate Risk Assessm
 ## 🎯 My Contributions
 
 ### **Team Context & Role**
-- **Team Size**: 4 developers (including myself)
+- **Team Size**: 6 developers (including myself)
 - **My Role**: **Senior Backend Developer & AI Integration Specialist**
-- **Project Duration**: 6 months (July 2024 - January 2025)
-- **Reporting To**: Technical Lead & Product Manager
+- **Project Duration**: 6 months (April 2025 - July 2025)
 
 ### **Key Technical Contributions**
 
