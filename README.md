@@ -11,7 +11,7 @@ The BHSI (Berkshire Hathaway Specialty Insurance) Corporate Risk Assessment Syst
 ### **Team Context & Role**
 - **Team Size**: 6 developers (including myself)
 - **My Role**: **Senior Backend Developer & AI Integration Specialist**
-- **Project Duration**: 6 months (April 2025 - July 2025)
+- **Project Duration**: 3 months (May 2025 - July 2025)
 
 ### **Key Technical Contributions**
 
