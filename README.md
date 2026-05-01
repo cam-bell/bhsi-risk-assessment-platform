@@ -29,7 +29,7 @@ The BHSI (Berkshire Hathaway Specialty Insurance) Corporate Risk Assessment Syst
 
 #### 🧠 **Vector Search & RAG System** *(Enhanced & Optimized)*
 - **Enhanced BigQuery-based vector database** using Google Text Embedding 004 for semantic search
-- **Optimized RAG pipeline** (originally built by Henry Aschke) for natural language queries
+- **Optimized RAG pipeline** for natural language queries
 - **Built management summarizer** generating executive-level risk insights
 - **Files**: `app/agents/analysis/management_summarizer.py`, `services/vector_search/main.py`
 
